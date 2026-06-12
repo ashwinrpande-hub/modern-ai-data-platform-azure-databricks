@@ -1,0 +1,85 @@
+# ONE ROW PER SOURCE OBJECT. This file IS the ingestion estate.
+# pattern: goldengate | lakeflow_sqlserver | litmus_adls | litmus_eventhub | autoloader_file
+defaults:
+  bronze_catalog: nucor_bronze
+  landing_root: abfss://landing@nucordl.dfs.core.windows.net
+  quarantine_table: nucor_bronze.audit.rejected_records
+
+sources:
+  - name: sap_vbak_sales_header
+    system: SAP            # Europe
+    region: EUROPE
+    pattern: goldengate
+    landing_path: gg/sap/VBAK
+    target: bronze.sap.vbak
+    primary_key: [VBELN]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "VBELN IS NOT NULL"
+      valid_date: "ERDAT <= current_date()"
+
+  - name: jde_f4201_sales_header
+    system: JDE            # Americas
+    region: AMERICAS
+    pattern: goldengate
+    landing_path: gg/jde/F4201
+    target: bronze.jde.f4201
+    primary_key: [SHKCOO, SHDOCO, SHDCTO]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "SHDOCO IS NOT NULL"
+
+  - name: qad_so_mstr
+    system: QAD            # EMEA
+    region: EMEA
+    pattern: lakeflow_sqlserver
+    source_db: qad_prod
+    source_schema: dbo
+    source_table: so_mstr
+    target: bronze.qad.so_mstr
+    primary_key: [so_domain, so_nbr]
+    cdc_mode: cdc          # cdc | change_tracking
+    schedule: "*/15 * * * *"
+    expectations:
+      valid_pk: "so_nbr IS NOT NULL"
+
+  - name: sfdc_opportunity
+    system: SALESFORCE
+    region: GLOBAL
+    pattern: autoloader_file
+    landing_path: sfdc/opportunity
+    format: json
+    target: bronze.sfdc.opportunity
+    primary_key: [Id]
+    sequence_col: SystemModstamp
+    schedule: "0 * * * *"
+    expectations:
+      valid_pk: "Id IS NOT NULL"
+
+  - name: ot_furnace_telemetry
+    system: LITMUS
+    region: AMERICAS
+    pattern: litmus_eventhub
+    eventhub_namespace: nucor-ot-ehns
+    topic_filter: "nucor/+/meltshop/#"
+    target: bronze.ot.furnace_telemetry
+    primary_key: [asset, tag, ts]
+    watermark: "10 minutes"
+    schedule: continuous
+    expectations:
+      valid_ts: "ts IS NOT NULL"
+      good_quality: "quality IN ('GOOD','UNCERTAIN')"
+
+  - name: ot_caster_history
+    system: LITMUS
+    region: AMERICAS
+    pattern: litmus_adls
+    landing_path: litmus/caster
+    format: parquet
+    target: bronze.ot.caster_history
+    primary_key: [asset, tag, ts]
+    schedule: "*/5 * * * *"
+    expectations:
+      valid_ts: "ts IS NOT NULL"

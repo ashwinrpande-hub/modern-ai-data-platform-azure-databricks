@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nucor Data Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;800&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#14171B;--panel:#1D232B;--line:#2E3742;--txt:#C8D1DA;--dim:#7E8A96;
+        --hot1:#FF7A1A;--hot2:#FFC53D;--ok:#5BBF7A;}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--txt);font:15px/1.55 "IBM Plex Sans",sans-serif;min-height:100vh}
+  header{padding:28px 40px;border-bottom:1px solid var(--line);display:flex;gap:18px;align-items:baseline}
+  h1{font:800 30px "Saira Condensed";letter-spacing:.04em;text-transform:uppercase;
+     background:linear-gradient(90deg,var(--hot1),var(--hot2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  header span{color:var(--dim);font-size:13px}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 24px}
+  .search{display:flex;gap:10px;margin-bottom:28px}
+  input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:6px;
+        color:var(--txt);padding:12px 16px;font:inherit}
+  input:focus{outline:2px solid var(--hot1);outline-offset:1px}
+  button{background:linear-gradient(90deg,var(--hot1),var(--hot2));border:0;border-radius:6px;
+         color:#14171B;font:600 14px "IBM Plex Sans";padding:0 22px;cursor:pointer}
+  button:focus-visible{outline:2px solid #fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;
+        border-top:3px solid var(--hot1)}
+  .card h3{font:600 17px "IBM Plex Sans";color:#F4F6F8;margin-bottom:6px}
+  .meta{font:12px "IBM Plex Mono";color:var(--dim);margin-bottom:10px}
+  .badge{display:inline-block;font:11px "IBM Plex Mono";color:var(--ok);border:1px solid var(--ok);
+         border-radius:3px;padding:1px 7px;margin-right:6px}
+  .empty{color:var(--dim);padding:40px;text-align:center;border:1px dashed var(--line);border-radius:8px}
+</style>
+</head>
+<body>
+<header><h1>Nucor Data Marketplace</h1><span>Discover · Trust · Consume — governed by Unity Catalog</span></header>
+<div class="wrap">
+  <div class="search">
+    <input id="q" placeholder='Ask in plain language, e.g. "daily revenue by mill with customer detail"' aria-label="Search data products">
+    <button onclick="search()">Search</button>
+  </div>
+  <div id="results" class="grid"></div>
+</div>
+<script>
+const API = window.MARKETPLACE_API || "http://localhost:8000";
+// Demo fallback so the portal renders without a backend
+const DEMO = [
+  {name:"v_sales_orders", domain:"sales", description:"Unified SAP+JDE+QAD sales orders. SLA 30-min freshness, 99.5% availability. Trust 98.7", certified:true},
+  {name:"v_customer_360", domain:"sales", description:"MDM-survived customer with LTV, churn risk, region masking applied. Trust 97.9", certified:true},
+  {name:"v_melt_to_margin", domain:"operations", description:"Furnace OT telemetry joined to shipped tonnage and margin. SLA 15-min. Trust 96.4", certified:true}
+];
+function card(p){
+  return `<div class="card"><h3>${p.name}</h3>
+    <div class="meta">domain: ${p.domain||"—"} · nucor_products</div>
+    ${p.certified?'<span class="badge">CERTIFIED</span>':''}<span class="badge" style="color:#FFC53D;border-color:#FFC53D">6-DIM DQ</span>
+    <p>${p.description||""}</p></div>`;
+}
+function render(list){
+  const r = document.getElementById("results");
+  r.innerHTML = list.length ? list.map(card).join("") : '<div class="empty">No products match. Try broader terms.</div>';
+}
+async function load(){
+  try{ render(await (await fetch(API+"/products")).json()); }
+  catch{ render(DEMO); }
+}
+async function search(){
+  const q = document.getElementById("q").value.trim();
+  if(!q) return load();
+  try{
+    const hits = await (await fetch(API+"/search?q="+encodeURIComponent(q))).json();
+    render(hits.map(h=>({name:h[0],description:h[1],domain:"ai-match"})));
+  }catch{ render(DEMO.filter(p=>(p.name+p.description).toLowerCase().includes(q.toLowerCase()))); }
+}
+document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
+load();
+</script>
+</body>
+</html>
