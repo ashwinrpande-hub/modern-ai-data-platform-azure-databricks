@@ -1,0 +1,16 @@
+# UNS topic -> Bronze table map (referenced by docs/REPLICATION_PATTERNS.md R3; was missing).
+# Topic convention: nucor/<site>/<area>/<asset>/<tag>  (MES adds /mes/<event>)
+# Wildcards: + = one level, # = remainder. First match wins (order matters).
+mappings:
+  - topic: "nucor/+/meltshop/#"
+    table: bronze.ot.furnace_telemetry
+    envelope: [site, area, asset, tag, ts, value, quality, ingest_ts]
+  - topic: "nucor/+/caster/#"
+    table: bronze.ot.caster_history
+    envelope: [site, area, asset, tag, ts, value, quality, ingest_ts]
+  - topic: "nucor/+/rollmill/mes/#"
+    table: bronze.mes.rollmill_orders
+    envelope: [site, area, work_order_id, event, ts, payload, ingest_ts]
+  - topic: "nucor/#"                       # catch-all: never silently drop a plant topic
+    table: bronze.ot.unmapped_topics
+    envelope: [topic, ts, _raw, ingest_ts]

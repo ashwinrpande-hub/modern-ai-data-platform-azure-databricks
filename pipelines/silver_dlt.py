@@ -1,64 +1,71 @@
 """
-SILVER — 3NF, INSERT-ONLY architecture.
-hash_key = sha2(source_system || '|' || original_pk, 256)  -> joins all Gold dims/facts.
-Every record version is a new row (effective_ts); no UPDATE/DELETE ever issued.
-Mappings come from nucor_bronze.cfg.layer_mappings (layer='silver'), so column changes
-are config inserts, fully lineage-tracked.
+SILVER — 3NF, INSERT-ONLY. hk = sha2(source_system|pk, 256); versions via effective_ts.
+NOW ACTUALLY CONFIG-DRIVEN (gap A1): column mappings are read from
+nucor_bronze.cfg.layer_mappings (layer='silver', latest version, valid_to IS NULL) at
+pipeline-graph build time. Adding/changing a column = INSERT a new mapping version
+(see config/seed_layer_mappings.sql) + pipeline refresh — no code edit, lineage kept.
+Note: Lakeflow Spark Declarative Pipelines is converging on `from pyspark import
+pipelines as dp`; `import dlt` remains supported — swap the alias when your runtime does.
 """
 import dlt
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 def hash_key(system_col, *pk_cols):
     return F.sha2(F.concat_ws("|", system_col, *[F.col(c).cast("string") for c in pk_cols]), 256)
 
-def silver_envelope(df, system, pk_cols):
-    return (df
-        .withColumn("hk", hash_key(F.lit(system), *pk_cols))
-        .withColumn("record_hash", F.sha2(F.to_json(F.struct(*df.columns)), 256))  # change detection
-        .withColumn("effective_ts", F.current_timestamp())
-        .withColumn("is_current", F.lit(True)))   # maintained by view, not UPDATE
+def load_mappings(tgt_table):
+    """[(src_table, [(tgt_col, sql_expr)])] from config; deterministic column order."""
+    rows = (spark.table("nucor_bronze.cfg.layer_mappings")
+        .filter((F.col("layer") == "silver") & (F.col("tgt_table") == tgt_table)
+                & F.col("valid_to").isNull())
+        .withColumn("rn", F.row_number().over(
+            Window.partitionBy("src_table", "tgt_column").orderBy(F.col("version").desc())))
+        .filter("rn = 1").collect())
+    by_src = {}
+    for r in rows:
+        expr = r.transform_expr if r.transform_expr else r.src_column
+        by_src.setdefault(r.src_table, []).append((r.tgt_column, expr))
+    return sorted((s, sorted(cols)) for s, cols in by_src.items())
 
-# ---- Sales order header, unified 3NF entity fed by three ERPs ----
-@dlt.table(name="sales_order_header", comment="3NF insert-only; one row per version per source PK")
+def silver_envelope(df, pk_cols):
+    return (df
+        .withColumn("hk", hash_key(F.col("source_system"), *pk_cols))
+        .withColumn("record_hash", F.sha2(F.to_json(F.struct(*df.columns)), 256))
+        .withColumn("effective_ts", F.current_timestamp()))
+
+def unioned_entity(tgt_table):
+    dfs = []
+    for src_table, cols in load_mappings(tgt_table):
+        df = dlt.read_stream(src_table).selectExpr(
+            *[f"{expr} AS {tgt}" for tgt, expr in cols])
+        dfs.append(df)
+    out = dfs[0]
+    for d in dfs[1:]:
+        out = out.unionByName(d, allowMissingColumns=True)
+    return out
+
+@dlt.table(name="sales_order_header", comment="3NF insert-only; config-driven from cfg.layer_mappings")
 @dlt.expect_all_or_drop({"valid_hk": "hk IS NOT NULL",
                          "valid_amount": "order_amount_usd >= 0",
                          "valid_currency": "currency_code IS NOT NULL"})
 def sales_order_header():
-    sap = (dlt.read_stream("nucor_bronze.sap.vbak")
-        .select(F.col("VBELN").alias("src_order_id"), F.col("KUNNR").alias("src_customer_id"),
-                F.col("NETWR").alias("order_amount"), F.col("WAERK").alias("currency_code"),
-                F.to_date("ERDAT").alias("order_date"), F.lit("SAP").alias("source_system")))
-    jde = (dlt.read_stream("nucor_bronze.jde.f4201")
-        .select(F.concat_ws("-", "SHKCOO", "SHDOCO", "SHDCTO").alias("src_order_id"),
-                F.col("SHAN8").alias("src_customer_id"),
-                (F.col("SHOTOT")/100).alias("order_amount"), F.col("SHCRCD").alias("currency_code"),
-                F.expr("date_add(to_date('1900-01-01'), SHTRDJ - 36525)").alias("order_date"),  # Julian
-                F.lit("JDE").alias("source_system")))
-    qad = (dlt.read_stream("nucor_bronze.qad.so_mstr")
-        .select(F.col("so_nbr").alias("src_order_id"), F.col("so_cust").alias("src_customer_id"),
-                F.col("so_t_amt").alias("order_amount"), F.col("so_curr").alias("currency_code"),
-                F.col("so_ord_date").alias("order_date"), F.lit("QAD").alias("source_system")))
-    unioned = sap.unionByName(jde).unionByName(qad)
-    fx = dlt.read("fx_rates")  # silver reference table
-    return (silver_envelope(unioned, None, ["src_order_id"])
-        .withColumn("hk", hash_key(F.col("source_system"), "src_order_id"))
+    u = unioned_entity("sales_order_header")
+    fx = dlt.read("fx_rates")
+    return (silver_envelope(u, ["src_order_id"])
         .join(fx, ["currency_code"], "left")
         .withColumn("order_amount_usd", F.col("order_amount") * F.coalesce("usd_rate", F.lit(1.0))))
 
-@dlt.table(name="customer", comment="3NF insert-only customer, MDM survivorship in Gold")
+@dlt.table(name="customer", comment="3NF insert-only customer; config-driven; MDM survivorship in Gold")
 @dlt.expect_all_or_drop({"valid_hk": "hk IS NOT NULL"})
 def customer():
-    sap = dlt.read_stream("nucor_bronze.sap.kna1").select(
-        F.col("KUNNR").alias("src_customer_id"), F.col("NAME1").alias("customer_name"),
-        F.col("LAND1").alias("country"), F.lit("SAP").alias("source_system"))
-    jde = dlt.read_stream("nucor_bronze.jde.f0101").select(
-        F.col("ABAN8").alias("src_customer_id"), F.col("ABALPH").alias("customer_name"),
-        F.col("ABCTR").alias("country"), F.lit("JDE").alias("source_system"))
-    u = sap.unionByName(jde)
-    return silver_envelope(u, None, ["src_customer_id"]) \
-        .withColumn("hk", hash_key(F.col("source_system"), "src_customer_id"))
+    return silver_envelope(unioned_entity("customer"), ["src_customer_id"])
 
-# ---- OT: furnace heat aggregates aligned to orders (insert-only) ----
+@dlt.table(name="fx_rates", comment="Reference: seeded by config/seed_layer_mappings.sql")
+def fx_rates():
+    return spark.table("nucor_silver.sales.fx_rates")
+
+# ---- OT: 5-min furnace aggregates (structural, stays code — no column mapping semantics) ----
 @dlt.table(name="furnace_heat_5min", comment="5-min OT aggregates from Litmus bronze")
 def furnace_heat_5min():
     return (dlt.read_stream("nucor_bronze.ot.furnace_telemetry")
@@ -68,13 +75,13 @@ def furnace_heat_5min():
              F.count("*").alias("samples"))
         .select(F.col("w.start").alias("window_start"), "site", "asset", "tag",
                 "avg_value", "max_value", "samples")
-        .withColumn("hk", hash_key(F.lit("LITMUS"), "site", "asset", "tag", "window_start"))
+        .withColumn("hk", F.sha2(F.concat_ws("|", F.lit("LITMUS"), "site", "asset", "tag",
+                                             F.col("window_start").cast("string")), 256))
         .withColumn("effective_ts", F.current_timestamp()))
 
-# "Current" semantics WITHOUT updates: latest version per hk
+# "Current" WITHOUT updates: latest version per hk
 @dlt.view(name="v_sales_order_header_current")
 def v_current():
-    from pyspark.sql.window import Window
     w = Window.partitionBy("hk").orderBy(F.col("effective_ts").desc())
     return (dlt.read("sales_order_header")
         .withColumn("rn", F.row_number().over(w)).filter("rn = 1").drop("rn"))
