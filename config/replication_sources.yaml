@@ -1,0 +1,200 @@
+# ONE ROW PER SOURCE OBJECT. This file IS the ingestion estate.
+# pattern: goldengate | lakeflow_sqlserver | lakeflow_query | lakeflow_d365
+#        | litmus_adls | litmus_eventhub | zerobus | autoloader_file
+# NEW (2026): lakeflow_query = Lakeflow Connect query-based connector (GA May 2026) —
+#   Databricks-native Oracle/SQLServer/etc. via cursor column, no gateway, no OGG.
+#   zerobus = Lakeflow Connect direct-write API (<5s latency) for OT/event producers.
+defaults:
+  bronze_catalog: nucor_bronze
+  landing_root: abfss://landing@nucordl.dfs.core.windows.net
+  quarantine_table: nucor_bronze.audit.rejected_records
+
+sources:
+  - name: sap_vbak_sales_header
+    system: SAP            # Europe
+    region: EUROPE
+    pattern: goldengate
+    landing_path: gg/sap/VBAK
+    target: bronze.sap.vbak
+    primary_key: [VBELN]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "VBELN IS NOT NULL"
+      valid_date: "ERDAT <= current_date()"
+
+  - name: sap_kna1_customer
+    system: SAP
+    region: EUROPE
+    pattern: goldengate
+    landing_path: gg/sap/KNA1
+    target: bronze.sap.kna1
+    primary_key: [KUNNR]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "KUNNR IS NOT NULL"
+
+  - name: sap_lips_delivery_item        # DV2.0 bridge lifecycle: shipment
+    system: SAP
+    region: EUROPE
+    pattern: goldengate
+    landing_path: gg/sap/LIPS
+    target: bronze.sap.lips
+    primary_key: [VBELN, POSNR]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "VBELN IS NOT NULL"
+      valid_order_ref: "VGBEL IS NOT NULL"
+
+  - name: sap_vbrp_billing_item         # DV2.0 bridge lifecycle: invoice
+    system: SAP
+    region: EUROPE
+    pattern: goldengate
+    landing_path: gg/sap/VBRP
+    target: bronze.sap.vbrp
+    primary_key: [VBELN, POSNR]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "VBELN IS NOT NULL"
+      valid_order_ref: "AUBEL IS NOT NULL"
+
+  - name: jde_f4201_sales_header
+    system: JDE            # Americas
+    region: AMERICAS
+    pattern: goldengate
+    landing_path: gg/jde/F4201
+    target: bronze.jde.f4201
+    primary_key: [SHKCOO, SHDOCO, SHDCTO]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "SHDOCO IS NOT NULL"
+
+  - name: jde_f0101_address_book
+    system: JDE
+    region: AMERICAS
+    pattern: goldengate
+    landing_path: gg/jde/F0101
+    target: bronze.jde.f0101
+    primary_key: [ABAN8]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "ABAN8 IS NOT NULL"
+
+  # NEW — Oracle EBS, true CDC path (deletes + before-images) via existing OGG estate
+  - name: ebs_oe_order_headers
+    system: EBS            # Oracle E-Business Suite
+    region: AMERICAS
+    pattern: goldengate
+    landing_path: gg/ebs/OE_ORDER_HEADERS_ALL
+    target: bronze.ebs.oe_order_headers_all
+    primary_key: [HEADER_ID]
+    sequence_col: csn
+    schedule: continuous
+    expectations:
+      valid_pk: "HEADER_ID IS NOT NULL"
+      valid_org: "ORG_ID IS NOT NULL"
+
+  # NEW — same EBS estate, Databricks-NATIVE path (no OGG): Lakeflow query-based connector
+  # (GA May 2026). Use for cursor-friendly tables; OGG remains only where deletes/exact
+  # replay matter. Swapping a table between the two = changing `pattern` here.
+  - name: ebs_ra_customer_trx
+    system: EBS
+    region: AMERICAS
+    pattern: lakeflow_query
+    connection_name: oracle_ebs_prod          # UC connection
+    source_schema: AR
+    source_table: RA_CUSTOMER_TRX_ALL
+    cursor_column: LAST_UPDATE_DATE
+    target: bronze.ebs.ra_customer_trx_all
+    primary_key: [CUSTOMER_TRX_ID]
+    schedule: "*/30 * * * *"
+    expectations:
+      valid_pk: "CUSTOMER_TRX_ID IS NOT NULL"
+
+  # NEW — Dynamics 365 via Lakeflow Connect managed D365 connector (enterprise-app connector)
+  - name: d365_salesorders
+    system: D365
+    region: GLOBAL
+    pattern: lakeflow_d365
+    connection_name: d365_sales_prod
+    entity: salesorders
+    target: bronze.d365.salesorders
+    primary_key: [salesorderid]
+    cursor_column: modifiedon
+    schedule: "0 * * * *"
+    expectations:
+      valid_pk: "salesorderid IS NOT NULL"
+
+  - name: qad_so_mstr
+    system: QAD            # EMEA
+    region: EMEA
+    pattern: lakeflow_sqlserver
+    source_db: qad_prod
+    source_schema: dbo
+    source_table: so_mstr
+    target: bronze.qad.so_mstr
+    primary_key: [so_domain, so_nbr]
+    cdc_mode: cdc          # cdc | change_tracking
+    schedule: "*/15 * * * *"
+    expectations:
+      valid_pk: "so_nbr IS NOT NULL"
+
+  - name: sfdc_opportunity
+    system: SALESFORCE
+    region: GLOBAL
+    pattern: autoloader_file
+    landing_path: sfdc/opportunity
+    format: json
+    target: bronze.sfdc.opportunity
+    primary_key: [Id]
+    sequence_col: SystemModstamp
+    schedule: "0 * * * *"
+    expectations:
+      valid_pk: "Id IS NOT NULL"
+
+  - name: ot_furnace_telemetry
+    system: LITMUS
+    region: AMERICAS
+    pattern: litmus_eventhub
+    eventhub_namespace: nucor-ot-ehns
+    topic_filter: "nucor/+/meltshop/#"
+    target: bronze.ot.furnace_telemetry
+    primary_key: [asset, tag, ts]
+    watermark: "10 minutes"
+    schedule: continuous
+    expectations:
+      valid_ts: "ts IS NOT NULL"
+      good_quality: "quality IN ('GOOD','UNCERTAIN')"
+
+  - name: ot_caster_history
+    system: LITMUS
+    region: AMERICAS
+    pattern: litmus_adls
+    landing_path: litmus/caster
+    format: parquet
+    target: bronze.ot.caster_history
+    primary_key: [asset, tag, ts]
+    schedule: "*/5 * * * *"
+    expectations:
+      valid_ts: "ts IS NOT NULL"
+
+  # NEW — MES (rolling mill execution) — covered by region/sensitivity policies per requirement
+  - name: mes_rollmill_orders
+    system: MES
+    region: AMERICAS
+    pattern: litmus_eventhub          # MES events flow through the same Litmus UNS estate
+    eventhub_namespace: nucor-ot-ehns
+    topic_filter: "nucor/+/rollmill/mes/#"
+    target: bronze.mes.rollmill_orders
+    primary_key: [work_order_id, ts]
+    watermark: "10 minutes"
+    schedule: continuous
+    expectations:
+      valid_pk: "work_order_id IS NOT NULL"
+    # Alternative (documented in REPLICATION_PATTERNS R3 Path C): Litmus flow -> Zerobus
+    # direct-write API — removes the Event Hubs hop entirely; adopt after PoC.

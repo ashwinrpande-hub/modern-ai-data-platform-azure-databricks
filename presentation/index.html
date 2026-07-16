@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nucor Sales Lakehouse — Azure Databricks</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14171B; --plate:#1D232B; --line:#2E3742; --txt:#C8D1DA; --bright:#F4F6F8;
+  --dim:#7E8A96; --hot1:#FF7A1A; --hot2:#FFC53D; --cool:#5B7C99; --ok:#5BBF7A; --bad:#E25C5C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font:16px/1.6 "IBM Plex Sans",sans-serif;overflow:hidden}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- heat-gauge progress rail ---- */
+#rail{position:fixed;left:0;top:0;bottom:0;width:64px;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;padding:18px 0;gap:0;z-index:5;background:#101317}
+#rail .tick{width:8px;flex:1;max-height:34px;margin:3px 0;border-radius:2px;background:var(--line);
+  cursor:pointer;transition:background .25s}
+#rail .tick.done{background:linear-gradient(180deg,var(--hot1),var(--hot2))}
+#rail .tick.now{background:var(--hot2);box-shadow:0 0 12px rgba(255,197,61,.7)}
+#rail .temp{font:500 11px "IBM Plex Mono";color:var(--dim);margin-top:10px;writing-mode:vertical-rl}
+
+/* ---- slides ---- */
+.slide{position:absolute;inset:0 0 0 64px;padding:54px 72px 70px;display:none;overflow-y:auto}
+.slide.active{display:block;animation:rollin .45s ease}
+@keyframes rollin{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+.eyebrow{font:600 13px "IBM Plex Mono";letter-spacing:.18em;color:var(--hot1);text-transform:uppercase;margin-bottom:10px}
+h1{font:800 64px/1.04 "Saira Condensed";color:var(--bright);text-transform:uppercase;letter-spacing:.015em}
+h2{font:700 40px/1.1 "Saira Condensed";color:var(--bright);text-transform:uppercase;letter-spacing:.02em;margin-bottom:22px}
+h3{font:600 17px "IBM Plex Sans";color:var(--bright);margin-bottom:6px}
+.molten{background:linear-gradient(92deg,var(--hot1),var(--hot2));-webkit-background-clip:text;background-clip:text;color:transparent}
+p.lead{font-size:19px;max-width:62ch;color:var(--txt)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
+.cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:22px}
+.panel{background:var(--plate);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
+.panel.hotline{border-top:3px solid var(--hot1)}
+.panel.coolline{border-top:3px solid var(--cool)}
+ul{list-style:none}
+ul li{padding:5px 0 5px 20px;position:relative}
+ul li::before{content:"";position:absolute;left:0;top:13px;width:10px;height:2px;background:var(--hot1)}
+code,.mono{font:13.5px "IBM Plex Mono";color:var(--hot2)}
+pre{background:#0E1114;border:1px solid var(--line);border-radius:6px;padding:14px 16px;
+    font:13px/1.55 "IBM Plex Mono";color:#B7C6D3;overflow-x:auto;margin-top:10px}
+pre .k{color:var(--hot2)} pre .c{color:#5E6B77}
+.kbd{position:fixed;right:22px;bottom:16px;font:12px "IBM Plex Mono";color:var(--dim)}
+.slideno{position:fixed;left:84px;bottom:16px;font:12px "IBM Plex Mono";color:var(--dim)}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14.5px}
+th{font:600 12px "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid #232A33;color:var(--txt)}
+td:first-child{color:var(--bright)}
+.tag{display:inline-block;font:11px "IBM Plex Mono";border:1px solid var(--cool);color:var(--cool);
+     border-radius:3px;padding:1px 8px;margin:2px 4px 2px 0}
+.tag.hot{border-color:var(--hot1);color:var(--hot2)}
+.tag.ok{border-color:var(--ok);color:var(--ok)}
+
+/* tabs */
+.tabs{display:flex;gap:8px;margin:18px 0 0}
+.tabs button{background:var(--plate);border:1px solid var(--line);color:var(--txt);padding:9px 18px;
+  border-radius:6px 6px 0 0;font:600 14px "IBM Plex Sans";cursor:pointer}
+.tabs button[aria-selected="true"]{background:#0E1114;border-bottom-color:#0E1114;color:var(--hot2);border-top:2px solid var(--hot1)}
+.tabpanel{display:none;background:#0E1114;border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:20px 22px}
+.tabpanel.show{display:block}
+
+/* mill diagram */
+.mill{margin-top:26px}
+.mill .layer{cursor:pointer}
+.mill .layer:focus{outline:2px solid var(--hot2)}
+#layerinfo{margin-top:14px;min-height:84px}
+
+/* DQ bars */
+.dqrow{display:grid;grid-template-columns:150px 1fr 70px;align-items:center;gap:14px;margin:11px 0}
+.dqbar{height:14px;background:#0E1114;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.dqbar i{display:block;height:100%;background:linear-gradient(90deg,var(--hot1),var(--hot2));width:0;transition:width 1s ease}
+.dqrow .v{font:500 14px "IBM Plex Mono";color:var(--hot2);text-align:right}
+.dqrow .n{font:600 13px "IBM Plex Mono";color:var(--txt)}
+
+/* roadmap */
+.road{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:26px;position:relative}
+.road::before{content:"";position:absolute;left:2%;right:2%;top:13px;height:3px;
+  background:linear-gradient(90deg,var(--hot2),var(--hot1) 55%,var(--line) 55%)}
+.phase{padding:0 14px}
+.phase .dot{width:27px;height:27px;border-radius:50%;background:var(--plate);border:3px solid var(--hot1);
+  position:relative;z-index:1;margin-bottom:12px;font:700 13px "IBM Plex Mono";color:var(--hot2);
+  display:flex;align-items:center;justify-content:center}
+.phase.future .dot{border-color:var(--line);color:var(--dim)}
+.phase h3{font:700 18px "Saira Condensed";text-transform:uppercase}
+.phase span{font:11px "IBM Plex Mono";color:var(--dim)}
+.phase ul{margin-top:8px;font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav id="rail" aria-label="Slide progress"><div class="temp">HEAT №2026-061</div></nav>
+
+<!-- 1 TITLE -->
+<section class="slide" data-title="Title">
+  <div style="height:14vh"></div>
+  <div class="eyebrow">Nucor · Sales Domain · Azure Databricks · 60-minute review</div>
+  <h1>From <span class="molten">Melt Shop</span> to<br>Market Signal</h1>
+  <p class="lead" style="margin-top:22px">A production-ready Lakehouse that unifies three ERPs, Salesforce,
+  and live plant-floor OT data into governed, trusted, AI-ready sales data products.</p>
+  <div style="margin-top:30px">
+    <span class="tag hot">Lakeflow Declarative Pipelines</span><span class="tag hot">Unity Catalog</span>
+    <span class="tag hot">Genie + Agent Bricks</span><span class="tag">GoldenGate</span>
+    <span class="tag">Lakeflow Connect (SQL Server)</span><span class="tag">Litmus Edge OT</span>
+  </div>
+</section>
+
+<!-- 2 AGENDA -->
+<section class="slide" data-title="Agenda">
+  <div class="eyebrow">Agenda</div><h2>60 minutes, three passes through the mill</h2>
+  <div class="cols3">
+    <div class="panel hotline"><h3>Technical demo · 15 min</h3>
+      <ul><li>Config-driven source onboarding, live</li><li>Bronze → Silver hash-key flow</li>
+      <li>DQ breach → agent root-cause</li><li>Genie Q&A on Gold aggregates</li></ul></div>
+    <div class="panel hotline"><h3>Strategic pitch · 15 min</h3>
+      <ul><li>Replication estate consolidation</li><li>Data products & marketplace</li>
+      <li>Value quantification & roadmap</li></ul></div>
+    <div class="panel hotline"><h3>Q&A · 30 min</h3>
+      <ul><li>Every decision has two documented alternatives</li>
+      <li>Deep-dives ready: keys, CDC, OT, cost, security</li></ul></div>
+  </div>
+</section>
+
+<!-- 3 CONTEXT -->
+<section class="slide" data-title="Context">
+  <div class="eyebrow">Business context</div><h2>The sales picture is split across four systems and a plant floor</h2>
+  <div class="cols">
+    <div class="panel"><h3>Today</h3>
+      <ul><li>SAP S/4HANA (Europe), JDE E1 (Americas), QAD (EMEA) — three definitions of "order" and "customer"</li>
+        <li>Salesforce pipeline disconnected from ERP actuals</li>
+        <li>OT data (furnace, caster) trapped at the edge — quality drivers invisible to margin analysis</li>
+        <li>Replication estate fragmented: GoldenGate + Fabric Mirroring + Litmus, three skillsets</li></ul></div>
+    <div class="panel coolline"><h3>Target</h3>
+      <ul><li>One governed Lakehouse: every source lands in Bronze through <b>three reusable patterns</b></li>
+        <li>One customer, one order — deterministic SHA-256 keys across ERPs</li>
+        <li>Melt-to-margin: OT joined to sales at 5-minute grain</li>
+        <li>Trusted data products any team can discover and consume</li></ul></div>
+  </div>
+</section>
+
+<!-- 4 REPLICATION -->
+<section class="slide" data-title="Replication">
+  <div class="eyebrow">Ingestion estate</div><h2>Three templates land <span class="molten">everything</span> in Bronze</h2>
+  <p class="lead">Any technical person onboards a source with one YAML row + one command. No new code, ever.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" onclick="tab(this,'t1')">R1 · Oracle / EBS</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'t2')">R2 · SQL Server</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'t3')">R3 · OT / Litmus</button>
+  </div>
+  <div id="t1" class="tabpanel show">
+    <pre>Oracle / EBS ─ GoldenGate Extract ─► OGG BigData handler ─► ADLS (avro_op: op_type + CSN)
+            ─► Auto Loader ─► DLT <span class="k">APPLY CHANGES INTO</span> bronze.sap.vbak  <span class="c">-- keys=PK, sequence_by=csn</span></pre>
+    <p style="margin-top:10px">Reuses existing OGG investment; landing zone decouples capture from compute.
+    <b>Swap-ready:</b> when Lakeflow Connect Oracle is GA for our tenant, the YAML <code>pattern:</code> changes — nothing else.</p>
+  </div>
+  <div id="t2" class="tabpanel">
+    <pre>SQL Server (CDC / Change Tracking) ─► <span class="k">Lakeflow Connect</span> gateway (in our VNet)
+            ─► staging volume ─► managed pipeline ─► bronze.qad.so_mstr</pre>
+    <p style="margin-top:10px">Replaces Fabric Mirroring: one governance plane (Unity Catalog), no OneLake copy,
+    serverless processing. Source-side prep is a two-line script any DBA runs.</p>
+  </div>
+  <div id="t3" class="tabpanel">
+    <pre>PLCs / SCADA ─► Litmus Edge (UNS: nucor/&lt;site&gt;/&lt;area&gt;/&lt;asset&gt;/&lt;tag&gt;)
+   ├─ default:      ADLS parquet ─► Auto Loader ─► bronze.ot.*
+   └─ low-latency:  Event Hubs (Kafka API) ─► Structured Streaming ─► bronze.ot.*  <span class="c">-- watermark 10m</span></pre>
+    <p style="margin-top:10px">Litmus keeps doing what it's good at — edge normalization. Topic→table mapping is config;
+    the template enforces one OT envelope: <code>site, area, asset, tag, ts, value, quality</code>.</p>
+  </div>
+  <p style="margin-top:14px"><b>The shared contract:</b> same envelope columns, same DQ gate, same quarantine table,
+  same registration via <code>deploy.py --register-source</code>.</p>
+</section>
+
+<!-- 5 ARCHITECTURE (signature mill diagram) -->
+<section class="slide" data-title="Architecture">
+  <div class="eyebrow">Medallion architecture</div><h2>Data rolls through the mill — click a stand</h2>
+  <div class="mill">
+  <svg viewBox="0 0 980 300" width="100%" role="img" aria-label="Rolling mill medallion diagram">
+    <defs>
+      <linearGradient id="slab" x1="0" x2="1">
+        <stop offset="0" stop-color="#FFC53D"/><stop offset=".5" stop-color="#FF7A1A"/><stop offset="1" stop-color="#8a4a18"/>
+      </linearGradient>
+      <linearGradient id="cooled" x1="0" x2="1">
+        <stop offset="0" stop-color="#8a4a18"/><stop offset="1" stop-color="#5B7C99"/>
+      </linearGradient>
+    </defs>
+    <!-- slab -->
+    <rect x="20" y="138" width="270" height="26" fill="url(#slab)" rx="3"/>
+    <rect x="290" y="141" width="300" height="20" fill="url(#slab)" rx="3" opacity=".9"/>
+    <rect x="590" y="144" width="290" height="14" fill="url(#cooled)" rx="3"/>
+    <polygon points="880,138 910,151 880,164" fill="#5B7C99"/>
+    <!-- roller stands = layers -->
+    <g class="layer" tabindex="0" onclick="layer('bronze')" onkeydown="if(event.key==='Enter')layer('bronze')">
+      <circle cx="290" cy="108" r="30" fill="#1D232B" stroke="#FF7A1A" stroke-width="3"/>
+      <circle cx="290" cy="194" r="30" fill="#1D232B" stroke="#FF7A1A" stroke-width="3"/>
+      <text x="290" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">BRONZE</text>
+      <text x="290" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">raw · CDC · envelope</text>
+    </g>
+    <g class="layer" tabindex="0" onclick="layer('silver')" onkeydown="if(event.key==='Enter')layer('silver')">
+      <circle cx="590" cy="108" r="30" fill="#1D232B" stroke="#FFC53D" stroke-width="3"/>
+      <circle cx="590" cy="194" r="30" fill="#1D232B" stroke="#FFC53D" stroke-width="3"/>
+      <text x="590" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">SILVER</text>
+      <text x="590" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">3NF · insert-only · sha256</text>
+    </g>
+    <g class="layer" tabindex="0" onclick="layer('gold')" onkeydown="if(event.key==='Enter')layer('gold')">
+      <circle cx="880" cy="108" r="30" fill="#1D232B" stroke="#5B7C99" stroke-width="3"/>
+      <circle cx="880" cy="194" r="30" fill="#1D232B" stroke="#5B7C99" stroke-width="3"/>
+      <text x="880" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">GOLD</text>
+      <text x="880" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">star · features · vectors</text>
+    </g>
+    <text x="20" y="120" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">SAP · JDE · QAD · SFDC · OT</text>
+    <text x="912" y="126" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11" text-anchor="end"> </text>
+  </svg>
+  </div>
+  <div id="layerinfo" class="panel hotline"><h3>Bronze — schema-on-write mirror, schema-on-read escape hatch</h3>
+    <p>Source 3NF structures preserved; every table carries <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code>.
+    DLT expectations quarantine bad rows into <code>audit.rejected_records</code> with the failed rule and DAMA dimension.</p></div>
+</section>
+
+<!-- 6 SILVER -->
+<section class="slide" data-title="Silver keys">
+  <div class="eyebrow">Silver design</div><h2>Insert-only 3NF with <span class="molten">deterministic hash keys</span></h2>
+  <div class="cols">
+    <div>
+      <pre>hk = <span class="k">sha2</span>(concat_ws('|', source_system, original_pk), 256)
+
+<span class="c">-- SAP order 0004000123  → hk a91f…  (always)</span>
+<span class="c">-- JDE order 00001-100042 → hk 7c2e…  (always)</span>
+
+<span class="c">-- no UPDATE / DELETE ever issued:</span>
+new version  ⇒  new row (effective_ts)
+"current"    ⇒  view: row_number() over (partition by hk
+                       order by effective_ts desc) = 1</pre>
+    </div>
+    <div class="panel"><h3>Why this wins</h3>
+      <ul><li><b>Deterministic across reloads & environments</b> — same input, same key, no lookup tables</li>
+        <li><b>Streaming-friendly</b> — append-only writes, no MERGE contention</li>
+        <li><b>Audit for free</b> — full history is just the table</li>
+        <li><b>Gold assembles by key</b> — facts join dims on hk, no surrogate pipeline</li>
+        <li><code>record_hash</code> detects no-op updates; quarantine + batch_log on every run</li></ul></div>
+  </div>
+</section>
+
+<!-- 7 GOLD -->
+<section class="slide" data-title="Gold">
+  <div class="eyebrow">Gold layer</div><h2>One layer, three consumers</h2>
+  <div class="cols3">
+    <div class="panel hotline"><h3>BI</h3>
+      <ul><li>Star schema: <code>fact_sales_orders</code> + conformed dims on hash keys</li>
+        <li>Liquid clustering <code>(order_date, customer_hk)</code></li>
+        <li><code>agg_sales_daily</code> feeds AI/BI dashboards & <b>Genie</b> NL Q&A</li></ul></div>
+    <div class="panel hotline"><h3>ML</h3>
+      <ul><li>Feature Engineering in UC, <code>timestamp_keys</code> ⇒ point-in-time-correct training joins</li>
+        <li>Feature versioning via effective_ts lineage</li>
+        <li>Low-latency serving: Online Feature Store synced to <b>Lakebase</b></li></ul></div>
+    <div class="panel hotline"><h3>AI / GenAI</h3>
+      <ul><li>Mosaic AI <b>Vector Search</b> Delta-sync index on customer profiles</li>
+        <li>RAG agent (<b>Agent Bricks</b>) grounded with citations, served on Model Serving</li>
+        <li>Semantic search powers the marketplace portal</li></ul></div>
+  </div>
+  <p style="margin-top:18px" class="mono">melt_to_margin: furnace_heat_5min (OT) ⨝ fact_sales_orders — chemistry & energy joined to margin.</p>
+</section>
+
+<!-- 8 CONFIG -->
+<section class="slide" data-title="Config-driven">
+  <div class="eyebrow">Config over code</div><h2>Mappings are data, so change is governed</h2>
+  <div class="cols">
+    <div class="panel"><h3><code>cfg.layer_mappings</code> — every layer, versioned</h3>
+      <table><tr><th>layer</th><th>src→tgt</th><th>transform</th><th>v</th></tr>
+        <tr><td>silver</td><td>vbak.NETWR → order_amount</td><td class="mono">cast(decimal)</td><td>3</td></tr>
+        <tr><td>silver</td><td>f4201.SHOTOT → order_amount</td><td class="mono">SHOTOT/100</td><td>2</td></tr>
+        <tr><td>gold</td><td>soh.hk → fact.order_hk</td><td class="mono">passthrough</td><td>1</td></tr></table>
+      <p style="margin-top:10px">A change = a new versioned row → lineage and rollback are built in.
+      UC system tables add column-level lineage on top.</p></div>
+    <div class="panel"><h3>Onboarding a new source — live demo</h3>
+      <pre><span class="c"># 1. one YAML row</span>
+- name: ebs_oe_order_headers
+  pattern: goldengate
+  primary_key: [HEADER_ID]
+  region: AMERICAS
+<span class="c"># 2. one command (validated by registrar agent)</span>
+$ python scripts/deploy.py --register-source ebs_oe_order_headers</pre></div>
+  </div>
+</section>
+
+<!-- 9 DQ -->
+<section class="slide" data-title="Data quality">
+  <div class="eyebrow">DAMA · 6 dimensions</div><h2>Trust is a number on a dashboard</h2>
+  <div class="cols">
+    <div id="dq">
+      <div class="dqrow"><span class="n">Completeness</span><div class="dqbar"><i data-w="99.4"></i></div><span class="v">99.4</span></div>
+      <div class="dqrow"><span class="n">Accuracy</span><div class="dqbar"><i data-w="99.1"></i></div><span class="v">99.1</span></div>
+      <div class="dqrow"><span class="n">Consistency</span><div class="dqbar"><i data-w="98.3"></i></div><span class="v">98.3</span></div>
+      <div class="dqrow"><span class="n">Validity</span><div class="dqbar"><i data-w="99.9"></i></div><span class="v">99.9</span></div>
+      <div class="dqrow"><span class="n">Uniqueness</span><div class="dqbar"><i data-w="100"></i></div><span class="v">100</span></div>
+      <div class="dqrow"><span class="n">Timeliness</span><div class="dqbar"><i data-w="97.2"></i></div><span class="v">97.2</span></div>
+    </div>
+    <div class="panel coolline"><h3>The loop, not just the score</h3>
+      <ul><li>DLT expectations gate in-pipeline; framework scores cross-table per dimension</li>
+        <li>Row-level rejects → <code>audit.rejected_records</code> (rule + dimension + payload)</li>
+        <li>Threshold breach <b>fails the job</b> → webhook → <b>DQ RCA agent</b> finds first bad batch & blast radius</li>
+        <li>Healer agent: schema drift → mapping PR; infra → smart retry; never auto-merges</li>
+        <li>Scores published per data product = its <b>trust score</b></li></ul></div>
+  </div>
+</section>
+
+<!-- 10 GOVERNANCE -->
+<section class="slide" data-title="Governance">
+  <div class="eyebrow">Unity Catalog</div><h2>Region & sensitivity enforced at the data, not the dashboard</h2>
+  <div class="cols">
+    <div class="panel"><h3>Row filters — one function, every Gold table</h3>
+      <pre>EUROPE   → source_system = 'SAP'
+AMERICAS → source_system = 'JDE'
+EMEA     → source_system = 'QAD'
+engineers / execs → all rows</pre>
+      <p style="margin-top:8px">Column masks: <code>customer_name</code> → <code>Nu*****</code> unless data_steward.
+      PII discoverable via tags; policies carry through product views & shares.</p></div>
+    <div class="panel"><h3>Eight roles, least privilege</h3>
+      <table><tr><th>group</th><th>scope</th></tr>
+      <tr><td>sales_analyst_{eu,am,emea}</td><td>Gold SELECT, region-filtered</td></tr>
+      <tr><td>data_engineer</td><td>Bronze/Silver ALL</td></tr>
+      <tr><td>ml_engineer</td><td>Gold SELECT + feature tables</td></tr>
+      <tr><td>data_steward</td><td>unmasked PII, DQ tooling</td></tr>
+      <tr><td>ot_engineer</td><td>bronze.ot</td></tr>
+      <tr><td>exec_readonly</td><td>products + dashboards</td></tr></table></div>
+  </div>
+</section>
+
+<!-- 11 PRODUCTS -->
+<section class="slide" data-title="Data products">
+  <div class="eyebrow">Data mesh principles</div><h2>Products with owners, contracts, and SLAs</h2>
+  <table>
+    <tr><th>product</th><th>owner</th><th>output port</th><th>SLA</th><th>trust</th></tr>
+    <tr><td>sales_orders_unified</td><td>sales-data-team</td><td class="mono">products.sales.v_sales_orders</td><td>30 min · 99.5%</td><td><span class="tag ok">98.7</span></td></tr>
+    <tr><td>customer_360</td><td>sales-data-team</td><td class="mono">products.sales.v_customer_360</td><td>60 min · 99.5%</td><td><span class="tag ok">97.9</span></td></tr>
+    <tr><td>melt_to_margin</td><td>ot-data-team</td><td class="mono">products.ops.v_melt_to_margin</td><td>15 min · 99.0%</td><td><span class="tag ok">96.4</span></td></tr>
+  </table>
+  <div class="cols" style="margin-top:18px">
+    <div class="panel"><h3>Discover & consume</h3>
+      <ul><li>UC tags → searchable in Catalog Explorer + <b>Databricks Marketplace</b> private listings (Delta Share per product)</li>
+        <li>Consumers mount the share — masks & filters travel with it</li>
+        <li>Stretch: custom portal (Databricks Apps) with Vector-Search-powered semantic discovery</li></ul></div>
+    <div class="panel"><h3>Federated governance</h3>
+      <ul><li>Domain teams own transformation + SLAs; platform owns templates, DQ framework, policies</li>
+        <li>Input/output contracts versioned in <code>data_products.yaml</code></li></ul></div>
+  </div>
+</section>
+
+<!-- 12 VALUE -->
+<section class="slide" data-title="Value">
+  <div class="eyebrow">Business value</div><h2>What the mill gets back</h2>
+  <div class="cols3">
+    <div class="panel hotline"><h3>Engineering velocity</h3><p>Source onboarding: <b>weeks → &lt;1 day</b> (YAML + command). One replication skillset instead of three.</p></div>
+    <div class="panel hotline"><h3>Revenue insight</h3><p>Single cross-ERP order & customer truth; Genie gives sales ops same-day answers instead of ticket queues.</p></div>
+    <div class="panel hotline"><h3>Margin from OT</h3><p>Melt-to-margin links energy & chemistry to profitability per heat — the analysis that was impossible while OT sat at the edge.</p></div>
+  </div>
+  <div class="road">
+    <div class="phase"><div class="dot">1</div><h3>Pilot</h3><span>0–3 mo · this build</span>
+      <ul><li>Sales domain, 6 sources</li><li>3 products live</li></ul></div>
+    <div class="phase"><div class="dot">2</div><h3>Harden</h3><span>3–6 mo</span>
+      <ul><li>Lakeflow Connect Oracle swap</li><li>SLO alerting, FinOps budgets</li></ul></div>
+    <div class="phase future"><div class="dot">3</div><h3>Scale</h3><span>6–12 mo</span>
+      <ul><li>Procurement & ops domains</li><li>Self-serve product template</li></ul></div>
+    <div class="phase future"><div class="dot">4</div><h3>Intelligence</h3><span>12+ mo</span>
+      <ul><li>Forecasting & pricing ML</li><li>Agentic ops at scale</li></ul></div>
+  </div>
+</section>
+
+<!-- 13 RISKS -->
+<section class="slide" data-title="Risks">
+  <div class="eyebrow">Risks & mitigation</div><h2>Where it can break, and what's already in place</h2>
+  <table>
+    <tr><th>risk</th><th>mitigation</th></tr>
+    <tr><td>Lakeflow Connect connector maturity/availability</td><td>Pattern abstraction: YAML swap back to GG/ADF path; no downstream change</td></tr>
+    <tr><td>OT volume spikes (campaign starts)</td><td>Watermarks + autoscaling streams; parquet batch path as pressure valve</td></tr>
+    <tr><td>ERP source schema drift</td><td>Healer agent proposes versioned mapping; <code>_raw</code> column preserves payload</td></tr>
+    <tr><td>Cost creep</td><td>Serverless auto-stop, budget policies, system.billing alerts, validate.py in CI</td></tr>
+    <tr><td>Hash collisions (theoretical)</td><td>SHA-256 over namespaced input; collision probability negligible at any realistic scale; uniqueness DQ check watches anyway</td></tr>
+    <tr><td>Agent overreach</td><td>Agents are read-only on prod data; act via PRs & config inserts; human review gate</td></tr>
+  </table>
+</section>
+
+<!-- 14 CLOSE -->
+<section class="slide" data-title="Q&A">
+  <div style="height:16vh"></div>
+  <div class="eyebrow">Q&A · 30 minutes</div>
+  <h1>Every decision has<br><span class="molten">two alternatives</span> on record</h1>
+  <p class="lead" style="margin-top:20px">docs/JUSTIFICATION_NOTES.md · live workspace (read-only) ·
+  marketplace portal URL · GitHub repo — all ready for inspection.</p>
+  <p class="mono" style="margin-top:26px;color:var(--dim)">← / → to navigate · click the gauge to jump</p>
+</section>
+
+<div class="slideno" id="slideno"></div>
+<div class="kbd">← → navigate</div>
+
+<script>
+const slides=[...document.querySelectorAll(".slide")];
+const rail=document.getElementById("rail");
+slides.forEach((s,i)=>{
+  const t=document.createElement("div");t.className="tick";t.title=s.dataset.title;
+  t.onclick=()=>go(i);rail.insertBefore(t,rail.querySelector(".temp"));
+});
+const ticks=[...rail.querySelectorAll(".tick")];
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  slides.forEach((s,j)=>s.classList.toggle("active",j===cur));
+  ticks.forEach((t,j)=>{t.classList.toggle("done",j<cur);t.classList.toggle("now",j===cur)});
+  document.getElementById("slideno").textContent=`${String(cur+1).padStart(2,"0")} / ${slides.length} — ${slides[cur].dataset.title}`;
+  if(slides[cur].dataset.title==="Data quality")
+    document.querySelectorAll("#dq i").forEach(b=>requestAnimationFrame(()=>b.style.width=b.dataset.w+"%"));
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" ")go(cur+1);
+  if(e.key==="ArrowLeft"||e.key==="PageUp")go(cur-1);
+});
+function tab(btn,id){
+  btn.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-selected","false"));
+  btn.setAttribute("aria-selected","true");
+  btn.parentElement.parentElement.querySelectorAll(".tabpanel").forEach(p=>p.classList.remove("show"));
+  document.getElementById(id).classList.add("show");
+}
+const LAYERS={
+ bronze:["Bronze — schema-on-write mirror, schema-on-read escape hatch",
+  'Source 3NF structures preserved; every table carries <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code>. DLT expectations quarantine bad rows into <code>audit.rejected_records</code> with the failed rule and DAMA dimension.'],
+ silver:["Silver — 3NF, insert-only, SHA-256 hash keys (DV2.0: hub keys + satellites)",
+  'Unified entities across SAP/JDE/QAD. <code>hk = sha2(source_system|pk, 256)</code> plays the Data Vault hub-key role; insert-only versions with <code>effective_ts</code> + <code>record_hash</code> are the satellites; every change is a new row; "current" is a window view — no UPDATE ever runs. FX-normalized to USD; DAMA gates score each refresh.'],
+ gold:["Gold — star + DV2.0 PIT & bridge, features, vectors",
+  'Facts and dims join on hash keys. DV2.0 query-assist tables: <code>pit_customer</code> gives leakage-free as-of joins (equality, no BETWEEN scans) for ML & month-end reporting; <code>bridge_order_fulfillment</code> pre-joins order→shipment→invoice so O2C cycle time, backlog and Genie need ONE join. <code>agg_sales_daily</code> serves dashboards; Vector Search serves semantic/RAG.']};
+function layer(k){
+  document.getElementById("layerinfo").innerHTML=`<h3>${LAYERS[k][0]}</h3><p>${LAYERS[k][1]}</p>`;
+}
+go(0);
+</script>
+</body>
+</html>
