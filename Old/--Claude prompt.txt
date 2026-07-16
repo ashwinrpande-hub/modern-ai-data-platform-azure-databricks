@@ -1,4 +1,4 @@
---Claude prompt for nucor
+﻿--Claude prompt for acme
 think well take your time 
 Create architecture for following job requirement 
 
@@ -8,7 +8,7 @@ refer to the repo and the read me files from https://github.com/ashwinrpande-hub
 
 For replication for Oracle databases and Oracle EBS, we use Oracle Golden Gate, and for SQL Server we have been using fabric mirroring, but lately we have been thinking through How to do that with databricks native? Also, we have a big task  or operational technology data. We use a product called Litmus to sync that data to delta par k. For all these things, we need reusable and templatized patterns or designs that we can let any technical person use for the replication to land in bronze.
 
-For steel manufacturing company Nucor
+For steel manufacturing company acme
 Design, build, and present a production-ready Data Platform solution (leveraging databricks to the max for all needed technical solutions) that 
 demonstrates ability to architect modern data platforms, think strategically about data 
 products, and deliver hands-on technical solutions. 
@@ -78,3 +78,4 @@ DELIVERABLES FOR INTERVIEW (Bring To The Interview – Do NOT share in advance)
   GitHub repository with all code and documentation
   Architecture diagrams showing Bronze/Silver/Gold design and performance considerations 
   Presentation slides (technical + strategic)
+

@@ -1,4 +1,4 @@
-"""GOLD — consumption-optimized. Dims & facts connect via Silver SHA-256 hash keys."""
+﻿"""GOLD — consumption-optimized. Dims & facts connect via Silver SHA-256 hash keys."""
 import dlt
 from pyspark.sql import functions as F
 
@@ -6,7 +6,7 @@ from pyspark.sql import functions as F
            comment="MDM-survived customer dim; PK = customer_hk",
            table_properties={"delta.enableChangeDataFeed": "true"})
 def dim_customer():
-    c = dlt.read("nucor_silver.sales.customer")
+    c = dlt.read("acme_silver.sales.customer")
     # survivorship: prefer SAP > JDE > QAD on name conflicts (latest version per hk)
     from pyspark.sql.window import Window
     w = Window.partitionBy("hk").orderBy(F.col("effective_ts").desc())
@@ -19,7 +19,7 @@ def dim_customer():
            cluster_by=["order_date", "customer_hk"])           # liquid clustering
 @dlt.expect_all({"fk_customer": "customer_hk IS NOT NULL"})
 def fact_sales_orders():
-    soh = dlt.read("nucor_silver.sales.v_sales_order_header_current")
+    soh = dlt.read("acme_silver.sales.v_sales_order_header_current")
     cust = dlt.read("dim_customer").select("customer_hk", "src_customer_id", "source_system")
     return (soh.alias("o")
         .join(cust.alias("c"),
@@ -31,7 +31,7 @@ def fact_sales_orders():
 @dlt.table(name="fact_heat_quality", cluster_by=["window_start"],
            comment="OT-to-business: furnace conditions joined to daily shipped tonnage")
 def fact_heat_quality():
-    ot = dlt.read("nucor_silver.sales.furnace_heat_5min")
+    ot = dlt.read("acme_silver.sales.furnace_heat_5min")
     return ot.select(F.col("hk").alias("heat_hk"), "site", "asset", "tag",
                      "window_start", "avg_value", "max_value")
 
@@ -42,3 +42,4 @@ def agg_sales_daily():
     return (f.groupBy("order_date", "source_system")
              .agg(F.sum("order_amount_usd").alias("revenue_usd"),
                   F.countDistinct("order_hk").alias("orders")))
+

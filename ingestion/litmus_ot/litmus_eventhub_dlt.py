@@ -1,4 +1,4 @@
-"""Litmus Edge UNS topics -> Event Hubs (Kafka API) -> Bronze OT tables. Config-driven."""
+﻿"""Litmus Edge UNS topics -> Event Hubs (Kafka API) -> Bronze OT tables. Config-driven."""
 import dlt, yaml
 from pyspark.sql import functions as F, types as T
 
@@ -25,7 +25,7 @@ def ot_bronze():
         F.col("topic"),
         F.from_json(F.col("value").cast("string"), OT_SCHEMA).alias("p"),
         F.col("timestamp").alias("_kafka_ts"))
-    # UNS topic: nucor/<site>/<area>/<asset>/<tag>
+    # UNS topic: acme/<site>/<area>/<asset>/<tag>
     parts = F.split("topic", "/")
     return (parsed
         .select(parts[1].alias("site"), parts[2].alias("area"), parts[3].alias("asset"),
@@ -36,3 +36,4 @@ def ot_bronze():
         .withWatermark("ts", SRC.get("watermark", "10 minutes"))
         .withColumn("_source_system", F.lit("LITMUS"))
         .withColumn("_ingest_ts", F.current_timestamp()))
+

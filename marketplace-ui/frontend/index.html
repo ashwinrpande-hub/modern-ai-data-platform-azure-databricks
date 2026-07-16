@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nucor Data Marketplace</title>
+<title>acme Data Marketplace</title>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;800&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#14171B;--panel:#1D232B;--line:#2E3742;--txt:#C8D1DA;--dim:#7E8A96;
@@ -32,7 +32,7 @@
 </style>
 </head>
 <body>
-<header><h1>Nucor Data Marketplace</h1><span>Discover · Trust · Consume — governed by Unity Catalog</span></header>
+<header><h1>acme Data Marketplace</h1><span>Discover · Trust · Consume — governed by Unity Catalog</span></header>
 <div class="wrap">
   <div class="search">
     <input id="q" placeholder='Ask in plain language, e.g. "daily revenue by mill with customer detail"' aria-label="Search data products">
@@ -50,7 +50,7 @@ const DEMO = [
 ];
 function card(p){
   return `<div class="card"><h3>${p.name}</h3>
-    <div class="meta">domain: ${p.domain||"—"} · nucor_products</div>
+    <div class="meta">domain: ${p.domain||"—"} · acme_products</div>
     ${p.certified?'<span class="badge">CERTIFIED</span>':''}<span class="badge" style="color:#FFC53D;border-color:#FFC53D">6-DIM DQ</span>
     <p>${p.description||""}</p></div>`;
 }
@@ -75,3 +75,4 @@ load();
 </script>
 </body>
 </html>
+

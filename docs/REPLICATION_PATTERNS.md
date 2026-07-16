@@ -1,4 +1,4 @@
-# Reusable Replication Patterns → Bronze
+﻿# Reusable Replication Patterns → Bronze
 
 Goal: **any technical person** lands a new source in Bronze by (1) adding one row to
 `config/replication_sources.yaml`, (2) running `scripts/deploy.py --register-source <name>`.
@@ -67,7 +67,7 @@ PLCs/SCADA/Historians --> Litmus Edge (UNS topics, normalization at edge)
 - Sub-second OT alerting (e.g., furnace excursion) is a fit for Lakeflow **real-time mode**
   (`update_flow`, Public Preview) on Path B/C streams — keep out of the default path until GA.
 - Topic→table mapping is config: `ingestion/litmus_ot/uns_topic_map.yaml`
-  (e.g., `nucor/berkeley/meltshop/furnace1/temperature` → `bronze.ot.furnace_telemetry`).
+  (e.g., `acme/berkeley/meltshop/furnace1/temperature` → `bronze.ot.furnace_telemetry`).
 - Template enforces the OT envelope: `site, area, line, asset, tag, ts, value, quality, ingest_ts`.
 - Late/out-of-order events handled with watermarking; raw payload kept in `_raw` (schema-on-read).
 
@@ -81,6 +81,7 @@ batch-only, loses edge normalization and UNS context.
    (system, pattern, pk, sequence_col, region, schedule, expectations).
 2. **Same Bronze envelope** on every table: `_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw`.
 3. **Same template per pattern** in `ingestion/templates/` — parameterized DLT, never copied.
-4. **Same DQ gate**: expectations from YAML; rejects → `nucor_bronze.audit.rejected_records` with reason.
+4. **Same DQ gate**: expectations from YAML; rejects → `acme_bronze.audit.rejected_records` with reason.
 5. **Same registration**: `deploy.py --register-source` writes config tables, creates the DLT
-   pipeline via REST, and records lineage in `nucor_bronze.audit.source_registry`.
+   pipeline via REST, and records lineage in `acme_bronze.audit.source_registry`.
+

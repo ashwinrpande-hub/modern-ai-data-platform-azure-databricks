@@ -1,8 +1,8 @@
-"""Marketplace API. Independent: only env vars connect it to Databricks."""
+﻿"""Marketplace API. Independent: only env vars connect it to Databricks."""
 from fastapi import FastAPI, Query
 import os, json, urllib.request
 
-app = FastAPI(title="Nucor Data Marketplace API")
+app = FastAPI(title="acme Data Marketplace API")
 HOST, TOKEN = os.environ["DATABRICKS_HOST"], os.environ["DATABRICKS_TOKEN"]
 
 def dbx(path, payload=None):
@@ -16,10 +16,10 @@ def health(): return {"ok": True}
 
 @app.get("/products")
 def products():
-    """Data products = tagged secure views in nucor_products (UC tags drive discovery)."""
+    """Data products = tagged secure views in acme_products (UC tags drive discovery)."""
     r = dbx("/api/2.0/sql/statements", {"warehouse_id": os.environ["DATABRICKS_WAREHOUSE_ID"],
         "statement": """SELECT v.table_name, v.comment, t.tag_value AS domain
-                        FROM nucor_products.information_schema.views v
+                        FROM acme_products.information_schema.views v
                         LEFT JOIN system.information_schema.table_tags t
                           ON t.table_name=v.table_name AND t.tag_name='domain'""",
         "wait_timeout": "30s"})
@@ -28,6 +28,7 @@ def products():
 @app.get("/search")
 def ai_search(q: str = Query(...)):
     """AI-powered metadata search via Databricks Vector Search over product descriptions."""
-    r = dbx("/api/2.0/vector-search/indexes/nucor_gold.ai.product_metadata_idx/query",
+    r = dbx("/api/2.0/vector-search/indexes/acme_gold.ai.product_metadata_idx/query",
         {"query_text": q, "num_results": 5, "columns": ["product_name", "description", "owner"]})
     return r.get("result", {}).get("data_array", [])
+

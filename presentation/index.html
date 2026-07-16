@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nucor Sales Lakehouse — Azure Databricks</title>
+<title>acme Sales Lakehouse — Azure Databricks</title>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -98,7 +98,7 @@ td:first-child{color:var(--bright)}
 <!-- 1 TITLE -->
 <section class="slide" data-title="Title">
   <div style="height:14vh"></div>
-  <div class="eyebrow">Nucor · Sales Domain · Azure Databricks · 60-minute review</div>
+  <div class="eyebrow">acme · Sales Domain · Azure Databricks · 60-minute review</div>
   <h1>From <span class="molten">Melt Shop</span> to<br>Market Signal</h1>
   <p class="lead" style="margin-top:22px">A production-ready Lakehouse that unifies three ERPs, Salesforce,
   and live plant-floor OT data into governed, trusted, AI-ready sales data products.</p>
@@ -164,7 +164,7 @@ td:first-child{color:var(--bright)}
     serverless processing. Source-side prep is a two-line script any DBA runs.</p>
   </div>
   <div id="t3" class="tabpanel">
-    <pre>PLCs / SCADA ─► Litmus Edge (UNS: nucor/&lt;site&gt;/&lt;area&gt;/&lt;asset&gt;/&lt;tag&gt;)
+    <pre>PLCs / SCADA ─► Litmus Edge (UNS: acme/&lt;site&gt;/&lt;area&gt;/&lt;asset&gt;/&lt;tag&gt;)
    ├─ default:      ADLS parquet ─► Auto Loader ─► bronze.ot.*
    └─ low-latency:  Event Hubs (Kafka API) ─► Structured Streaming ─► bronze.ot.*  <span class="c">-- watermark 10m</span></pre>
     <p style="margin-top:10px">Litmus keeps doing what it's good at — edge normalization. Topic→table mapping is config;
@@ -437,3 +437,4 @@ go(0);
 </script>
 </body>
 </html>
+

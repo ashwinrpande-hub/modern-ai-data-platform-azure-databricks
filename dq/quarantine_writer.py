@@ -1,10 +1,10 @@
-"""
+﻿"""
 Quarantine + batch logger (fills gaps A2/A3 in docs/GAP_ANALYSIS.md).
 Runs as a Lakeflow Job task after every pipeline update (see pipelines/jobs/lakeflow_jobs.yaml).
 
 What it does — from each pipeline's event log (event_log() TVF, no direct storage paths):
- 1. flow_progress metrics  -> nucor_bronze.audit.batch_log   (rows read/written/dropped, status)
- 2. expectation failures   -> nucor_bronze.audit.rejected_records (rule + DAMA dimension)
+ 1. flow_progress metrics  -> acme_bronze.audit.batch_log   (rows read/written/dropped, status)
+ 2. expectation failures   -> acme_bronze.audit.rejected_records (rule + DAMA dimension)
 DAMA dimension is inferred from the expectation name prefix used in replication_sources.yaml
 (valid_* = VALIDITY, complete_/*_pk = COMPLETENESS, ts/timely = TIMELINESS, etc.).
 """
@@ -13,7 +13,7 @@ import sys
 
 spark = SparkSession.builder.getOrCreate()
 PIPELINE_IDS = sys.argv[1:] or [r[0] for r in spark.sql(
-    "SELECT pipeline_id FROM nucor_bronze.cfg.pipeline_registry WHERE active").collect()]
+    "SELECT pipeline_id FROM acme_bronze.cfg.pipeline_registry WHERE active").collect()]
 
 DIM_MAP = [("pk", "COMPLETENESS"), ("complete", "COMPLETENESS"), ("valid", "VALIDITY"),
            ("ts", "TIMELINESS"), ("timely", "TIMELINESS"), ("uniq", "UNIQUENESS"),
@@ -43,7 +43,7 @@ for pid in PIPELINE_IDS:
        .withColumn("error", F.lit(None).cast("string"))
        .select("batch_id","source_name","layer","rows_read","rows_written",
                "rows_rejected","started_at","finished_at","status","error")
-       .write.mode("append").saveAsTable("nucor_bronze.audit.batch_log"))
+       .write.mode("append").saveAsTable("acme_bronze.audit.batch_log"))
 
     # ---- 2. rejected_records from expectation drops (rule-level; row payloads stay in
     #         the failing flow's quarantine view when expect_all_or_drop is used) ----
@@ -59,6 +59,7 @@ for pid in PIPELINE_IDS:
             f"{dama_dim('e.name')} AS dq_dimension",
             "to_json(named_struct('failed_records', e.failed_records)) AS record_payload",
             "current_timestamp() AS rejected_at")
-        .write.mode("append").saveAsTable("nucor_bronze.audit.rejected_records"))
+        .write.mode("append").saveAsTable("acme_bronze.audit.rejected_records"))
 
 print(f"quarantine_writer: processed {len(PIPELINE_IDS)} pipeline event logs")
+

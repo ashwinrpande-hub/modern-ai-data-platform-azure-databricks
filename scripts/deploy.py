@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Idempotent deployer. Usage:
    python scripts/deploy.py --env dev                  # full deploy
    python scripts/deploy.py --register-source <name>   # onboard one source from YAML
@@ -36,7 +36,7 @@ def register_source(name):
     # A4 fix: record in cfg.source_registry so governance + validate.py see the estate
     exp = ", ".join(f"'{k}','{v}'" for k, v in src.get("expectations", {}).items())
     pks = ", ".join(f"'{p}'" for p in src["primary_key"])
-    sql(f"""INSERT INTO nucor_bronze.cfg.source_registry VALUES (
+    sql(f"""INSERT INTO acme_bronze.cfg.source_registry VALUES (
         '{name}','{src["system"]}','{src["region"]}','{src["pattern"]}','{src["target"]}',
         array({pks}),'{src.get("sequence_col", src.get("cursor_column",""))}',
         '{src.get("schedule","")}', map({exp}), current_user(), current_timestamp(), true)""")
@@ -52,8 +52,8 @@ def register_source(name):
             "continuous": src.get("schedule") == "continuous",
             "libraries": [{"file": {"path": f"/Workspace/Repos/platform/{template}"}}],
             "configuration": {"source_name": name},
-            "catalog": "nucor_bronze", "target": src["target"].split(".")[1]}, "POST")
-        sql(f"""INSERT INTO nucor_bronze.cfg.pipeline_registry VALUES (
+            "catalog": "acme_bronze", "target": src["target"].split(".")[1]}, "POST")
+        sql(f"""INSERT INTO acme_bronze.cfg.pipeline_registry VALUES (
             '{r.get("pipeline_id","")}','bronze-{name}','{name}',current_timestamp(),true)""")
     else:
         print(f"[lakeflow] managed connector ({src['pattern']}) — created via Lakeflow "
@@ -74,3 +74,4 @@ if __name__ == "__main__":
             register_source(s["name"])
         print("Deploy complete. Then: `databricks bundle deploy` for pipelines/jobs/, "
               "and run scripts/validate.py.")
+

@@ -1,4 +1,4 @@
-# Architecture — Nucor Sales Lakehouse on Azure Databricks
+﻿# Architecture — acme Sales Lakehouse on Azure Databricks
 
 ## Source landscape → Bronze (templatized, see REPLICATION_PATTERNS.md)
 SAP S/4HANA (EU) & Oracle EBS → GoldenGate → ADLS → Auto Loader/APPLY CHANGES
@@ -7,15 +7,15 @@ Salesforce → file/API landing → Auto Loader
 OT (PLCs/SCADA) → Litmus Edge UNS → Event Hubs (Kafka) or ADLS parquet → Structured Streaming
 
 ## Medallion
-- **Bronze (nucor_bronze)** — schema-on-write mirror of source 3NF structures; envelope columns
+- **Bronze (acme_bronze)** — schema-on-write mirror of source 3NF structures; envelope columns
   (`_source_system,_ingest_ts,_batch_id,_op_type,_seq,_raw`); raw payload preserved in `_raw`
   (schema-on-read escape hatch). DLT expectations quarantine bad rows.
-- **Silver (nucor_silver)** — 3NF, **insert-only**. `hk = sha2(source_system|pk, 256)`;
+- **Silver (acme_silver)** — 3NF, **insert-only**. `hk = sha2(source_system|pk, 256)`;
   `record_hash` for change detection; `effective_ts` versioning; "current" exposed as a view
   (row_number over hk), never via UPDATE. FX-normalized to USD. DAMA DQ gates.
-- **Gold (nucor_gold)** — star schema (dims + facts **joined on hash keys**), pre-aggregations for
+- **Gold (acme_gold)** — star schema (dims + facts **joined on hash keys**), pre-aggregations for
   AI/BI + Genie, ML feature store (PIT-correct), vector indexes for semantic search/RAG.
-- **Products (nucor_products)** — secure-view output ports, Delta Sharing, Marketplace listings.
+- **Products (acme_products)** — secure-view output ports, Delta Sharing, Marketplace listings.
 
 ## Databricks features used (and why)
 Lakeflow Declarative Pipelines (DLT) — expectations, AUTO CDC, serverless;
@@ -34,3 +34,4 @@ budget policies + system.billing alerts; spot for non-critical jobs.
 ## Observability
 batch_log + dq_results + rejected_records tables; Lakeflow job notifications → webhook →
 healer agent; UC system tables for lineage + audit; SQL alerts on freshness SLOs.
+

@@ -1,19 +1,19 @@
-"""
+﻿"""
 Sales RAG agent (fills gap B5 — previously a comment in vector_search_rag.py).
 Mosaic AI Agent Framework: UC-registered retriever tool over the customer-profile
-Vector Search index + a served agent endpoint 'nucor-sales-rag'. Grounded answers
+Vector Search index + a served agent endpoint 'acme-sales-rag'. Grounded answers
 with citations; region row filters still apply because retrieval reads governed tables.
 For multi-agent (healer + RCA + this), wrap with the Supervisor Agent SDK (2026).
 """
 from databricks.sdk import WorkspaceClient
 import mlflow
 
-INDEX = "nucor_gold.ai.customer_profile_idx"
+INDEX = "acme_gold.ai.customer_profile_idx"
 LLM_ENDPOINT = "databricks-claude-sonnet"      # any Databricks-hosted FM endpoint
 
 # 1) Retriever as a UC SQL function -> callable by ANY agent (Genie, Agent Bricks, custom)
 RETRIEVER_SQL = f"""
-CREATE OR REPLACE FUNCTION nucor_gold.ai.search_customer_profiles(question STRING)
+CREATE OR REPLACE FUNCTION acme_gold.ai.search_customer_profiles(question STRING)
 RETURNS TABLE (customer_hk STRING, profile_text STRING, score DOUBLE)
 COMMENT 'Semantic search over customer profiles (Vector Search delta-sync index)'
 RETURN SELECT customer_hk, profile_text, search_score
@@ -39,15 +39,16 @@ def build_and_deploy():
 
     with mlflow.start_run():
         mlflow.langchain.log_model(
-            agent, "agent", registered_model_name="nucor_gold.ai.sales_rag_agent",
+            agent, "agent", registered_model_name="acme_gold.ai.sales_rag_agent",
             resources=[DatabricksVectorSearchIndex(index_name=INDEX),
                        DatabricksServingEndpoint(endpoint_name=LLM_ENDPOINT)],
             input_example={"messages": [{"role": "user",
                 "content": "Which customers buy rebar and slowed orders this quarter?"}]})
     # 3) Serve: agents.deploy handles endpoint + review app + inference tables (audit)
     from databricks import agents
-    agents.deploy("nucor_gold.ai.sales_rag_agent", model_version=1,
-                  endpoint_name="nucor-sales-rag")
+    agents.deploy("acme_gold.ai.sales_rag_agent", model_version=1,
+                  endpoint_name="acme-sales-rag")
 
 if __name__ == "__main__":
     build_and_deploy()
+

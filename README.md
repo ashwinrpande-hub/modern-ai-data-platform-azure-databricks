@@ -1,6 +1,6 @@
-# Nucor Modern AI Data Platform — Azure Databricks
+﻿# acme Modern AI Data Platform — Azure Databricks
 
-Production-ready Lakehouse for the **Sales domain** of a steel manufacturer (Nucor), unifying
+Production-ready Lakehouse for the **Sales domain** of a steel manufacturer (acme), unifying
 **SAP S/4HANA (Europe)**, **JDE E1 (Americas)**, **QAD (EMEA)**, **Salesforce CRM**,
 **SQL Server operational DBs**, and **Litmus Edge OT/plant-floor data** on
 **Azure Databricks + Delta Lake + Unity Catalog**.
@@ -32,11 +32,12 @@ python scripts/validate.py --env dev               # post-deploy validation (12 
 
 ## Layered catalogs (Unity Catalog)
 ```
-nucor_bronze   raw, schema-on-write, CDC feeds, OT streams   (3NF mirror of source)
-nucor_silver   3NF, insert-only, SHA-256 hash keys, DQ-gated
-nucor_gold     star schema (hash-key joins), feature store, vectors
-nucor_products governed data products, Delta Sharing / Marketplace
+acme_bronze   raw, schema-on-write, CDC feeds, OT streams   (3NF mirror of source)
+acme_silver   3NF, insert-only, SHA-256 hash keys, DQ-gated
+acme_gold     star schema (hash-key joins), feature store, vectors
+acme_products governed data products, Delta Sharing / Marketplace
 ```
 
 Read `docs/ARCHITECTURE.md` first; every design decision and its two rejected
 alternatives are in `docs/JUSTIFICATION_NOTES.md`.
+

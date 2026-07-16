@@ -1,22 +1,23 @@
-# Domain-driven data products (Data Mesh: domain ownership, product thinking,
+﻿# Domain-driven data products (Data Mesh: domain ownership, product thinking,
 # self-serve platform, federated computational governance)
 products:
   - name: sales_orders_unified
     domain: sales
-    owner: sales-data-team@nucor.com
-    input_contract: [nucor_silver.sales.v_sales_order_header_current]
-    output_port: nucor_products.sales.v_sales_orders        # secure view
+    owner: sales-data-team@acme.com
+    input_contract: [acme_silver.sales.v_sales_order_header_current]
+    output_port: acme_products.sales.v_sales_orders        # secure view
     sla: { freshness_minutes: 30, availability: "99.5%" }
     dq_dimensions_threshold: { completeness: 0.99, validity: 0.999, uniqueness: 0.999,
                                timeliness: 0.95, consistency: 0.98, accuracy: 0.99 }
     discovery: [unity_catalog_tags, databricks_marketplace, custom_portal]
   - name: customer_360
     domain: sales
-    owner: sales-data-team@nucor.com
-    output_port: nucor_products.sales.v_customer_360
+    owner: sales-data-team@acme.com
+    output_port: acme_products.sales.v_customer_360
     sla: { freshness_minutes: 60, availability: "99.5%" }
   - name: melt_to_margin
     domain: operations
-    owner: ot-data-team@nucor.com
-    output_port: nucor_products.ops.v_melt_to_margin       # OT + sales joined product
+    owner: ot-data-team@acme.com
+    output_port: acme_products.ops.v_melt_to_margin       # OT + sales joined product
     sla: { freshness_minutes: 15, availability: "99.0%" }
+

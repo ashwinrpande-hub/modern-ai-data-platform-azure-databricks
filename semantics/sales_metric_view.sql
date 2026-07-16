@@ -1,14 +1,14 @@
--- Unity Catalog Metric View (Business Semantics — GA 2026).
+﻿-- Unity Catalog Metric View (Business Semantics — GA 2026).
 -- Define revenue/orders/AOV ONCE; AI/BI Dashboards, Genie spaces, SQL, and external BI
 -- (Power BI/Tableau/Sigma) all bind to the same governed definitions.
 -- Replaces the old pattern of pointing Genie at agg_sales_daily: the metric view carries
 -- synonyms + formats so Genie grounds NL questions deterministically (Genie Ontology-ready).
-CREATE OR REPLACE VIEW nucor_gold.sales.mv_sales_metrics
+CREATE OR REPLACE VIEW acme_gold.sales.mv_sales_metrics
 WITH METRICS
 LANGUAGE YAML
 AS $$
 version: 1.0
-source: nucor_gold.sales.fact_sales_orders
+source: acme_gold.sales.fact_sales_orders
 filter: order_amount_usd IS NOT NULL
 dimensions:
   - name: order_date
@@ -40,9 +40,10 @@ measures:
     display_name: Active Customers
 $$;
 
-ALTER VIEW nucor_gold.sales.mv_sales_metrics SET TAGS ('certified'='true','domain'='sales');
-GRANT SELECT ON VIEW nucor_gold.sales.mv_sales_metrics TO `sales_analyst_emea`;
-GRANT SELECT ON VIEW nucor_gold.sales.mv_sales_metrics TO `sales_analyst_americas`;
-GRANT SELECT ON VIEW nucor_gold.sales.mv_sales_metrics TO `sales_analyst_europe`;
+ALTER VIEW acme_gold.sales.mv_sales_metrics SET TAGS ('certified'='true','domain'='sales');
+GRANT SELECT ON VIEW acme_gold.sales.mv_sales_metrics TO `sales_analyst_emea`;
+GRANT SELECT ON VIEW acme_gold.sales.mv_sales_metrics TO `sales_analyst_americas`;
+GRANT SELECT ON VIEW acme_gold.sales.mv_sales_metrics TO `sales_analyst_europe`;
 -- Genie space + AI/BI dashboard are created ON this metric view (UI/API), inheriting
 -- the row filter from fact_sales_orders — regional analysts see regional metrics only.
+
