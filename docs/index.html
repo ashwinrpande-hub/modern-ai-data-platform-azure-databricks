@@ -65,7 +65,10 @@ td:first-child{color:var(--bright)}
     <button role="tab" aria-selected="false" onclick="tab(this,'p1')">Code Graph</button>
     <button role="tab" aria-selected="false" onclick="tab(this,'p2')">Data Vault PIT Bridge</button>
     <button role="tab" aria-selected="false" onclick="tab(this,'p3')">Justification Notes</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p4')">Session Notes</button></div>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p4')">Session Notes</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p5')">Gap Analysis</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p6')">Jd Alignment</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p7')">Replication Patterns</button></div>
 <div id="p0" class="tabpanel show" role="tabpanel">
 <p class="srcfile">source: docs/ARCHITECTURE.md</p>
 <h1>Architecture — acme Sales Lakehouse on Azure Databricks</h1>
@@ -163,11 +166,13 @@ validate.py checks 13–14 assert PIT freshness and bridge referential integrity
   DAB[[databricks.yml + resources/pipelines.yml]] -.deploys.-&gt; S1 &amp; G1
   Q[sql/*.sql] -.traces.-&gt; B &amp; S &amp; G
 </pre>
-<p>Files referenced above that don't exist yet in this repo (<code>ingestion/templates/bronze_ingest_template.py</code>,
-<code>ingestion/litmus_ot/litmus_eventhub_dlt.py</code>, <code>scripts/deploy.py</code>, <code>ml/feature_store.py</code>,
-<code>ai/vector_search_rag.py</code>, <code>data_products/publish_marketplace.sql</code>, <code>marketplace-ui/</code>) describe the
-target design, not the current state — tracked as open gaps, same as <code>docs/SESSION_NOTES.md</code>'s
-2026-07-05 gap analysis. What's real and running today: <code>pipelines/silver_dlt.py</code> and
+<p>The design-estate files referenced above (<code>ingestion/templates/bronze_ingest_template.py</code>,
+<code>ingestion/litmus_ot/litmus_eventhub_dlt.py</code>, <code>scripts/deploy.py</code>, <code>dq/dama_dq_framework.py</code>,
+<code>ml/feature_store.py</code>, <code>ai/vector_search_rag.py</code>, <code>data_products/publish_marketplace.sql</code>,
+<code>marketplace-ui/</code>, <code>security/unity_catalog_policies.sql</code>, agent design docs in <code>agents/*.md</code>) exist
+in-repo as design-stage code merged from the sibling working copy (2026-07-19) but are NOT yet
+deployed or validated against the workspace — still tracked as open gaps, same as
+<code>docs/SESSION_NOTES.md</code>'s 2026-07-05 gap analysis. What's real and running today: <code>pipelines/silver_dlt.py</code> and
 <code>pipelines/gold_dlt.py</code>, deployed via <code>databricks.yml</code>/<code>resources/pipelines.yml</code>, reading from
 Bronze tables seeded directly from <code>scripts/generate_synthetic_data.py</code> output (no ingestion pipeline
 yet — see <code>docs/ARCHITECTURE.md</code>'s Deployment section) and <code>config/seed_layer_mappings.sql</code>-seeded
@@ -473,6 +478,345 @@ inside transform_expr as consumed (JDE composite-key columns no longer false-pos
 - deployment_gate: classified all 5 failures with evidence and issued HOLD on the one genuine
   regression (pit_customer 1 day stale) — cleared by rerunning gold_pipeline (PIT now current).
 Remaining known gaps unchanged: row filters/masks not built; validate.py counts stale (checks 2–3).</p>
+</div>
+<div id="p5" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/GAP_ANALYSIS.md</p>
+<h1>Gap Analysis — repo vs. requirement (July 2026)</h1>
+<p>Legend: 🔴 broken/missing (claimed but not real) · 🟠 required but absent · 🟡 improvement / new-feature opportunity · ✅ solid</p>
+<h2>A. Claimed-in-docs but NOT in code (highest interview risk — fix first)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Evidence</th>
+<th>Fix (in this package)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>🔴 <strong>Silver is NOT config-driven.</strong> <code>silver_dlt.py</code> docstring says mappings come from <code>cfg.layer_mappings</code>; all mappings are hardcoded. <code>layer_mappings</code> is never seeded, never read.</td>
+<td><code>pipelines/silver_dlt.py</code> vs <code>config/config_tables.sql</code></td>
+<td>Updated <code>silver_dlt.py</code> (reads <code>cfg.layer_mappings</code>, hardcoded specs kept only as seed/fallback) + <code>config/seed_layer_mappings.sql</code></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>🔴 <strong><code>batch_log</code> never written.</strong> Requirement: "automated checks and logging for the rejected records <strong>and batches</strong>". Table exists; zero writers.</td>
+<td>grep: no writer for <code>audit.batch_log</code></td>
+<td><code>dq/quarantine_writer.py</code> writes batch_log from the DLT event log every run</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>🔴 <strong>DLT-dropped rows never reach <code>rejected_records</code>.</strong> <code>expect_all_or_drop</code> silently drops; the promised <code>dq/quarantine_writer.py</code> doesn't exist (referenced in <code>bronze_ingest_template.py</code>). Only the batch DQ job quarantines.</td>
+<td><code>ingestion/templates/bronze_ingest_template.py</code> comment</td>
+<td>New <code>dq/quarantine_writer.py</code>: parses pipeline event log expectations → rejected_records with DAMA dimension tag</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>🔴 <strong><code>validate.py</code> check #3 can never pass.</strong> "Sources registered ≥6" reads <code>cfg.source_registry</code>, but <code>deploy.py --register-source</code> never inserts into it.</td>
+<td><code>scripts/deploy.py</code></td>
+<td>Updated <code>deploy.py</code> inserts registry row per source</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>🔴 <strong>Referenced files missing</strong>: <code>ingestion/litmus_ot/uns_topic_map.yaml</code> (REPLICATION_PATTERNS R3), <code>gg_bronze_dlt.py</code> (R1 — actually covered by the shared template), <code>fx_rates</code> table (read by Silver, never created), <code>docs/SESSION_NOTES.md</code> (CLAUDE.md rule 4).</td>
+<td>docs vs tree</td>
+<td>Added <code>uns_topic_map.yaml</code>; <code>fx_rates</code> created+seeded in <code>seed_layer_mappings.sql</code>; R1 doc corrected to name the real template; SESSION_NOTES.md stub</td>
+</tr>
+</tbody>
+</table>
+<h2>B. Requirement present, repo silent (🟠 required)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Requirement text</th>
+<th>Gap</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1</td>
+<td>"dashboard showing that metrics" (DAMA 6 DQ dimensions) + trust in data products</td>
+<td>No dashboard artifact at all. <code>dq_results</code> exists but nothing consumes it.</td>
+<td><code>dashboards/dq_trust_dashboard.sql</code> — Lakeview-ready dataset queries: score by dimension over time, product trust scorecard, reject drill-down, freshness SLO</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>"oracle EBS <strong>and D365</strong> data along with <strong>MES</strong>" in region/sensitivity policies</td>
+<td>No EBS, D365, or MES source rows; security SQL only covers SAP/JDE/QAD</td>
+<td>3 new rows in <code>replication_sources.yaml</code> (EBS via OGG, D365 via Lakeflow Connect managed connector, MES via Litmus); <code>unity_catalog_policies.sql</code> region filter extended (EBS→AMERICAS, D365→GLOBAL-masked, MES→ot_engineer)</td>
+</tr>
+<tr>
+<td>B3</td>
+<td>Workflow orchestration (JD: "workflow orchestration tools"; deploy.py step 7 "jobs (DQ, features, vectors)")</td>
+<td>No job definitions exist anywhere</td>
+<td><code>pipelines/jobs/lakeflow_jobs.yaml</code> — Declarative Automation Bundle resources: dq job (with failure→healer webhook), quarantine writer, feature refresh, vector sync</td>
+</tr>
+<tr>
+<td>B4</td>
+<td>ML Feature Store "low-latency serving"</td>
+<td>Only a comment; no online path</td>
+<td><code>ml/feature_store.py</code> updated: publishes a <strong>Lakebase</strong>-synced online feature table (Lakebase is GA on Azure since Mar 2026)</td>
+</tr>
+<tr>
+<td>B5</td>
+<td>"RAG patterns" / Agent Bricks</td>
+<td><code>vector_search_rag.py</code> ends in a comment where the agent should be</td>
+<td><code>ai/rag_agent.py</code> — retriever tool + agent + Model Serving endpoint via Mosaic AI Agent Framework</td>
+</tr>
+<tr>
+<td>B6</td>
+<td>Synthetic data "from multiple source systems"</td>
+<td>Generator covers SAP VBAK, JDE F4201, OT only. No KNA1/F0101 (Silver customer reads them!), no QAD, SFDC, D365; <code>STEEL</code> product list defined but unused</td>
+<td><code>generate_synthetic_data.py</code> extended: kna1, f0101, qad so_mstr, sfdc opportunity, d365 salesorders — with product codes so a <code>dim_product</code> becomes possible</td>
+</tr>
+<tr>
+<td>B7</td>
+<td>Gold star schema depth ("dimensional modeling")</td>
+<td>Only <code>dim_customer</code> + 2 facts; no <code>dim_date</code>, no <code>dim_product</code>; <code>fact_heat_quality</code> comment promises a tonnage join it doesn't do</td>
+<td>Deliberately <strong>not</strong> auto-fixed (would need your grain decisions) — flagged as open question below</td>
+</tr>
+</tbody>
+</table>
+<h2>C. Latest-feature upgrades (🟡 — what changed since the repo was written)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature (status, July 2026)</th>
+<th>Where it lands</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td><strong>Oracle query-based connector — GA May 2026.</strong> Databricks-native Oracle/EBS ingestion via cursor column, no gateway, no OGG.</td>
+<td>New pattern <code>lakeflow_query</code> in YAML + REPLICATION_PATTERNS R1b. Positioning: OGG stays for true CDC/deletes; query-based for cursor-friendly tables (EBS <code>LAST_UPDATE_DATE</code>). This directly answers "how to do it Databricks-native."</td>
+</tr>
+<tr>
+<td>C2</td>
+<td><strong>Zerobus (Lakeflow Connect direct-write API)</strong> — high-throughput (~100MB/s), &lt;5s latency event ingestion without managing Event Hubs consumers.</td>
+<td>Documented as Path C for Litmus OT in R3; Litmus can push straight to the lakehouse. Event Hubs path kept as default (Litmus ships a native EH connector today).</td>
+</tr>
+<tr>
+<td>C3</td>
+<td><strong>AUTO CDC replaces <code>apply_changes</code></strong> in Lakeflow Spark Declarative Pipelines; <code>dlt</code> module direction is <code>pyspark.pipelines</code>.</td>
+<td>Bronze template updated to <code>create_auto_cdc_flow</code> with graceful fallback; comment notes the module rename so the repo doesn't look pre-2025.</td>
+</tr>
+<tr>
+<td>C4</td>
+<td><strong>Unity Catalog Metric Views / Business Semantics — GA</strong>, integrated with AI/BI Dashboards + Genie.</td>
+<td><code>semantics/sales_metric_view.sql</code> — revenue/orders/AOV defined once; Genie space and dashboards both bind to it. Replaces "Genie hits agg table" with the 2026-correct answer.</td>
+</tr>
+<tr>
+<td>C5</td>
+<td><strong>Lakebase GA on Azure (Mar 2026)</strong> — autoscaling, HA, scale-to-zero.</td>
+<td>B4 above; also noted as the backing store for the marketplace UI if it needs app state.</td>
+</tr>
+<tr>
+<td>C6</td>
+<td><strong>Data Quality Monitoring / Anomaly Detection (Public Preview) + table health indicators.</strong></td>
+<td>Noted in dashboard SQL header: complements (not replaces) the DAMA framework — anomaly detection = unknown-unknowns, DAMA rules = contractual thresholds. Good interview talking point.</td>
+</tr>
+<tr>
+<td>C7</td>
+<td><strong>Declarative Automation Bundles</strong> (Asset Bundles renamed).</td>
+<td><code>lakeflow_jobs.yaml</code> written in bundle resource shape; deploy.py notes <code>databricks bundle deploy</code> as the target-state deployer vs raw REST.</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>Real-time mode (<code>update_flow</code>, ms-latency, Public Preview)</td>
+<td>Documented option in R3 for OT alerting use cases; not defaulted (preview).</td>
+</tr>
+</tbody>
+</table>
+<h2>D. Open questions (per CLAUDE.md rule 3 — no assumptions made)</h2>
+<ol>
+<li><strong>Gold dims</strong>: should <code>dim_product</code> key off SAP MATNR / JDE item / QAD part unified by hash key, and what survivorship order? (B7)</li>
+<li><strong>fact_heat_quality ↔ shipped tonnage</strong>: which table carries daily tonnage — JDE F4211 lines or MES? Join grain (site+date?) needs your call.</li>
+<li><strong>D365 scope</strong>: which entities (salesorders only, or accounts/quotes)? Managed connector vs Synapse Link landing?</li>
+<li><strong>OGG retirement horizon</strong>: if EBS tables all have reliable <code>LAST_UPDATE_DATE</code>, query-based connector could retire OGG entirely — licensing decision, not technical.</li>
+<li><code>Old/</code> folder still ships stale content (599-line old README, jsx) — delete before sharing repo access at the interview?</li>
+</ol>
+</div>
+<div id="p6" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/JD_ALIGNMENT.md</p>
+<h1>JD Alignment — Senior Data Engineer (Agentic Lakehouse)</h1>
+<p>Maps each requirement to (a) proof in this repo, (b) real project history. Use for resume
+tailoring and interview talking points. Source-of-truth for both: this file only — do not
+duplicate into ARCHITECTURE.md or REPLICATION_PATTERNS.md.</p>
+<table>
+<thead>
+<tr>
+<th>JD requirement</th>
+<th>Repo evidence</th>
+<th>Real-world evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6+ yrs modern data platforms/pipelines</td>
+<td>Full Bronze→Silver→Gold→Products lakehouse, config-driven</td>
+<td>19+ yrs; BNY (Customer MDM/governance), JPMC, UBS, Bank of America, Westfield, Autoliv, Bayer</td>
+</tr>
+<tr>
+<td>AI/ML-driven workflows</td>
+<td><code>agents/</code> (dq_rca_agent, pipeline_healer, lineage_doc_agent, ingestion_registrar); <code>ml/feature_store.py</code>; <code>ai/vector_search_rag.py</code></td>
+<td>New — this repo is the primary proof point; position as hands-on agentic build, not just theory</td>
+</tr>
+<tr>
+<td>Strong SQL &amp; Python</td>
+<td><code>config/config_tables.sql</code>, <code>dq/dama_dq_framework.py</code>, <code>pipelines/*_dlt.py</code>, <code>scripts/*.py</code></td>
+<td>Snowflake/T-SQL/PySpark across all prior engagements</td>
+</tr>
+<tr>
+<td>Databricks, Delta Lake, Spark hands-on</td>
+<td>Entire repo: DLT pipelines, Delta tables, Liquid Clustering, Unity Catalog</td>
+<td>Azure Databricks at Westfield Insurance (P&amp;C) and Autoliv (manufacturing)</td>
+</tr>
+<tr>
+<td>ETL/ELT in Azure</td>
+<td>ADLS Gen2 landing, Lakeflow Connect, Azure DevOps CI/CD</td>
+<td>Azure Databricks/ADF pipelines at Westfield, Autoliv</td>
+</tr>
+<tr>
+<td>Workflow orchestration tools</td>
+<td>Lakeflow Jobs orchestration; <code>.azuredevops/azure-pipelines.yml</code></td>
+<td>ADF/Databricks Workflows at prior engagements</td>
+</tr>
+<tr>
+<td>Agentic automation concepts</td>
+<td><code>agents/*.md</code> specs: self-healing pipelines, DQ root-cause-analysis agent, lineage-doc agent, ingestion registrar agent — all config-driven, no hardcoded logic</td>
+<td>Differentiator — most candidates will only have orchestration, not self-healing/agentic design</td>
+</tr>
+<tr>
+<td>DW/DL/Lakehouse design</td>
+<td>Medallion (3NF Bronze/Silver, star Gold), hash-key joins, config-table lineage</td>
+<td>Data Vault 2.0 on Snowflake at Autoliv; Snowflake medallion at Vertiv-style platform build</td>
+</tr>
+<tr>
+<td>CI/CD (Azure DevOps preferred)</td>
+<td><code>.azuredevops/azure-pipelines.yml</code>, <code>scripts/validate.py</code> as CI gate</td>
+<td>Azure DevOps pipelines in prior Azure engagements</td>
+</tr>
+<tr>
+<td>Agile</td>
+<td>—</td>
+<td>Standard across all consulting engagements (BNY, Westfield, Autoliv)</td>
+</tr>
+<tr>
+<td>MDM / Reference Data collaboration</td>
+<td><code>security/unity_catalog_policies.sql</code> (region-based RBAC), hash-key dimension model as reference-data backbone</td>
+<td>Direct: Customer MDM + data governance frameworks at BNY</td>
+</tr>
+<tr>
+<td>Observability/monitoring/alerting</td>
+<td><code>dq/</code> quarantine + rejected-record logging; batch_log/dq_results tables; SQL freshness alerts</td>
+<td>Standard governance practice from BNY/Westfield engagements</td>
+</tr>
+</tbody>
+</table>
+<h2>How to use this in interview prep</h2>
+<ul>
+<li>Lead with BNY MDM + governance as the "why data quality/lineage/config-driven design matters to me" story.</li>
+<li>Use this repo as the concrete Databricks-native answer to "have you worked with agentic pipelines?" — walk through <code>agents/pipeline_healer.md</code> and <code>agents/dq_rca_agent.md</code> specifically, since that's the requirement most candidates will fake or hand-wave.</li>
+<li>Bridge Data Vault 2.0 (Autoliv/Snowflake) → hash-key Silver design here: same deterministic-key idea, applied without full hub/link/sat overhead (see <code>JUSTIFICATION_NOTES.md</code> #4–5 for the reasoning to repeat verbatim in an interview).</li>
+<li>If asked about production Databricks depth specifically (vs. Snowflake): be upfront that Westfield/Autoliv is your hands-on Databricks base, and this repo demonstrates the newer Databricks 2025/2026 surface (Lakeflow Connect, Agent Bricks, Genie, Lakebase) applied to that same real-world pattern set.</li>
+</ul>
+<h2>Gaps to name honestly (don't oversell)</h2>
+<ul>
+<li>No production Databricks Marketplace publish in real engagements — <code>data_products/publish_marketplace.sql</code> here is a design/demo, say so if asked directly.</li>
+<li>Agentic pipeline healing is a <strong>build</strong>, not yet <strong>production-run-at-scale</strong> — frame as "designed and implemented in a representative environment," not "running in prod for N years."</li>
+</ul>
+</div>
+<div id="p7" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/REPLICATION_PATTERNS.md</p>
+<h1>Reusable Replication Patterns → Bronze</h1>
+<p>Goal: <strong>any technical person</strong> lands a new source in Bronze by (1) adding one row to
+<code>config/replication_sources.yaml</code>, (2) running <code>scripts/deploy.py --register-source &lt;name&gt;</code>.
+No new code. Three patterns cover the estate.</p>
+<hr />
+<h2>Pattern R1 — Oracle DB / Oracle EBS via GoldenGate</h2>
+<p><strong>Today:</strong> OGG classic replicat → target DB.
+<strong>Target state (Databricks-native landing):</strong></p>
+<pre><code>Oracle / EBS --OGG Extract--&gt; OGG for Distributed Apps &amp; Analytics (BigData)
+        --&gt; ADLS Gen2 landing zone (Avro/JSON, op_type + CSN metadata)
+        --&gt; Auto Loader (cloudFiles) --&gt; DLT AUTO CDC / APPLY CHANGES INTO --&gt; bronze.&lt;schema&gt;.&lt;table&gt;
+</code></pre>
+<ul>
+<li>OGG handler: <code>abs</code> (Azure Blob/ADLS) or the Kafka handler if sub-minute latency is needed.</li>
+<li>Template: <code>ingestion/templates/bronze_ingest_template.py</code> (pattern <code>goldengate</code>) — reads the
+  YAML row, applies AUTO CDC keyed on PK with <code>sequence_by = csn</code>, deletes handled via op_type.</li>
+<li>EBS specifics: replicate base tables (e.g., <code>OE_ORDER_HEADERS_ALL</code>), not views/APIs;
+  keep <code>ORG_ID</code>, <code>LAST_UPDATE_DATE</code> for partitioning + sequencing.</li>
+</ul>
+<p><strong>Alternatives considered:</strong> (a) Pattern R1b below — now GA. (b) OGG → Kafka →
+Structured Streaming — choose when many consumers need the same CDC stream.</p>
+<hr />
+<h2>Pattern R1b — Oracle / EBS via Lakeflow Connect query-based connector (Databricks-native, GA May 2026)</h2>
+<pre><code>Oracle / EBS --UC connection (Lakehouse Federation)--&gt; Lakeflow Connect query-based pipeline
+        --cursor column (e.g. LAST_UPDATE_DATE)--&gt; streaming table in bronze.&lt;schema&gt;.&lt;table&gt;
+</code></pre>
+<ul>
+<li><strong>Zero extra infra</strong>: no OGG, no gateway, no staging volume — the connector queries the source
+  and tracks a high-water mark on a monotonically increasing cursor column.</li>
+<li>YAML: <code>pattern: lakeflow_query</code> + <code>connection_name</code> + <code>cursor_column</code> (see <code>ebs_ra_customer_trx</code>).</li>
+<li><strong>Choose R1 (OGG) when</strong>: hard deletes must be captured, exact ordered replay (CSN) matters,
+  or the table lacks a reliable cursor column. <strong>Choose R1b when</strong>: soft-delete/insert-update
+  tables with <code>LAST_UPDATE_DATE</code> — most EBS transactional tables qualify.</li>
+<li>Strategic answer to "Databricks-native for Oracle": R1b per table where the cursor works,
+  R1 retained only for the CDC-hard subset; both are one-line pattern swaps in the YAML.</li>
+</ul>
+<hr />
+<h2>Pattern R2 — SQL Server (replacing Fabric Mirroring)</h2>
+<p><strong>Databricks-native:</strong> <strong>Lakeflow Connect SQL Server connector</strong> (managed; uses CDC / Change Tracking):</p>
+<pre><code>SQL Server (CDC or CT enabled) --&gt; Lakeflow Connect ingestion gateway (classic compute in your VNet)
+        --&gt; staging volume --&gt; managed ingestion pipeline --&gt; bronze tables (SCD-ready)
+</code></pre>
+<ul>
+<li>Enable per-table: CDC for full before/after images; Change Tracking when only keys/net changes are needed.</li>
+<li>Config in <code>ingestion/sqlserver/lakeflow_sqlserver.yaml</code>; one gateway per SQL instance, one
+  pipeline per database, table list driven by the same <code>replication_sources.yaml</code>.</li>
+</ul>
+<p><strong>Alternatives considered:</strong> (a) keep Fabric Mirroring + read via shortcut/external location —
+zero ingestion compute, but data lives in OneLake and governance splits across two platforms.
+(b) Debezium → Event Hubs (Kafka API) → Structured Streaming — most control/lowest latency,
+highest ops burden.</p>
+<hr />
+<h2>Pattern R3 — OT / plant-floor data via Litmus Edge</h2>
+<p><strong>Today:</strong> Litmus syncs to Delta/Parquet landing.
+<strong>Templatized target:</strong></p>
+<pre><code>PLCs/SCADA/Historians --&gt; Litmus Edge (UNS topics, normalization at edge)
+   ├─ Path A (default): Litmus → ADLS Gen2 parquet landing --&gt; Auto Loader --&gt; bronze.ot.*
+   ├─ Path B (low latency): Litmus → Azure Event Hubs (Kafka API) --&gt; Structured Streaming --&gt; bronze.ot.*
+   └─ Path C (2026, evaluate): Litmus flow → **Zerobus** (Lakeflow Connect direct-write API,
+      ~100MB/s, &lt;5s latency) --&gt; bronze.ot.*  — removes the Event Hubs hop + consumer entirely
+</code></pre>
+<ul>
+<li>Sub-second OT alerting (e.g., furnace excursion) is a fit for Lakeflow <strong>real-time mode</strong>
+  (<code>update_flow</code>, Public Preview) on Path B/C streams — keep out of the default path until GA.</li>
+<li>Topic→table mapping is config: <code>ingestion/litmus_ot/uns_topic_map.yaml</code>
+  (e.g., <code>acme/berkeley/meltshop/furnace1/temperature</code> → <code>bronze.ot.furnace_telemetry</code>).</li>
+<li>Template enforces the OT envelope: <code>site, area, line, asset, tag, ts, value, quality, ingest_ts</code>.</li>
+<li>Late/out-of-order events handled with watermarking; raw payload kept in <code>_raw</code> (schema-on-read).</li>
+</ul>
+<p><strong>Alternatives considered:</strong> (a) Litmus → IoT Hub / IoT Operations → Event Hubs — adds device
+management you do not need since Litmus owns the edge. (b) direct historian pull (PI via JDBC) —
+batch-only, loses edge normalization and UNS context.</p>
+<hr />
+<h2>The contract every pattern obeys (what makes it reusable)</h2>
+<ol>
+<li><strong>One YAML row per source object</strong> → <code>config/replication_sources.yaml</code>
+   (system, pattern, pk, sequence_col, region, schedule, expectations).</li>
+<li><strong>Same Bronze envelope</strong> on every table: <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code>.</li>
+<li><strong>Same template per pattern</strong> in <code>ingestion/templates/</code> — parameterized DLT, never copied.</li>
+<li><strong>Same DQ gate</strong>: expectations from YAML; rejects → <code>acme_bronze.audit.rejected_records</code> with reason.</li>
+<li><strong>Same registration</strong>: <code>deploy.py --register-source</code> writes config tables, creates the DLT
+   pipeline via REST, and records lineage in <code>acme_bronze.audit.source_registry</code>.</li>
+</ol>
 </div>
 </div>
 <script>

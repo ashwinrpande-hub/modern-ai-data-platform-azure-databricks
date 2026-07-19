@@ -29,11 +29,13 @@ flowchart LR
   Q[sql/*.sql] -.traces.-> B & S & G
 ```
 
-Files referenced above that don't exist yet in this repo (`ingestion/templates/bronze_ingest_template.py`,
-`ingestion/litmus_ot/litmus_eventhub_dlt.py`, `scripts/deploy.py`, `ml/feature_store.py`,
-`ai/vector_search_rag.py`, `data_products/publish_marketplace.sql`, `marketplace-ui/`) describe the
-target design, not the current state — tracked as open gaps, same as `docs/SESSION_NOTES.md`'s
-2026-07-05 gap analysis. What's real and running today: `pipelines/silver_dlt.py` and
+The design-estate files referenced above (`ingestion/templates/bronze_ingest_template.py`,
+`ingestion/litmus_ot/litmus_eventhub_dlt.py`, `scripts/deploy.py`, `dq/dama_dq_framework.py`,
+`ml/feature_store.py`, `ai/vector_search_rag.py`, `data_products/publish_marketplace.sql`,
+`marketplace-ui/`, `security/unity_catalog_policies.sql`, agent design docs in `agents/*.md`) exist
+in-repo as design-stage code merged from the sibling working copy (2026-07-19) but are NOT yet
+deployed or validated against the workspace — still tracked as open gaps, same as
+`docs/SESSION_NOTES.md`'s 2026-07-05 gap analysis. What's real and running today: `pipelines/silver_dlt.py` and
 `pipelines/gold_dlt.py`, deployed via `databricks.yml`/`resources/pipelines.yml`, reading from
 Bronze tables seeded directly from `scripts/generate_synthetic_data.py` output (no ingestion pipeline
 yet — see `docs/ARCHITECTURE.md`'s Deployment section) and `config/seed_layer_mappings.sql`-seeded
