@@ -69,7 +69,8 @@ td:first-child{color:var(--bright)}
     <button role="tab" aria-selected="false" onclick="tab(this,'p5')">Demo Runbook</button>
     <button role="tab" aria-selected="false" onclick="tab(this,'p6')">Gap Analysis</button>
     <button role="tab" aria-selected="false" onclick="tab(this,'p7')">Jd Alignment</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p8')">Replication Patterns</button></div>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p8')">Replication Patterns</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p9')">Traceability Matrix</button></div>
 <div id="p0" class="tabpanel show" role="tabpanel">
 <p class="srcfile">source: docs/ARCHITECTURE.md</p>
 <h1>Architecture — acme Sales Lakehouse on Azure Databricks</h1>
@@ -921,6 +922,438 @@ batch-only, loses edge normalization and UNS context.</p>
 <li><strong>Same registration</strong>: <code>deploy.py --register-source</code> writes config tables, creates the DLT
    pipeline via REST, and records lineage in <code>acme_bronze.audit.source_registry</code>.</li>
 </ol>
+</div>
+<div id="p9" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/TRACEABILITY_MATRIX.md</p>
+<h1>Requirements Traceability Matrix</h1>
+<p>Source: "requirements azure databricks data vault" spec (Nucor tech challenge).
+Status legend — ✅ <strong>Deployed &amp; validated</strong> (running in workspace adb-7405618665227003,
+verified this build) · 🟡 <strong>Partial</strong> (core deployed, named remainder open) ·
+📘 <strong>Design-only</strong> (code/docs in repo, not deployed) · ❌ <strong>Gap</strong> (not built).</p>
+<p>Verification anchors: <code>scripts/validate.py</code> = 14/14 green (2026-07-19);
+<code>audit.agent_runs</code> / <code>agent_reports</code> = agent evidence; <code>sql/03</code> = zero-orphan lineage.</p>
+<h2>1 — Replication / ingestion patterns</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence (script / object)</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1.1</td>
+<td>Oracle / Oracle EBS via GoldenGate pattern</td>
+<td><code>config/replication_sources.yaml</code> (goldengate ×5 incl. EBS), <code>ingestion/goldengate/gg_adls_handler.props</code>, <code>docs/REPLICATION_PATTERNS.md</code>, JUSTIFICATION #1</td>
+<td>📘 Design-only (Bronze seeded synthetically instead)</td>
+</tr>
+<tr>
+<td>R1.2</td>
+<td>SQL Server: replace Fabric Mirroring with Databricks-native</td>
+<td><code>replication_sources.yaml</code> (lakeflow_sqlserver), <code>ingestion/sqlserver/enable_cdc.sql</code> + <code>lakeflow_sqlserver.yaml</code>, JUSTIFICATION #2</td>
+<td>📘 Design-only</td>
+</tr>
+<tr>
+<td>R1.3</td>
+<td>OT data via Litmus → Delta</td>
+<td><code>replication_sources.yaml</code> (litmus_eventhub/adls ×3), <code>ingestion/litmus_ot/*</code>, <code>pipelines/silver_dlt.py::furnace_heat_5min</code> (watermarked streaming agg — deployed), <code>acme_bronze.ot.furnace_telemetry</code> (seeded)</td>
+<td>🟡 Silver OT flow deployed; edge ingestion design-only</td>
+</tr>
+<tr>
+<td>R1.4</td>
+<td>Reusable templatized patterns any technical person can use</td>
+<td><code>replication_sources.yaml</code> (14 sources / 8 patterns — one YAML row per source), <code>ingestion/templates/bronze_ingest_template.py</code>, <code>cfg.source_registry</code> (14 rows live)</td>
+<td>🟡 Config estate live; template pipeline not deployed</td>
+</tr>
+</tbody>
+</table>
+<h2>2 — Platform, presentation, justification</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R2.1</td>
+<td>Production-ready platform, Sales domain, Databricks-max</td>
+<td>Whole repo; 2 Lakeflow DLT pipelines + 3 jobs deployed via DAB (<code>databricks.yml</code>, <code>resources/*.yml</code>)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R2.2</td>
+<td>60-min interactive HTML presentation</td>
+<td><code>presentation/index.html</code> (19 slides, verified via headless Chrome)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R2.3</td>
+<td>Justification notes, 2 alternatives per decision</td>
+<td><code>docs/JUSTIFICATION_NOTES.md</code> (11 decisions × 2 alternatives)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R2.4</td>
+<td>Real-time ingestion alongside ERP</td>
+<td>Design: Event Hubs/Zerobus patterns; deployed: watermarked streaming in <code>silver_dlt.py</code> over seeded OT</td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R2.5</td>
+<td>Real/synthetic data from multiple sources</td>
+<td><code>scripts/generate_synthetic_data.py</code> → 7 systems, ~25.9K rows in Bronze</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2>3 — Medallion + Data Vault 2.0</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R3.1</td>
+<td>Bronze/Silver/Gold with rationale</td>
+<td><code>pipelines/silver_dlt.py</code> (9 flows), <code>pipelines/gold_dlt.py</code> (6 flows), <code>docs/ARCHITECTURE.md</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.2</td>
+<td>DV2.0 methodology; PIT + bridge use cases in Gold</td>
+<td><code>gold_dlt.py::pit_customer</code> + <code>bridge_order_fulfillment</code>, <code>docs/DATA_VAULT_PIT_BRIDGE.md</code>, validate checks 13–14</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.3</td>
+<td>DQ/cleansing per DAMA 6 dimensions</td>
+<td><code>agents/dq_monitor_rca.py</code> (10 checks → <code>audit.dq_results</code>, deployed), DLT expectations in <code>silver_dlt.py</code>, <code>dq/dama_dq_framework.py</code> (design)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.4</td>
+<td>Advanced features: DLT/Lakeflow, Delta, UC, Genie, Agent Bricks, AI/BI, Serving, Apps, Lakebase</td>
+<td>DLT+Jobs+UC+liquid clustering+CDF ✅; metric view for Genie ✅; agents (custom, deployed) ✅; Vector endpoint provisioning 🟡; Lakebase (<code>ml/feature_store.py</code>) + Apps (<code>marketplace-ui/</code>) 📘</td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R3.5</td>
+<td>Bronze and Silver in 3NF</td>
+<td>Bronze mirrors source 3NF; Silver 3NF entities</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.6</td>
+<td>Silver insert-only; sha256(source_system|pk) hash keys</td>
+<td><code>silver_dlt.py::hash_key/silver_envelope</code>; validate checks 5–6 (no UPDATE/DELETE in history; 64-hex)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.7</td>
+<td>Gold joins dimensions on hash keys</td>
+<td><code>gold_dlt.py</code> (all joins on *_hk)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R3.8</td>
+<td>Config tables for source→target mapping per layer, lineage-tracked</td>
+<td><code>cfg.layer_mappings</code> (40 versioned rows) drives Silver graph at build time (<code>silver_dlt.py::load_mappings</code>); <code>config/seed_layer_mappings.sql</code>, <code>config/config_tables.sql</code></td>
+<td>🟡 Silver fully config-driven; Gold intentionally structural (JUSTIFICATION/PIT-bridge notes)</td>
+</tr>
+<tr>
+<td>R3.9</td>
+<td>Automated checks + logging of rejected records and batches</td>
+<td><code>scripts/validate.py</code> (14/14), <code>audit.dq_results</code> (populated), <code>audit.rejected_records</code> + <code>batch_log</code> (tables exist, <strong>not yet written by pipelines</strong> — <code>dq/quarantine_writer.py</code> design)</td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R3.10</td>
+<td>Roles/policies: sensitive data + region (EU-SAP, AM-JDE, EMEA-QAD)</td>
+<td><code>acme_gold.sec.region_filter</code> + <code>mask_customer_name</code> enforced in <code>gold_dlt.py</code> (row_filter/MASK — validate checks 8–9 ✅); PII tags; grants staged in <code>security/unity_catalog_policies.sql</code></td>
+<td>🟡 Policies live; account groups pending admin creation</td>
+</tr>
+</tbody>
+</table>
+<h2>4 — Use-case architectures &amp; performance</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R4.1</td>
+<td>ML feature store: PIT correctness, versioning, low-latency</td>
+<td><code>ml/build_features.py</code> + <code>resources/ml.yml</code> job (deployed; strict <code>order_date &lt; as_of_date</code>; 1,001 rows; append per as_of_date = versioning); Lakebase online serving in <code>ml/feature_store.py</code></td>
+<td>🟡 Offline deployed; online serving design-only</td>
+</tr>
+<tr>
+<td>R4.2</td>
+<td>BI: dimensional model, aggregations, query performance</td>
+<td>Gold star + <code>agg_sales_daily</code> + metric view <code>mv_sales_metrics</code> (deployed, MEASURE()-queryable); <code>dashboards/dq_trust_dashboard.sql</code> (design)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R4.3</td>
+<td>AI-ready: embeddings, semantic search, RAG</td>
+<td><code>customer_narratives</code> + <code>ai.customer_profile_text</code> (CDF, deployed); <code>ai/provision_vector_search.py</code> (endpoint <code>acme-vs</code> provisioning); <code>ai/vector_search_rag.py</code>, <code>ai/rag_agent.py</code> (design)</td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R4.4</td>
+<td>Clustering, MVs, search optimization</td>
+<td>Liquid clustering on fact/PIT/bridge (<code>gold_dlt.py cluster_by</code>); DLT materialized views; Photon (serverless default)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R4.5</td>
+<td>Warehouse sizing/auto-scaling; cost optimization</td>
+<td><code>docs/ARCHITECTURE.md</code> (auto-stop, autoscale, budget alerts, shallow clones); serverless everywhere in practice</td>
+<td>🟡 Documented + serverless; no SQL warehouse provisioned</td>
+</tr>
+</tbody>
+</table>
+<h2>5 — Data products (mesh principles)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R5.1</td>
+<td>Domain products with input/output contracts</td>
+<td><code>acme_products.sales.v_sales_orders</code>, <code>v_customer_360</code>, <code>ops.v_melt_to_margin</code> (+ agent-built <code>order_to_cash</code>) — COMMENT contracts + tags; <code>data_products/data_products.yaml</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R5.2</td>
+<td>SLAs, ownership, governance + DQ trust metrics + dashboard</td>
+<td>SLA/owner in view comments; <code>meta.v_product_trust_scores</code> (live, from dq_results); trust dashboard SQL design-only</td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R5.3</td>
+<td>Publish to Databricks Marketplace; discovery + consumption</td>
+<td>UC tags for discovery ✅; <code>data_products/publish_marketplace.sql</code>; <strong>CREATE SHARE denied — metastore privilege missing</strong></td>
+<td>🟡 blocked on admin</td>
+</tr>
+</tbody>
+</table>
+<h2>6 — Custom marketplace UI (stretch)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R6.1</td>
+<td>Independent front-end portal, deployed on Azure</td>
+<td><code>marketplace-ui/backend/app.py</code> + <code>frontend/index.html</code> (independent code)</td>
+<td>📘 Not deployed</td>
+</tr>
+<tr>
+<td>R6.2</td>
+<td>AI-powered metadata search</td>
+<td>Depends on <code>acme-vs</code> endpoint (provisioning) + portal deploy</td>
+<td>❌ Stretch, open</td>
+</tr>
+</tbody>
+</table>
+<h2>7 — Business value</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R7.1</td>
+<td>Quantified value / strategic impact</td>
+<td>Presentation "Value·ROI" slide ($1.2M/yr modeled, 4 drivers, before/after)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R7.2</td>
+<td>Implementation roadmap pilot→enterprise</td>
+<td>Presentation roadmap (4 phases with value/yr)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R7.3</td>
+<td>Risks &amp; mitigations</td>
+<td>Presentation "Risks" slide (6 risks)</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2>8 — Interview deliverables</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R8.1</td>
+<td>Working Databricks environment + read-only access</td>
+<td>Workspace live, all green; <strong>read-only viewer grant = manual admin step</strong></td>
+<td>🟡</td>
+</tr>
+<tr>
+<td>R8.2</td>
+<td>Deployed marketplace UI URL</td>
+<td>—</td>
+<td>❌ (stretch)</td>
+</tr>
+<tr>
+<td>R8.3</td>
+<td>GitHub repository, code + docs</td>
+<td>github.com/ashwinrpande-hub/modern-ai-data-platform-azure-databricks (dv2)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R8.4</td>
+<td>Architecture diagrams incl. performance</td>
+<td>Presentation slides 5–8 + <code>docs/CODE_GRAPH.md</code> mermaid</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R8.5</td>
+<td>Presentation slides (technical + strategic)</td>
+<td><code>presentation/index.html</code></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2>9 — Process &amp; agentic (JD + closing asks)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R9.1</td>
+<td>Agentic workflows / self-healing pipelines</td>
+<td><code>agents/</code> 6 agents + <code>agent_core.py</code>, 3 jobs deployed, all validated <code>mode=llm</code>; healer/registrar/lineage-doc specs in <code>agents/*.md</code></td>
+<td>🟡 6 live; 4 spec'd agents design-only</td>
+</tr>
+<tr>
+<td>R9.2</td>
+<td>.md per section; session summaries; token-optimized docs</td>
+<td><code>docs/*.md</code> (12 files) + <code>docs/index.html</code> tabbed site; <code>docs/SESSION_NOTES.md</code> dated log</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R9.3</td>
+<td>Automation + validation scripts</td>
+<td><code>scripts/validate.py</code> (CI gate), <code>scripts/generate_synthetic_data.py</code>, <code>scripts/deploy.py</code> (design), agents</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R9.4</td>
+<td>Code graph</td>
+<td><code>docs/CODE_GRAPH.md</code> (mermaid, rendered in docs site)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>R9.5</td>
+<td>JD skills traceability</td>
+<td><code>docs/JD_ALIGNMENT.md</code> (JD → repo → real-world evidence)</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2>Score &amp; open gaps (prioritized)</h2>
+<p><strong>28 requirements: 17 ✅ · 12 🟡 · 4 📘 · 2 ❌</strong> (some IDs span categories).</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Smallest closing action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Bronze ingestion pipelines not deployed (R1.1–R1.4)</td>
+<td>Deploy <code>ingestion/templates/bronze_ingest_template.py</code> as a DLT pipeline for ONE pattern (autoloader_file over <code>data/</code> uploads) to prove the template</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>rejected_records</code>/<code>batch_log</code> never written by pipelines (R3.9)</td>
+<td>Wire <code>dq/quarantine_writer.py</code> logic into <code>silver_dlt.py</code> expectations, or extend the DQ agent to snapshot DLT expectation metrics per run</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Delta Share / Marketplace listing (R5.3)</td>
+<td>Metastore admin grants CREATE SHARE, then run <code>data_products/publish_marketplace.sql</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Account groups for regional RBAC (R3.10)</td>
+<td>Account admin creates <code>sales_analyst_*</code>/<code>data_engineer</code>/<code>data_steward</code>; rerun grants in <code>security/unity_catalog_policies.sql</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Vector index + RAG serving (R4.3)</td>
+<td>Rerun <code>ai/provision_vector_search.py</code> once <code>acme-vs</code> is ONLINE; then <code>ai/rag_agent.py</code> needs a serving endpoint</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Marketplace UI not deployed (R6)</td>
+<td>Azure App Service / Static Web App deploy of <code>marketplace-ui/</code>; point backend at <code>cfg.product_registry</code> + trust view</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Trust dashboard not live (R5.2)</td>
+<td>Create SQL warehouse → import <code>dashboards/dq_trust_dashboard.sql</code> as AI/BI dashboard</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Read-only interview access (R8.1)</td>
+<td>Workspace admin invites reviewer as workspace user with SELECT-only grants on the 4 catalogs</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <script>
