@@ -2,8 +2,8 @@
 """Post-deployment validation — 14 checks, exits non-zero on failure (CI gate)."""
 CHECKS = [
  ("Catalogs exist",            "SELECT count(*) FROM system.information_schema.catalogs WHERE catalog_name IN ('acme_bronze','acme_silver','acme_gold','acme_products')", 4),
- ("Config tables",             "SELECT count(*) FROM acme_bronze.information_schema.tables WHERE table_schema IN ('cfg','audit')", 5),
- ("Sources registered",        "SELECT count(*) FROM acme_bronze.cfg.source_registry WHERE active", 6),
+ ("Config tables",             "SELECT count(*) FROM acme_bronze.information_schema.tables WHERE table_schema IN ('cfg','audit')", ">=9"),
+ ("Sources registered",        "SELECT count(*) FROM acme_bronze.cfg.source_registry WHERE active", 14),
  ("Bronze envelope present",   "SELECT count(*) FROM acme_bronze.information_schema.columns WHERE column_name='_ingest_ts'", ">=6"),
  ("Silver insert-only (no deletes in history)", "SELECT count(*) FROM (DESCRIBE HISTORY acme_silver.sales.sales_order_header) WHERE operation IN ('DELETE','UPDATE')", 0),
  ("Hash keys 64-char hex",     "SELECT count(*) FROM acme_silver.sales.sales_order_header WHERE hk NOT RLIKE '^[0-9a-f]{64}$'", 0),

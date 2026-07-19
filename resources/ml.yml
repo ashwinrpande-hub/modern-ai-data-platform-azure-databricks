@@ -1,0 +1,16 @@
+resources:
+  jobs:
+    ml_features_job:
+      name: acme_ml_features
+      description: >
+        Builds the PIT-correct customer feature snapshot (acme_gold.ml.customer_features).
+        Run after gold_pipeline refreshes; append-only per (customer_hk, as_of_date).
+      environments:
+        - environment_key: ml_env
+          spec:
+            environment_version: "3"
+      tasks:
+        - task_key: build_features
+          spark_python_task:
+            python_file: ../ml/build_features.py
+          environment_key: ml_env

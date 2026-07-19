@@ -16,12 +16,11 @@ from agent_core import ensure_audit_tables, get_spark, log_run, run_reasoning, s
 from scripts.validate import CHECKS
 
 GATE_SYSTEM = """You are the deployment-gate agent for the acme lakehouse CI pipeline.
-You receive the results of the 14-check validation suite. Known tracked gaps (documented
-in docs/SESSION_NOTES.md, not regressions): UC row filters and column masks are designed
-but not yet applied (checks 8-9), and validate.py's expected active-source count is stale
-vs replication_sources.yaml (check 3). Anything else failing is a candidate regression.
-You may use run_sql (read-only) to investigate a failure before judging it.
-Output: a markdown gate report — table of results, regression vs known-gap classification,
+You receive the results of the 14-check validation suite. As of 2026-07-19 there are NO
+open known gaps: UC row filters/masks are applied via the gold pipeline definition, and
+validate.py baselines were refreshed (config tables >=9, sources = 14). Treat every
+failing check as a candidate regression and investigate it with run_sql (read-only)
+before judging. Output: a markdown gate report — table of results, per-failure diagnosis,
 and a final PROMOTE or HOLD recommendation with one-line justification. A human merges."""
 
 

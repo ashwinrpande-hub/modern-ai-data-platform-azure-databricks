@@ -4,7 +4,16 @@ from pyspark.sql import functions as F
 
 @dlt.table(name="dim_customer",
            comment="MDM-survived customer dim; PK = customer_hk",
-           table_properties={"delta.enableChangeDataFeed": "true"})
+           table_properties={"delta.enableChangeDataFeed": "true"},
+           # Governance is declared here, not via ALTER: DLT-materialized tables reject
+           # ALTER TABLE SET ROW FILTER / SET MASK (they are views to the ALTER path).
+           # Functions live in acme_gold.sec (security/unity_catalog_policies.sql).
+           schema="""customer_hk STRING,
+                     src_customer_id STRING,
+                     customer_name STRING MASK acme_gold.sec.mask_customer_name,
+                     country STRING,
+                     source_system STRING""",
+           row_filter="ROW FILTER acme_gold.sec.region_filter ON (source_system)")
 def dim_customer():
     c = dlt.read("acme_silver.sales.customer")
     # survivorship: prefer SAP > JDE > QAD on name conflicts (latest version per hk)
@@ -16,7 +25,8 @@ def dim_customer():
 
 @dlt.table(name="fact_sales_orders",
            comment="Grain: one row per order per source; FKs are hash keys",
-           cluster_by=["order_date", "customer_hk"])           # liquid clustering
+           cluster_by=["order_date", "customer_hk"],           # liquid clustering
+           row_filter="ROW FILTER acme_gold.sec.region_filter ON (source_system)")
 @dlt.expect_all({"fk_customer": "customer_hk IS NOT NULL"})
 def fact_sales_orders():
     soh = dlt.read("acme_silver.sales.v_sales_order_header_current")

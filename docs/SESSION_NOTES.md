@@ -114,3 +114,31 @@ All six agents validated in mode=llm (see audit.agent_runs / agent_reports):
 - deployment_gate: classified all 5 failures with evidence and issued HOLD on the one genuine
   regression (pit_customer 1 day stale) — cleared by rerunning gold_pipeline (PIT now current).
 Remaining known gaps unchanged: row filters/masks not built; validate.py counts stale (checks 2–3).
+
+## 2026-07-19 (later) — Design estate deployed: security, products, ML features, semantics — 14/14
+After merging the sibling repo's design estate, deployed the deployable parts:
+- SECURITY (checks 8–9 closed): acme_gold.sec schema + region_filter/mask_customer_name
+  functions (is_member('admins') escape added so the owner keeps visibility — the account
+  groups don't exist yet). Learning: DLT-materialized tables REJECT ALTER TABLE SET ROW
+  FILTER/MASK ("expects a table but is a view") — governance must be declared in the pipeline
+  definition: gold_dlt.py now sets row_filter= on fact_sales_orders + dim_customer and a
+  schema DDL with MASK on dim_customer.customer_name. Verified in information_schema.
+  GRANTs to sales_analyst_*/data_engineer fail (PRINCIPAL_DOES_NOT_EXIST — account groups
+  not provisioned); staged in security/unity_catalog_policies.sql until an account admin
+  creates them. PII tags applied.
+- PRODUCTS: v_sales_orders (canonical), v_customer_360 (narrative + fulfillment metrics),
+  ops.v_melt_to_margin (36 rows), meta.v_product_trust_scores (from dq_results), all
+  commented + tagged; registry entries added. CREATE SHARE denied (needs metastore-level
+  privilege) — documented.
+- SEMANTICS: acme_gold.sales.mv_sales_metrics metric view (WITH METRICS LANGUAGE YAML)
+  created successfully — query with MEASURE().
+- ML: ml/build_features.py + resources/ml.yml job acme_ml_features — PIT-correct
+  (order_date < as_of_date strictly) customer features: 1,001 rows, churn_risk computed
+  (594 high-risk — consistent with the frozen order flow). audit.batch_log created.
+- AI: ai/provision_vector_search.py (sdk-based, 3-phase idempotent) — source table
+  customer_profile_text (1,001 rows, CDF), endpoint acme-vs PROVISIONING; rerun for index.
+  NOTE: the endpoint bills while it exists.
+- validate.py baselines refreshed (config tables >=9, sources = 14); deployment_gate
+  known-gaps prompt updated to "no open gaps — every failure is a candidate regression".
+- RESULT: full validation suite 14/14 GREEN for the first time.
+- docs/DEMO_RUNBOOK.md added — 5-station talking-point sequence + honest-answer cards.
