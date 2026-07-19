@@ -1,0 +1,4 @@
+pyyaml>=6.0
+databricks-sdk>=0.38
+databricks-feature-engineering>=0.8
+databricks-vectorsearch>=0.40

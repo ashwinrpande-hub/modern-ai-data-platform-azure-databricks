@@ -1,0 +1,14 @@
+﻿# Managed SQL Server ingestion (Lakeflow Connect). Deployed by scripts/deploy.py via REST API.
+# Replaces Fabric Mirroring. Prereq: enable CDC or Change Tracking on source tables.
+gateway:
+  name: gw-qad-prod
+  connection_name: sqlserver_qad_prod        # UC connection (created by security/)
+  staging_catalog: acme_bronze
+  staging_schema: _staging_sqlserver
+pipeline:
+  name: lf-sqlserver-qad
+  target_catalog: acme_bronze
+  target_schema: qad
+  scd_type: 1                                # history handled in Silver (insert-only)
+  tables_from: config/replication_sources.yaml   # pattern == lakeflow_sqlserver
+

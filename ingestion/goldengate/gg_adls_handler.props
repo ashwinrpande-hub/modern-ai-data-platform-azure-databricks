@@ -1,0 +1,11 @@
+﻿# OGG for Distributed Apps & Analytics -> ADLS Gen2 (Avro op-records). Template: replace <>.
+gg.handlerlist=abs
+gg.handler.abs.type=abs
+gg.handler.abs.bucketMappingTemplate=landing
+gg.handler.abs.pathMappingTemplate=gg/<SYSTEM>/${tableName}
+gg.handler.abs.accountName=acmedl
+gg.handler.abs.format=avro_op            # includes op_type + csn for APPLY CHANGES
+gg.handler.abs.mode=op
+gg.handler.abs.flushIntervalMillis=30000
+gg.handler.abs.authType=managedidentity
+

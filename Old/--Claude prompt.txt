@@ -1,0 +1,81 @@
+﻿--Claude prompt for acme
+think well take your time 
+Create architecture for following job requirement 
+
+The Senior Data Engineer will play a critical role in advancing data and automation initiatives by designing, building, and optimizing scalable data platforms and intelligent data workflows. This role is responsible for enabling high-quality, trusted data products while leveraging modern lake house architectures and agentic automation frameworks to drive efficiency and innovation. This position combines deep technical expertise in data engineering with emerging capabilities in automated, self-orchestrating data systems. The Senior Data Engineer will work closely with cross-functional teams to deliver data-driven solutions, automate complex data processes, and support real-time decision-making across the enterprise. The role requires a strong analytical mindset, attention to detail, and the ability to lead technical initiatives in a collaborative environment. RESPONSIBILITIES: Ensure industry best practices in data engineering, data governance, and automation are implemented and continuously improved to meet technical and business objectives. Design, build, and maintain secure, scalable, and reliable data pipelines and data products using modern lake house architectures (Databricks). Lead the development and implementation of agentic data workflows, enabling intelligent automation, orchestration, and self-healing data pipelines. Work closely with business and technical teams to gather requirements and translate them into scalable data and automation solutions. Provide technical leadership and mentorship to the data engineering team. Lead the design and implementation of a scalable Data Lakehouse architecture leveraging Databricks, Delta Lake, and cloud-native technologies. Develop reusable data frameworks and accelerators to improve engineering velocity. Drive the integration of AI-assisted development and automation tools. Collaborate on Master Data Management (MDM) and Reference Data strategies. Ensure observability, monitoring, and automated alerting are in place for data pipelines. Minimum Qualifications: MINIMUM REQUIREMENTS: 6+ years of experience designing and building modern data platforms and pipelines Experience with AI/ML-driven workflows Strong experience with SQL and Python Hands-on experience with Databricks, Delta Lake, and Spark Experience implementing ETL/ELT solutions in Azure Experience with workflow orchestration tools Familiarity with agentic automation concepts Experience designing Data Warehouses, Data Lakes, or Lake houses Experience with CI/CD pipelines (Azure DevOps preferred) Experience working within Agile frameworks
+
+refer to the repo and the read me files from https://github.com/ashwinrpande-hub/modern-ai-data-platform
+
+For replication for Oracle databases and Oracle EBS, we use Oracle Golden Gate, and for SQL Server we have been using fabric mirroring, but lately we have been thinking through How to do that with databricks native? Also, we have a big task  or operational technology data. We use a product called Litmus to sync that data to delta par k. For all these things, we need reusable and templatized patterns or designs that we can let any technical person use for the replication to land in bronze.
+
+For steel manufacturing company acme
+Design, build, and present a production-ready Data Platform solution (leveraging databricks to the max for all needed technical solutions) that 
+demonstrates ability to architect modern data platforms, think strategically about data 
+products, and deliver hands-on technical solutions. 
+Presentation: 60 minutes (15 min technical demo + 15 min strategic pitch + 30 min Q&A) 
+generate html interactive page for presentation
+also have justification notes for the decision taken and mention two alternative approaches
+Key Tenets 
+
+ Choose a functional domain of Sales
+ consider some real time data ingestion also along with ERP systems
+ Ingest real or synthetic data from multiple source systems 
+2. Medallion Architecture with Performance Optimization 
+ Implement Bronze/Silver/Gold layers with clear design rationale 
+ Apply data quality, cleansing, and standardization (stay with DAMA 6 DQ dimensions) 
+ Use advanced databricks features (Dynamic Tables, Streams, Tasks, delta lake, delta tables, Genie Code, Agent Bricks,AI/BI Enhancements,AI & Model Serving,Lakeflow Upgrades,Databricks Apps,Unity Catalog & Lakebase) 
+have bronze and silver layer in 3rd normal form 
+silver layer insert only architecture using sha256 to generate hash key based on the source system name and original primary key
+Gold layer will use those hash keys for connecting different dimensions
+have configuration tables for source to target mappings at each layer, so the changes are easily accommodate and linage tracked
+have automated checks and logging for the rejected records and batches
+apply databricks roles/ policies for sensative data and based on region data(europe-sap, america-jde, emea- qad)
+
+Demonstrate architectural expertise: 
+ Design for ML Feature Store (point-in-time correctness, feature versioning, low-latency serving) 
+ Design for BI Reporting (dimensional modeling, aggregations, query performance) 
+ Design for AI-Ready Use Cases (vector embeddings, semantic search, RAG patterns) 
+Performance considerations: 
+ Clustering keys, materialized views, search optimization 
+ Warehouse sizing and auto-scaling strategies 
+ Cost optimization (query pruning, result caching, zero-copy cloning) 
+3. Data Products 
+use principals mentioned in following blogs to create data products  
+https://martinfowler.com/articles/data-monolith-to-mesh.html 
+https://martinfowler.com/articles/data-mesh-principles.html
+https://martinfowler.com/articles/designing-data-products.html
+ Design domain-driven data products with clear input/output contracts 
+ Define SLAs, ownership, and governance (access/security) along with Data Quality metrics to 
+demonstrate Trust in Data Products quality 
+based on 6 data quality dimensions and have dashboard showing that metrics
+ Publish to databricks Data Marketplace for any consumer to consume – Show how they will 
+discover and search for Data Products – and then consume via databricks 
+4. Custom Data Marketplace UI (STRETCH TARGET – if time permits) 
+have code files completely independent of rest of the project
+ Build a front-end portal for discovery and access 
+o Use any tech stack (React/Vue/Angular + Node/Python/Java) 
+ Deploy on  azure infrastructure 
+ Implement AI-powered metadata search (AZURE OpenSearch or databricks vectorization) 
+ Be creative – sign up for free infra/resources 
+5. Business Value 
+ Quantify Value and strategic impact 
+ Create implementation roadmap (strategic architecture roadmap – to scale from above pilot 
+solution to entire organization) – Restrict scope to what is meaningful / Prioritize 
+ Address risks and mitigation strategies 
+SHOW YOUR databricks ARCHITECTURE DEPTH (in your 
+solution) 
+Your solution must also demonstrate expertise of: 
+Bronze/Silver/Gold Design Patterns: 
+ Bronze: Raw ingestion strategy, schema-on-read vs schema-on-write trade-offs 
+ Silver: Transformation patterns, incremental processing, data quality gates 
+ Gold: Consumption-optimized design for different use cases (ML vs BI vs AI) 
+Performance & Optimization: 
+Use Case-Specific Architectures: 
+ ML Feature Store / BI Reports / AI/GenA
+DELIVERABLES FOR INTERVIEW (Bring To The Interview – Do NOT share in advance)
+  Working databricks environment (provide read-only access)
+  Deployed Data Marketplace UI (provide URL)
+  GitHub repository with all code and documentation
+  Architecture diagrams showing Bronze/Silver/Gold design and performance considerations 
+  Presentation slides (technical + strategic)
+

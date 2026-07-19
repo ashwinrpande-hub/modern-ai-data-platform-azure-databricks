@@ -1,0 +1,49 @@
+﻿# Lakeflow Jobs as Declarative Automation Bundle resources (formerly Databricks Asset Bundles).
+# Deploy: `databricks bundle deploy -t dev`  (bundle root = repo root, include this file).
+# Fills gap B3: the DQ / quarantine / feature / vector jobs referenced by deploy.py step 7
+# previously had no definitions anywhere.
+resources:
+  jobs:
+    dq_and_observability:
+      name: acme-dq-observability
+      schedule: { quartz_cron_expression: "0 0 * * * ?", timezone_id: UTC }  # hourly
+      tasks:
+        - task_key: quarantine_writer            # batch_log + expectation rejects (gaps A2/A3)
+          spark_python_task: { python_file: ../../dq/quarantine_writer.py }
+          environment_key: default
+        - task_key: dama_dq
+          depends_on: [{ task_key: quarantine_writer }]
+          spark_python_task: { python_file: ../../dq/dama_dq_framework.py }
+          environment_key: default
+      # DQ breach raises -> job failure -> webhook -> Pipeline Healer / DQ RCA agent
+      webhook_notifications:
+        on_failure: [{ id: "${var.healer_webhook_id}" }]
+      email_notifications: { on_failure: ["data-stewards@acme.com"] }
+      health:
+        rules: [{ metric: RUN_DURATION_SECONDS, op: GREATER_THAN, value: 1800 }]
+
+    feature_refresh:
+      name: acme-feature-refresh
+      schedule: { quartz_cron_expression: "0 30 2 * * ?", timezone_id: UTC }  # daily 02:30
+      tasks:
+        - task_key: customer_features            # writes offline + syncs Lakebase online table
+          spark_python_task: { python_file: ../../ml/feature_store.py }
+          environment_key: default
+
+    vector_sync:
+      name: acme-vector-sync
+      schedule: { quartz_cron_expression: "0 0 3 * * ?", timezone_id: UTC }
+      tasks:
+        - task_key: profile_index_sync           # TRIGGERED Delta Sync index refresh
+          spark_python_task: { python_file: ../../ai/vector_search_rag.py }
+          environment_key: default
+
+  # Freshness SLO alerts live as SQL alerts on acme_bronze.audit.batch_log —
+  # see dashboards/dq_trust_dashboard.sql (query: freshness_slo).
+environments:
+  default:
+    spec: { client: "2" }   # serverless
+variables:
+  healer_webhook_id:
+    description: Notification destination id wired to the Databricks App hosting pipeline_healer
+
