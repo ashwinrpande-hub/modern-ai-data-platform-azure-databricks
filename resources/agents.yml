@@ -1,0 +1,61 @@
+resources:
+  jobs:
+    agents_scheduled_job:
+      name: acme_agents_scheduled
+      description: >
+        Scheduled platform agents: DQ monitor + RCA, then the daily operational-intel
+        digest. LLM reasoning activates when the Databricks secret agents/anthropic_api_key
+        exists; otherwise agents run in deterministic mode (checks and digest still produced).
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+      environments:
+        - environment_key: agent_env
+          spec:
+            environment_version: "3"
+            dependencies: ["anthropic"]
+      tasks:
+        - task_key: dq_monitor_rca
+          spark_python_task:
+            python_file: ../agents/dq_monitor_rca.py
+          environment_key: agent_env
+        - task_key: operational_intel
+          depends_on:
+            - task_key: dq_monitor_rca
+          spark_python_task:
+            python_file: ../agents/operational_intel.py
+          environment_key: agent_env
+
+    agents_on_demand_job:
+      name: acme_agents_on_demand
+      description: >
+        On-demand platform agents: schema-evolution drift scan, vector/content corpus
+        rebuild, deployment gate, and the NL-driven data product creator (set the
+        product_request job parameter).
+      parameters:
+        - name: product_request
+          default: "Order-to-cash data product: current orders with customer name, country, USD amounts, and shipped/invoiced lifecycle status, for BI consumption."
+      environments:
+        - environment_key: agent_env
+          spec:
+            environment_version: "3"
+            dependencies: ["anthropic"]
+      tasks:
+        - task_key: schema_evolution
+          spark_python_task:
+            python_file: ../agents/schema_evolution.py
+          environment_key: agent_env
+        - task_key: vector_content
+          spark_python_task:
+            python_file: ../agents/vector_content.py
+          environment_key: agent_env
+        - task_key: deployment_gate
+          spark_python_task:
+            python_file: ../agents/deployment_gate.py
+          environment_key: agent_env
+        - task_key: product_creator
+          spark_python_task:
+            python_file: ../agents/product_creator.py
+            parameters: ["{{job.parameters.product_request}}"]
+          environment_key: agent_env

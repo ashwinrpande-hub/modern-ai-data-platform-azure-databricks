@@ -1,13 +1,17 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nucor Sales Lakehouse — Azure Databricks</title>
+<title>acme Sales Lakehouse — Azure Databricks</title>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#14171B; --plate:#1D232B; --line:#2E3742; --txt:#C8D1DA; --bright:#F4F6F8;
-  --dim:#7E8A96; --hot1:#FF7A1A; --hot2:#FFC53D; --cool:#5B7C99; --ok:#5BBF7A; --bad:#E25C5C;
+  /* Restrained industrial-corporate palette (steel-sector convention: black/white/steel-gray,
+     one disciplined accent color, no neon) -- swapped from the prior orange/amber "molten glow"
+     treatment, which read as gaming-HUD rather than boardroom. The literal molten-steel SVG
+     gradient (mill diagram) keeps its warm tones deliberately -- that's realistic, not decorative. */
+  --bg:#111315; --plate:#1A1D21; --line:#2B3037; --txt:#C6CBD1; --bright:#F5F6F7;
+  --dim:#7D848C; --hot1:#1F6F4F; --hot2:#3FA378; --cool:#5C7A93; --ok:#4CAF7D; --bad:#D9534F;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -20,7 +24,7 @@ body{background:var(--bg);color:var(--txt);font:16px/1.6 "IBM Plex Sans",sans-se
 #rail .tick{width:8px;flex:1;max-height:34px;margin:3px 0;border-radius:2px;background:var(--line);
   cursor:pointer;transition:background .25s}
 #rail .tick.done{background:linear-gradient(180deg,var(--hot1),var(--hot2))}
-#rail .tick.now{background:var(--hot2);box-shadow:0 0 12px rgba(255,197,61,.7)}
+#rail .tick.now{background:var(--hot2);box-shadow:0 0 12px rgba(63,163,120,.7)}
 #rail .temp{font:500 11px "IBM Plex Mono";color:var(--dim);margin-top:10px;writing-mode:vertical-rl}
 
 /* ---- slides ---- */
@@ -55,6 +59,59 @@ td:first-child{color:var(--bright)}
      border-radius:3px;padding:1px 8px;margin:2px 4px 2px 0}
 .tag.hot{border-color:var(--hot1);color:var(--hot2)}
 .tag.ok{border-color:var(--ok);color:var(--ok)}
+
+/* platform-at-a-glance stat band */
+.statband{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-top:36px}
+.stat{background:var(--plate);border:1px solid var(--line);border-top:3px solid var(--hot1);border-radius:6px;padding:12px 6px;text-align:center}
+.stat b{display:block;font:700 30px/1.05 "Saira Condensed";color:var(--bright)}
+.stat span{font:500 10px "IBM Plex Mono";color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+
+/* agent cards */
+.agentgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px}
+.agent{background:var(--plate);border:1px solid var(--line);border-top:3px solid var(--hot2);border-radius:8px;padding:14px 16px}
+.agent h3{font:700 16px "Saira Condensed";text-transform:uppercase;color:var(--bright)}
+.agent .owns{font:500 10.5px "IBM Plex Mono";color:var(--hot2);letter-spacing:.05em;margin:2px 0 7px;text-transform:uppercase}
+.agent ul{font-size:13px}
+.agent ul li{padding:3px 0 3px 16px}
+.agent ul li::before{top:10px;width:8px}
+.strip{background:#0E1114;border:1px solid var(--line);border-radius:6px;padding:10px 16px;margin-top:14px;
+  display:flex;gap:26px;flex-wrap:wrap;font:12.5px "IBM Plex Mono";color:var(--txt)}
+.strip b{color:var(--hot2);font-weight:500}
+
+/* cloud flow map (data architecture diagram) */
+.flowmap{display:grid;grid-template-columns:1fr 22px 1fr 22px 1fr 22px 1.15fr 22px 1fr 22px 1fr;gap:0;margin-top:18px;align-items:stretch}
+.lane{display:flex;flex-direction:column;gap:8px}
+.lanehead{font:700 13px "Saira Condensed";letter-spacing:.08em;text-transform:uppercase;color:var(--hot2);
+  border-bottom:2px solid var(--hot1);padding-bottom:5px;margin-bottom:2px;text-align:center}
+.svc{background:var(--plate);border:1px solid var(--line);border-left:3px solid var(--cool);border-radius:5px;padding:7px 9px}
+.svc.az{border-left-color:#3FA0D0}
+.svc.dbx{border-left-color:var(--hot1)}
+.svc b{display:block;font:600 12px "IBM Plex Sans";color:var(--bright)}
+.svc span{font:400 10.5px/1.45 "IBM Plex Mono";color:var(--dim);display:block;margin-top:2px}
+.flowarrow{display:flex;align-items:center;justify-content:center;color:var(--hot1);font:700 15px "IBM Plex Mono"}
+.devops{background:#0E1114;border:1px solid var(--line);border-radius:6px;padding:9px 16px;margin-top:14px;
+  font:12px "IBM Plex Mono";color:var(--txt);text-align:center}
+.devops b{color:var(--hot2);font-weight:500}
+
+/* agent services stack (agentic architecture diagram) */
+.band{background:var(--plate);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:12px}
+.band .bandlabel{font:700 12px "Saira Condensed";letter-spacing:.12em;text-transform:uppercase;color:var(--hot2);margin-bottom:7px}
+.band.orch{border-color:var(--hot1);background:linear-gradient(135deg,#1c2420,#1A1D21)}
+.bandgrid{display:grid;gap:8px}
+.bandgrid.c3{grid-template-columns:repeat(3,1fr)}
+.bandgrid.c6{grid-template-columns:repeat(6,1fr)}
+.bandgrid.c5{grid-template-columns:repeat(5,1fr)}
+.bandarrow{text-align:center;color:var(--hot1);font:700 13px "IBM Plex Mono";margin-top:6px;line-height:1}
+.chip{background:#0E1114;border:1px solid var(--line);border-radius:5px;padding:6px 8px;text-align:center}
+.chip b{display:block;font:600 11.5px "IBM Plex Sans";color:var(--bright)}
+.chip span{font:400 10px/1.4 "IBM Plex Mono";color:var(--dim)}
+
+/* value cards */
+.valgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+.val{background:var(--plate);border:1px solid var(--line);border-top:3px solid var(--ok);border-radius:8px;padding:14px 16px}
+.val b{display:block;font:700 30px/1 "Saira Condensed";color:var(--ok)}
+.val h3{margin-top:4px}
+.val p{font-size:12.5px;color:var(--txt);margin-top:6px}
 
 /* tabs */
 .tabs{display:flex;gap:8px;margin:18px 0 0}
@@ -97,16 +154,27 @@ td:first-child{color:var(--bright)}
 
 <!-- 1 TITLE -->
 <section class="slide" data-title="Title">
-  <div style="height:14vh"></div>
-  <div class="eyebrow">Nucor · Sales Domain · Azure Databricks · 60-minute review</div>
+  <div style="height:7vh"></div>
+  <div class="eyebrow">acme · Sales Domain · Azure Databricks · 60-minute review</div>
   <h1>From <span class="molten">Melt Shop</span> to<br>Market Signal</h1>
   <p class="lead" style="margin-top:22px">A production-ready Lakehouse that unifies three ERPs, Salesforce,
   and live plant-floor OT data into governed, trusted, AI-ready sales data products.</p>
-  <div style="margin-top:30px">
+  <div style="margin-top:24px">
     <span class="tag hot">Lakeflow Declarative Pipelines</span><span class="tag hot">Unity Catalog</span>
     <span class="tag hot">Genie + Agent Bricks</span><span class="tag">GoldenGate</span>
     <span class="tag">Lakeflow Connect (SQL Server)</span><span class="tag">Litmus Edge OT</span>
   </div>
+  <div class="statband">
+    <div class="stat"><b>4</b><span>UC catalogs</span></div>
+    <div class="stat"><b>14</b><span>sources · 8 patterns</span></div>
+    <div class="stat"><b>32</b><span>tables</span></div>
+    <div class="stat"><b>40</b><span>mapping rows</span></div>
+    <div class="stat"><b>25.9K</b><span>records loaded</span></div>
+    <div class="stat"><b>13K</b><span>orders · 0 orphans</span></div>
+    <div class="stat"><b>14</b><span>CI checks</span></div>
+    <div class="stat"><b>99.0%</b><span>trust score</span></div>
+  </div>
+  <p class="mono" style="margin-top:14px;color:var(--dim)">Bronze · Silver · Gold — DV2.0 PIT + Bridge — 2 serverless Lakeflow pipelines · 15 flows — deployed &amp; validated</p>
 </section>
 
 <!-- 2 AGENDA -->
@@ -164,7 +232,7 @@ td:first-child{color:var(--bright)}
     serverless processing. Source-side prep is a two-line script any DBA runs.</p>
   </div>
   <div id="t3" class="tabpanel">
-    <pre>PLCs / SCADA ─► Litmus Edge (UNS: nucor/&lt;site&gt;/&lt;area&gt;/&lt;asset&gt;/&lt;tag&gt;)
+    <pre>PLCs / SCADA ─► Litmus Edge (UNS: acme/&lt;site&gt;/&lt;area&gt;/&lt;asset&gt;/&lt;tag&gt;)
    ├─ default:      ADLS parquet ─► Auto Loader ─► bronze.ot.*
    └─ low-latency:  Event Hubs (Kafka API) ─► Structured Streaming ─► bronze.ot.*  <span class="c">-- watermark 10m</span></pre>
     <p style="margin-top:10px">Litmus keeps doing what it's good at — edge normalization. Topic→table mapping is config;
@@ -194,20 +262,20 @@ td:first-child{color:var(--bright)}
     <polygon points="880,138 910,151 880,164" fill="#5B7C99"/>
     <!-- roller stands = layers -->
     <g class="layer" tabindex="0" onclick="layer('bronze')" onkeydown="if(event.key==='Enter')layer('bronze')">
-      <circle cx="290" cy="108" r="30" fill="#1D232B" stroke="#FF7A1A" stroke-width="3"/>
-      <circle cx="290" cy="194" r="30" fill="#1D232B" stroke="#FF7A1A" stroke-width="3"/>
+      <circle cx="290" cy="108" r="30" fill="#1A1D21" stroke="#B08D57" stroke-width="3"/>
+      <circle cx="290" cy="194" r="30" fill="#1A1D21" stroke="#B08D57" stroke-width="3"/>
       <text x="290" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">BRONZE</text>
       <text x="290" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">raw · CDC · envelope</text>
     </g>
     <g class="layer" tabindex="0" onclick="layer('silver')" onkeydown="if(event.key==='Enter')layer('silver')">
-      <circle cx="590" cy="108" r="30" fill="#1D232B" stroke="#FFC53D" stroke-width="3"/>
-      <circle cx="590" cy="194" r="30" fill="#1D232B" stroke="#FFC53D" stroke-width="3"/>
+      <circle cx="590" cy="108" r="30" fill="#1A1D21" stroke="#B9C2CB" stroke-width="3"/>
+      <circle cx="590" cy="194" r="30" fill="#1A1D21" stroke="#B9C2CB" stroke-width="3"/>
       <text x="590" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">SILVER</text>
       <text x="590" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">3NF · insert-only · sha256</text>
     </g>
     <g class="layer" tabindex="0" onclick="layer('gold')" onkeydown="if(event.key==='Enter')layer('gold')">
-      <circle cx="880" cy="108" r="30" fill="#1D232B" stroke="#5B7C99" stroke-width="3"/>
-      <circle cx="880" cy="194" r="30" fill="#1D232B" stroke="#5B7C99" stroke-width="3"/>
+      <circle cx="880" cy="108" r="30" fill="#1A1D21" stroke="#C9A227" stroke-width="3"/>
+      <circle cx="880" cy="194" r="30" fill="#1A1D21" stroke="#C9A227" stroke-width="3"/>
       <text x="880" y="64" text-anchor="middle" fill="#F4F6F8" font-family="Saira Condensed" font-size="22" font-weight="700">GOLD</text>
       <text x="880" y="252" text-anchor="middle" fill="#7E8A96" font-family="IBM Plex Mono" font-size="11">star · features · vectors</text>
     </g>
@@ -218,6 +286,114 @@ td:first-child{color:var(--bright)}
   <div id="layerinfo" class="panel hotline"><h3>Bronze — schema-on-write mirror, schema-on-read escape hatch</h3>
     <p>Source 3NF structures preserved; every table carries <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code>.
     DLT expectations quarantine bad rows into <code>audit.rejected_records</code> with the failed rule and DAMA dimension.</p></div>
+</section>
+
+<!-- 5a CLOUD ARCHITECTURE -->
+<section class="slide" data-title="Cloud architecture">
+  <div class="eyebrow">Data architecture · cloud components</div><h2>End-to-end on Azure — <span class="molten">every service, one flow</span></h2>
+  <div class="flowmap">
+    <div class="lane"><div class="lanehead">Sources</div>
+      <div class="svc"><b>SAP S/4HANA · EU</b><span>GoldenGate extract</span></div>
+      <div class="svc"><b>Oracle EBS</b><span>OGG + query connector</span></div>
+      <div class="svc"><b>JDE E1 · Americas</b><span>GoldenGate extract</span></div>
+      <div class="svc"><b>QAD on SQL Server</b><span>CDC / change tracking</span></div>
+      <div class="svc"><b>Salesforce · D365</b><span>API + file export</span></div>
+      <div class="svc"><b>PLCs · SCADA · MES</b><span>Litmus Edge UNS topics</span></div>
+    </div>
+    <div class="flowarrow">▸</div>
+    <div class="lane"><div class="lanehead">Azure ingest</div>
+      <div class="svc az"><b>ADLS Gen2 landing</b><span>abfss://landing@acmedl<br>avro_op · op_type + CSN</span></div>
+      <div class="svc az"><b>Azure Event Hubs</b><span>Kafka API · acme/+/meltshop/#<br>10-min watermark</span></div>
+      <div class="svc dbx"><b>Lakeflow Connect</b><span>managed SQL Server CDC<br>gateway in our VNet</span></div>
+      <div class="svc dbx"><b>Auto Loader</b><span>incremental file discovery<br>schema evolution</span></div>
+      <div class="svc dbx"><b>Zerobus (PoC)</b><span>direct-write API &lt;5s<br>drops Event Hubs hop</span></div>
+    </div>
+    <div class="flowarrow">▸</div>
+    <div class="lane"><div class="lanehead">Bronze</div>
+      <div class="svc dbx"><b>acme_bronze</b><span>11 source tables<br>schema-on-write + _raw</span></div>
+      <div class="svc dbx"><b>AUTO CDC apply</b><span>keys + _seq ordering<br>op_type replay-safe</span></div>
+      <div class="svc dbx"><b>DLT expectations</b><span>bad rows → quarantine<br>audit.rejected_records</span></div>
+      <div class="svc dbx"><b>cfg.* + audit.*</b><span>mappings · registry ·<br>batch_log · dq_results</span></div>
+    </div>
+    <div class="flowarrow">▸</div>
+    <div class="lane"><div class="lanehead">Silver + Gold</div>
+      <div class="svc dbx"><b>silver_pipeline · 9 flows</b><span>serverless Lakeflow DLT<br>3NF insert-only · hk sha2 · fx→USD</span></div>
+      <div class="svc dbx"><b>gold_pipeline · 6 flows</b><span>star · PIT · bridge · aggs<br>liquid clustering + Photon</span></div>
+      <div class="svc dbx"><b>Unity Catalog</b><span>RBAC · row filters · masks<br>lineage · tags · audit</span></div>
+      <div class="svc dbx"><b>Predictive Optimization</b><span>auto OPTIMIZE / VACUUM</span></div>
+    </div>
+    <div class="flowarrow">▸</div>
+    <div class="lane"><div class="lanehead">Serve</div>
+      <div class="svc dbx"><b>acme_products</b><span>secure-view output ports</span></div>
+      <div class="svc dbx"><b>Delta Sharing</b><span>+ Marketplace listings<br>policies travel with share</span></div>
+      <div class="svc dbx"><b>Genie</b><span>NL Q&amp;A on agg + bridge</span></div>
+      <div class="svc dbx"><b>Vector Search + Serving</b><span>Mosaic AI · RAG endpoints</span></div>
+      <div class="svc dbx"><b>Lakebase</b><span>low-latency online features</span></div>
+    </div>
+    <div class="flowarrow">▸</div>
+    <div class="lane"><div class="lanehead">Consume</div>
+      <div class="svc"><b>AI/BI dashboards</b><span>+ Power BI via warehouse</span></div>
+      <div class="svc"><b>Sales ops · execs</b><span>region-filtered Gold</span></div>
+      <div class="svc"><b>ML training</b><span>PIT-correct feature joins</span></div>
+      <div class="svc"><b>RAG agents</b><span>grounded, cited answers</span></div>
+      <div class="svc"><b>External consumers</b><span>Databricks Apps portal</span></div>
+    </div>
+  </div>
+  <div class="devops"><b>DEVOPS SPINE</b> — GitHub repo → Databricks Asset Bundles → bundle validate / deploy -t dev → pipelines run → validate.py 14-check CI gate → promote</div>
+</section>
+
+<!-- 5b DATA MODEL -->
+<section class="slide" data-title="Data model">
+  <div class="eyebrow">Data architecture · layer model</div><h2>Every table, every count — <span class="molten">live in Unity Catalog</span></h2>
+  <div class="cols3">
+    <div class="panel hotline"><h3>Bronze — acme_bronze · 11 source + 5 config tables</h3>
+      <table><tr><th>table</th><th>rows</th></tr>
+        <tr><td>sap.vbak / kna1</td><td class="mono">5,000 · 500</td></tr>
+        <tr><td>sap.lips / vbrp</td><td class="mono">3,478 · 2,767</td></tr>
+        <tr><td>jde.f4201 / f0101</td><td class="mono">5,000 · 501</td></tr>
+        <tr><td>qad.so_mstr</td><td class="mono">3,000</td></tr>
+        <tr><td>sfdc / d365</td><td class="mono">2,000 · 1,500</td></tr>
+        <tr><td>ot.furnace / mes.rollmill</td><td class="mono">648 · 1,500</td></tr>
+        <tr><td>cfg.* + audit.*</td><td class="mono">5 tables</td></tr></table>
+      <p style="margin-top:8px;font-size:13px">Envelope on every row: <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code></p></div>
+    <div class="panel hotline"><h3>Silver — acme_silver.sales · 9 flows</h3>
+      <table><tr><th>table</th><th>rows / role</th></tr>
+        <tr><td>sales_order_header</td><td class="mono">13,000 · 3 ERPs unioned</td></tr>
+        <tr><td>customer</td><td class="mono">1,001 · SAP + JDE</td></tr>
+        <tr><td>shipment / invoice</td><td class="mono">3,478 · 2,767</td></tr>
+        <tr><td>furnace_heat_5min</td><td class="mono">5-min OT windows</td></tr>
+        <tr><td>v_*_current × 3</td><td class="mono">latest version per hk</td></tr>
+        <tr><td>ref.fx_rates</td><td class="mono">4 · outside pipeline target</td></tr></table>
+      <p style="margin-top:8px;font-size:13px">Insert-only · <code>hk = sha2(system|pk)</code> · <code>record_hash</code> hashdiff · <code>effective_ts</code> versions</p></div>
+    <div class="panel coolline"><h3>Gold — acme_gold.sales · 6 flows</h3>
+      <table><tr><th>table</th><th>rows / grain</th></tr>
+        <tr><td>fact_sales_orders</td><td class="mono">13,000 · order × source</td></tr>
+        <tr><td>dim_customer</td><td class="mono">1,001 · survived</td></tr>
+        <tr><td>pit_customer</td><td class="mono">1,001 / snapshot day</td></tr>
+        <tr><td>bridge_order_fulfillment</td><td class="mono">13,000 · O2C lifecycle</td></tr>
+        <tr><td>fact_heat_quality</td><td class="mono">OT × business</td></tr>
+        <tr><td>agg_sales_daily</td><td class="mono">BI / Genie surface</td></tr></table>
+      <p style="margin-top:8px;font-size:13px">Facts join dims on hash keys · liquid clustering on real predicates · products publish from here</p></div>
+  </div>
+  <p class="mono" style="margin-top:14px">2 serverless Lakeflow pipelines (silver_pipeline · gold_pipeline) — deployed via Databricks Asset Bundles, both green.</p>
+</section>
+
+<!-- 5c LINEAGE -->
+<section class="slide" data-title="Lineage">
+  <div class="eyebrow">Data architecture · field-level lineage</div><h2>Source field → Bronze → Silver → Gold: <span class="molten">every hop traceable</span></h2>
+  <table>
+    <tr><th>source field</th><th>bronze</th><th>silver transform (cfg.layer_mappings)</th><th>gold / product</th></tr>
+    <tr><td>SAP VBELN (order no.)</td><td class="mono">sap.vbak.VBELN</td><td class="mono">sha2('SAP'|VBELN, 256) → hk</td><td class="mono">fact.order_hk · bridge.order_hk</td></tr>
+    <tr><td>JDE SHTRDJ (Julian date)</td><td class="mono">jde.f4201.SHTRDJ</td><td class="mono">date_add('1900-01-01', SHTRDJ − 36525)</td><td class="mono">fact.order_date · agg_sales_daily</td></tr>
+    <tr><td>JDE SHOTOT (implied decimals)</td><td class="mono">jde.f4201.SHOTOT</td><td class="mono">SHOTOT / 100 → order_amount</td><td class="mono">fact.order_amount_usd</td></tr>
+    <tr><td>SAP NETWR + WAERK (EUR/GBP)</td><td class="mono">sap.vbak.NETWR</td><td class="mono">× ref.fx_rates.usd_rate → order_amount_usd</td><td class="mono">agg_sales_daily.revenue_usd</td></tr>
+    <tr><td>SAP KNA1 KUNNR / NAME1</td><td class="mono">sap.kna1</td><td class="mono">customer versions (insert-only)</td><td class="mono">dim_customer — survivorship SAP&gt;JDE&gt;QAD</td></tr>
+    <tr><td>SAP LIPS VGBEL (order ref)</td><td class="mono">sap.lips.VGBEL</td><td class="mono">shipment.src_order_id · NOT NULL gate</td><td class="mono">bridge.shipment_hk + is_shipped (min_by ship_date)</td></tr>
+    <tr><td>SAP VBRP AUBEL (order ref)</td><td class="mono">sap.vbrp.AUBEL</td><td class="mono">invoice.src_order_id · NOT NULL gate</td><td class="mono">bridge.invoice_hk + is_invoiced (min_by invoice_date)</td></tr>
+    <tr><td>Litmus topic site/asset/tag</td><td class="mono">ot.furnace_telemetry</td><td class="mono">15-min watermark · 5-min window agg</td><td class="mono">fact_heat_quality — melt-to-margin join</td></tr>
+    <tr><td>all columns (any source)</td><td class="mono">_raw (JSON payload)</td><td class="mono">record_hash = sha2(to_json(struct(*)))</td><td class="mono">no-op change suppression · DV hashdiff</td></tr>
+  </table>
+  <p class="mono" style="margin-top:12px">Proof, not promise: sql/03_full_lineage_reconciliation.sql recomputes hk from Bronze and anti-joins Gold — all 13,000 orders across SAP/JDE/QAD reconcile, zero orphans.</p>
 </section>
 
 <!-- 6 SILVER -->
@@ -305,6 +481,7 @@ $ python scripts/deploy.py --register-source ebs_oe_order_headers</pre></div>
         <li>Healer agent: schema drift → mapping PR; infra → smart retry; never auto-merges</li>
         <li>Scores published per data product = its <b>trust score</b></li></ul></div>
   </div>
+  <p class="mono" style="margin-top:16px">Live result: validate.py runs 14 CI checks — 10 green today (row-filter, mask, DQ-run &amp; source-count gaps tracked openly) · 13,000 orders reconcile Bronze→Gold with zero orphans · avg dimension score 99.0%.</p>
 </section>
 
 <!-- 10 GOVERNANCE -->
@@ -329,6 +506,94 @@ engineers / execs → all rows</pre>
   </div>
 </section>
 
+<!-- 10a AGENT STACK -->
+<section class="slide" data-title="Agent stack">
+  <div class="eyebrow">Agentic AI architecture · service stack</div><h2>Triggers → orchestrator → tools → <span class="molten">platform surfaces</span></h2>
+  <div class="band"><div class="bandlabel">Triggers</div>
+    <div class="bandgrid c3">
+      <div class="chip"><b>Lakeflow Jobs · cron</b><span>15-min task → DQ sweep<br>daily task → intel digest</span></div>
+      <div class="chip"><b>Event-driven</b><span>job-fail webhook · DQ breach<br>schema drift · PR opened</span></div>
+      <div class="chip"><b>User NL request</b><span>marketplace UI (Databricks Apps)<br>"create a data product for…"</span></div>
+    </div>
+  </div>
+  <div class="bandarrow">▼</div>
+  <div class="band orch"><div class="bandlabel">Orchestrator</div>
+    <div class="bandgrid c3">
+      <div class="chip"><b>Claude Agent SDK</b><span>claude-sonnet-5</span></div>
+      <div class="chip"><b>Agent loop</b><span>multi-step reasoning · tool use<br>code generation · self-correction</span></div>
+      <div class="chip"><b>Decision log</b><span>every conclusion + action audited<br>like any pipeline event</span></div>
+    </div>
+  </div>
+  <div class="bandarrow">▼</div>
+  <div class="band"><div class="bandlabel">Tools (MCP + APIs)</div>
+    <div class="bandgrid c6">
+      <div class="chip"><b>Databricks MCP</b><span>SQL Statement API<br>Jobs · Pipelines API</span></div>
+      <div class="chip"><b>Unity Catalog API</b><span>lineage graph · tags<br>grants (read-only)</span></div>
+      <div class="chip"><b>GitHub MCP</b><span>read repo · branch<br>open PR · never merge</span></div>
+      <div class="chip"><b>CLI + Asset Bundles</b><span>bundle validate / deploy<br>pipeline run</span></div>
+      <div class="chip"><b>Notifications</b><span>Slack webhook<br>email digest</span></div>
+      <div class="chip"><b>Web fetch</b><span>endpoint smoke tests<br>portal health checks</span></div>
+    </div>
+  </div>
+  <div class="bandarrow">▼</div>
+  <div class="band"><div class="bandlabel">Agents (detail on next slide)</div>
+    <div class="bandgrid c6">
+      <div class="chip"><b>DQ Monitor + RCA</b></div><div class="chip"><b>Schema Evolution</b></div>
+      <div class="chip"><b>Product Creator</b></div><div class="chip"><b>Vector / Content</b></div>
+      <div class="chip"><b>Deployment</b></div><div class="chip"><b>Operational Intel</b></div>
+    </div>
+  </div>
+  <div class="bandarrow">▼</div>
+  <div class="band"><div class="bandlabel">Platform surfaces acted on</div>
+    <div class="bandgrid c5">
+      <div class="chip"><b>Lakehouse catalogs</b><span>acme_bronze→gold<br>SQL read-only</span></div>
+      <div class="chip"><b>cfg.layer_mappings</b><span>versioned inserts<br>via PR only</span></div>
+      <div class="chip"><b>audit schema</b><span>batch_log · dq_results<br>rejected_records (read)</span></div>
+      <div class="chip"><b>GitHub repo</b><span>databricks.yml · resources/<br>pipelines/ (PR only)</span></div>
+      <div class="chip"><b>Serving layer</b><span>Vector index refresh<br>marketplace registry</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10b AGENTS -->
+<section class="slide" data-title="Agents">
+  <div class="eyebrow">Agentic AI architecture</div><h2>Six agents, one platform — <span class="molten">each owns a different part of the build</span></h2>
+  <div class="strip">
+    <span><b>TRIGGERS</b> — Lakeflow task (15-min cron) · events (DQ breach webhook, schema drift, job fail, PR open) · user NL request (marketplace)</span>
+  </div>
+  <div class="strip">
+    <span><b>ORCHESTRATOR</b> — Claude agent: multi-step reasoning · tool use · code generation · self-correction</span>
+    <span><b>TOOLS</b> — Databricks MCP (SQL/DDL, Jobs, Pipelines) · GitHub MCP (read, PR) · Asset Bundles CLI · Slack/email · web-fetch smoke tests</span>
+  </div>
+  <div class="agentgrid">
+    <div class="agent"><h3>DQ Monitor + RCA</h3><div class="owns">owns: Bronze→Silver gates · audit schema</div>
+      <ul><li>Polls trust score / dq_results every 15 min</li>
+      <li>Traces quarantined rows via <code>_batch_id</code> → first bad batch</li>
+      <li>Maps blast radius through lineage; RCA report → domain owner</li></ul></div>
+    <div class="agent"><h3>Schema Evolution</h3><div class="owns">owns: cfg.layer_mappings · Bronze contract</div>
+      <ul><li>Detects new column landing in <code>_raw</code> payload</li>
+      <li>Drafts versioned mapping inserts cascading Silver→Gold</li>
+      <li>Opens GitHub PR; re-runs validate.py after merge</li></ul></div>
+    <div class="agent"><h3>Data Product Creator</h3><div class="owns">owns: Gold → Products output ports</div>
+      <ul><li>NL prompt → SQL → secure view in acme_products</li>
+      <li>Registers product + contract in marketplace catalog</li>
+      <li>Deploys via bundle; end-to-end in one agent loop</li></ul></div>
+    <div class="agent"><h3>Vector / Content</h3><div class="owns">owns: Gold AI zone · semantic search</div>
+      <ul><li>Generates customer narratives from dim + features</li>
+      <li>Refreshes Mosaic AI Vector Search index</li>
+      <li>Validates retrieval quality with test queries</li></ul></div>
+    <div class="agent"><h3>Deployment</h3><div class="owns">owns: CI/CD · Asset Bundles</div>
+      <ul><li><code>bundle deploy -t dev</code> → runs 14-check validate.py</li>
+      <li>Merges PR on green; rolls back on red</li>
+      <li>Posts deploy status to Slack</li></ul></div>
+    <div class="agent"><h3>Operational Intel</h3><div class="owns">owns: platform-wide observability</div>
+      <ul><li>Daily digest: volume anomalies vs batch_log baseline</li>
+      <li>Stale pipelines vs freshness SLO; cost drift vs budget</li>
+      <li>New high-churn accounts flagged → HTML report to leads</li></ul></div>
+  </div>
+  <p class="mono" style="margin-top:12px">Guardrails on all six: read-only on prod data · act via PRs &amp; versioned config inserts · bounded retries · full decision audit · human owns the merge button.</p>
+</section>
+
 <!-- 11 PRODUCTS -->
 <section class="slide" data-title="Data products">
   <div class="eyebrow">Data mesh principles</div><h2>Products with owners, contracts, and SLAs</h2>
@@ -351,21 +616,37 @@ engineers / execs → all rows</pre>
 
 <!-- 12 VALUE -->
 <section class="slide" data-title="Value">
-  <div class="eyebrow">Business value</div><h2>What the mill gets back</h2>
-  <div class="cols3">
-    <div class="panel hotline"><h3>Engineering velocity</h3><p>Source onboarding: <b>weeks → &lt;1 day</b> (YAML + command). One replication skillset instead of three.</p></div>
-    <div class="panel hotline"><h3>Revenue insight</h3><p>Single cross-ERP order & customer truth; Genie gives sales ops same-day answers instead of ticket queues.</p></div>
-    <div class="panel hotline"><h3>Margin from OT</h3><p>Melt-to-margin links energy & chemistry to profitability per heat — the analysis that was impossible while OT sat at the edge.</p></div>
+  <div class="eyebrow">Business value · ROI</div><h2>$1.2M annual value — <span class="molten">conservatively estimated</span>, payback &lt; 6 months</h2>
+  <div class="valgrid">
+    <div class="val"><b>$420K</b><h3>Reporting efficiency</h3><p>65% cut in report prep time — pre-aggregated Gold views eliminate manual data work for ~12 analyst FTEs.</p></div>
+    <div class="val"><b>$480K</b><h3>Churn prevention (ML)</h3><p>~40 at-risk enterprise accounts/month flagged 72h early via PIT-correct features; 10% intervention success.</p></div>
+    <div class="val"><b>$180K</b><h3>ETL platform elimination</h3><p>Retires legacy ETL licensing (~$120K) + 0.5 FTE maintenance — Lakeflow pipelines handle all incremental processing.</p></div>
+    <div class="val"><b>$120K</b><h3>DQ cost recovery</h3><p>~200 bad records/month caught before invoicing × ~$500 avg downstream cost (disputes, credit memos).</p></div>
+  </div>
+  <div class="cols" style="margin-top:16px">
+    <div class="panel"><h3>Before → After</h3>
+      <table><tr><th>metric</th><th>before</th><th>after</th></tr>
+        <tr><td>Revenue close</td><td>3 days manual rec.</td><td>same day, automated</td></tr>
+        <tr><td>Data freshness</td><td>24h nightly batch</td><td>15-min pipelines</td></tr>
+        <tr><td>Churn visibility</td><td>post-mortem</td><td>72h early warning</td></tr>
+        <tr><td>Analyst self-service</td><td>2-week IT ticket</td><td>4-min marketplace</td></tr>
+        <tr><td>Quality confidence</td><td>unknown / disputed</td><td>99.0% live dashboard</td></tr>
+        <tr><td>New source onboarding</td><td>6–12 months</td><td>config rows — days</td></tr></table></div>
+    <div class="panel coolline"><h3>Cost &amp; net</h3>
+      <ul><li>Platform run cost ≈ <b>$105K/yr</b> (serverless compute + storage + 0.5 FTE)</li>
+        <li>Net year-1 value: $1.2M − $105K ≈ <b>$1.1M · 11.4× ROI</b></li>
+        <li>18-month roadmap cumulative: <b>$7.6M</b> value on ~$315K invest ≈ <b>24×</b></li>
+        <li>Every figure decomposes to a countable driver — defensible line by line</li></ul></div>
   </div>
   <div class="road">
-    <div class="phase"><div class="dot">1</div><h3>Pilot</h3><span>0–3 mo · this build</span>
-      <ul><li>Sales domain, 6 sources</li><li>3 products live</li></ul></div>
-    <div class="phase"><div class="dot">2</div><h3>Harden</h3><span>3–6 mo</span>
-      <ul><li>Lakeflow Connect Oracle swap</li><li>SLO alerting, FinOps budgets</li></ul></div>
-    <div class="phase future"><div class="dot">3</div><h3>Scale</h3><span>6–12 mo</span>
-      <ul><li>Procurement & ops domains</li><li>Self-serve product template</li></ul></div>
-    <div class="phase future"><div class="dot">4</div><h3>Intelligence</h3><span>12+ mo</span>
-      <ul><li>Forecasting & pricing ML</li><li>Agentic ops at scale</li></ul></div>
+    <div class="phase"><div class="dot">1</div><h3>Pilot</h3><span>0–3 mo · this build · $1.2M/yr</span>
+      <ul><li>Sales domain, 14 sources</li><li>3 products + agents design</li></ul></div>
+    <div class="phase"><div class="dot">2</div><h3>Harden</h3><span>3–6 mo · +$800K/yr</span>
+      <ul><li>Finance + supply chain domains</li><li>SLO alerting, FinOps budgets</li></ul></div>
+    <div class="phase future"><div class="dot">3</div><h3>Scale</h3><span>6–12 mo · +$2.1M/yr</span>
+      <ul><li>All domains · external products</li><li>Stewardship council</li></ul></div>
+    <div class="phase future"><div class="dot">4</div><h3>Intelligence</h3><span>12–18 mo · +$3.5M/yr</span>
+      <ul><li>NL SQL for all users</li><li>Autonomous DQ remediation</li></ul></div>
   </div>
 </section>
 
@@ -437,3 +718,4 @@ go(0);
 </script>
 </body>
 </html>
+

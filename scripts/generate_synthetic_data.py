@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Synthetic data — now covers ALL registered sources (gap B6): SAP VBAK+KNA1,
 JDE F4201+F0101, QAD so_mstr, SFDC opportunity, D365 salesorders, Litmus OT.
 Product codes (STEEL) now emitted -> enables a future dim_product."""
@@ -77,7 +77,7 @@ def ot():
     for h in range(72):
         for asset in ["furnace1","furnace2","caster1"]:
             for tag in ["temperature","power_kw","o2_pct"]:
-                rows.append({"topic": f"nucor/berkeley/meltshop/{asset}/{tag}",
+                rows.append({"topic": f"acme/berkeley/meltshop/{asset}/{tag}",
                     "deviceID": asset, "tagName": tag,
                     "value": round({"temperature":1620,"power_kw":42000,"o2_pct":2.1}[tag]*random.uniform(.92,1.08),2),
                     "timestamp": int((base+dt.timedelta(hours=h)).timestamp()*1000),
@@ -85,7 +85,7 @@ def ot():
     json.dump(rows, open("data/litmus_ot_sample.json","w"), indent=0)
 
 def mes():
-    rows=[{"topic": f"nucor/berkeley/rollmill/mes/order_{ev}",
+    rows=[{"topic": f"acme/berkeley/rollmill/mes/order_{ev}",
            "work_order_id": f"WO{80000+i}", "event": ev, "product": random.choice(STEEL),
            "ts": int((dt.datetime(2026,6,1)+dt.timedelta(minutes=15*i)).timestamp()*1000)}
           for i in range(1000) for ev in (["start","complete"] if i%2==0 else ["start"])]
@@ -95,3 +95,4 @@ if __name__ == "__main__":
     sap(); jde(); qad(); sfdc(); d365(); ot(); mes()
     print("Synthetic data in ./data: SAP 5k+500, JDE 5k+501, QAD 3k, SFDC 2k, D365 1.5k, "
           "OT 648, MES ~1.5k. Product codes included for dim_product.")
+

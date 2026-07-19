@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>acme Sales Lakehouse — Documentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true, theme:'dark', themeVariables:{fontFamily:'IBM Plex Sans'}});
+</script>
+<style>
+:root{
+  --bg:#111315; --plate:#1A1D21; --line:#2B3037; --txt:#C6CBD1; --bright:#F5F6F7;
+  --dim:#7D848C; --acc:#1F6F4F; --acc2:#3FA378; --cool:#5C7A93;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.65 "IBM Plex Sans",sans-serif;padding:0 0 70px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+header{border-bottom:1px solid var(--line);padding:38px 0 24px;margin-bottom:0}
+.eyebrow{font:600 12px "IBM Plex Mono";letter-spacing:.18em;color:var(--acc2);text-transform:uppercase;margin-bottom:8px}
+header h1{font:800 40px/1.05 "Saira Condensed";color:var(--bright);text-transform:uppercase}
+.tabs{display:flex;gap:8px;margin:22px 0 0;flex-wrap:wrap;position:sticky;top:0;
+  background:rgba(17,19,21,.96);backdrop-filter:blur(4px);padding:12px 0 0;z-index:9}
+.tabs button{background:var(--plate);border:1px solid var(--line);color:var(--txt);padding:9px 18px;
+  border-radius:6px 6px 0 0;font:600 13.5px "IBM Plex Sans";cursor:pointer}
+.tabs button[aria-selected="true"]{background:#0E1114;border-bottom-color:#0E1114;color:var(--acc2);border-top:2px solid var(--acc)}
+.tabpanel{display:none;background:#0E1114;border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:26px 30px 34px}
+.tabpanel.show{display:block}
+.srcfile{font:500 11px "IBM Plex Mono";color:var(--dim);margin-bottom:14px;letter-spacing:.05em}
+.tabpanel h1{font:700 30px/1.15 "Saira Condensed";color:var(--bright);text-transform:uppercase;margin:6px 0 14px}
+.tabpanel h2{font:700 22px/1.15 "Saira Condensed";color:var(--bright);text-transform:uppercase;
+  margin:26px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+.tabpanel h3{font:600 16px "IBM Plex Sans";color:var(--bright);margin:18px 0 8px}
+.tabpanel p{margin:9px 0;max-width:92ch}
+.tabpanel ul,.tabpanel ol{margin:9px 0 9px 24px}
+.tabpanel li{margin:4px 0}
+.tabpanel a{color:var(--acc2)}
+.tabpanel strong{color:var(--bright)}
+code{font:13px "IBM Plex Mono";color:var(--acc2);background:#15181C;border:1px solid #232A33;
+  border-radius:3px;padding:1px 5px}
+pre{background:#15181C;border:1px solid var(--line);border-radius:6px;padding:14px 16px;
+  font:12.5px/1.55 "IBM Plex Mono";color:#B7C6D3;overflow-x:auto;margin:12px 0}
+pre code{background:none;border:none;padding:0;color:inherit}
+pre.mermaid{background:#15181C;text-align:center}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th{font:600 11px "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid #232A33;vertical-align:top}
+td:first-child{color:var(--bright)}
+@media print{
+  body{background:#fff;color:#222}
+  .tabs{display:none}
+  .tabpanel{display:block;border-color:#bbb;background:#fff;page-break-before:always}
+  .tabpanel h1,.tabpanel h2,.tabpanel h3,td:first-child,.tabpanel strong{color:#000}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="eyebrow">acme · Sales Lakehouse on Azure Databricks · Project Documentation</div>
+  <h1>Documentation</h1>
+</div></header>
+<div class="wrap">
+  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" onclick="tab(this,'p0')">Architecture</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p1')">Code Graph</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p2')">Data Vault PIT Bridge</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p3')">Justification Notes</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p4')">Session Notes</button></div>
+<div id="p0" class="tabpanel show" role="tabpanel">
+<p class="srcfile">source: docs/ARCHITECTURE.md</p>
+<h1>Architecture — acme Sales Lakehouse on Azure Databricks</h1>
+<h2>Source landscape → Bronze (templatized, see REPLICATION_PATTERNS.md)</h2>
+<p>SAP S/4HANA (EU) &amp; Oracle EBS → GoldenGate → ADLS → Auto Loader/AUTO CDC
+SQL Server (QAD host) → Lakeflow Connect SQL Server (CDC) — replaces Fabric Mirroring
+Salesforce → file/API landing → Auto Loader
+OT (PLCs/SCADA) → Litmus Edge UNS → Event Hubs (Kafka) or ADLS parquet → Structured Streaming</p>
+<h2>Medallion — Data Vault 2.0 methodology (see DATA_VAULT_PIT_BRIDGE.md)</h2>
+<p>The lakehouse applies DV2.0 <em>methodology</em> without materializing hub/link/sat objects:
+- <strong>Business keys → hash keys</strong>: <code>hk = sha2(source_system|pk, 256)</code> in Silver plays the DV hub-key
+  role — deterministic, source-agnostic, computed not looked-up.
+- <strong>Satellites → insert-only versions</strong>: every Silver change is a new row with <code>effective_ts</code>;
+  full history, no UPDATE. <code>record_hash</code> = DV hashdiff (no-op change detection).
+- <strong>Links → virtual</strong>: relationships live as hash-key FKs inside 3NF entities, not link tables.
+- <strong>Query-assistance tables → materialized in Gold</strong>: <code>pit_customer</code> (point-in-time) and
+  <code>bridge_order_fulfillment</code> (order→shipment→invoice) — the DV2.0 answer to
+  "history is cheap to store, expensive to query."</p>
+<h3>Layers</h3>
+<ul>
+<li><strong>Bronze (acme_bronze)</strong> — schema-on-write mirror of source 3NF structures; envelope columns
+  (<code>_source_system,_ingest_ts,_batch_id,_op_type,_seq,_raw</code>); raw payload preserved in <code>_raw</code>
+  (schema-on-read escape hatch). DLT expectations quarantine bad rows.</li>
+<li><strong>Silver (acme_silver)</strong> — 3NF, <strong>insert-only</strong>, DV-aligned as above; "current" exposed as a
+  view (row_number over hk), never via UPDATE. FX-normalized to USD. DAMA DQ gates.</li>
+<li><strong>Gold (acme_gold)</strong> — star schema (dims + facts <strong>joined on hash keys</strong>), DV2.0 PIT + bridge
+  query-assist tables, pre-aggregations for AI/BI + Genie, ML feature store (PIT-correct via
+  <code>pit_customer</code>), vector indexes for semantic search/RAG.</li>
+<li><strong>Products (acme_products)</strong> — secure-view output ports, Delta Sharing, Marketplace listings.</li>
+</ul>
+<h2>Databricks features used (and why)</h2>
+<p>Lakeflow Declarative Pipelines (DLT) — expectations, AUTO CDC, serverless;
+Lakeflow Connect — managed SQL Server CDC; Lakeflow Jobs — orchestration;
+Unity Catalog — RBAC, row filters/masks, lineage, tags; Liquid Clustering — fact pruning;
+Predictive Optimization — auto OPTIMIZE/VACUUM; Genie — NL Q&amp;A on agg tables;
+Agent Bricks / Mosaic AI — DQ RCA + healer agents, RAG serving; Online/Lakebase — low-latency features;
+Databricks Apps — marketplace portal + agent hosting; Delta Sharing/Marketplace — product distribution.</p>
+<h2>Deployment</h2>
+<p><code>databricks.yml</code> + <code>resources/pipelines.yml</code> (Databricks Asset Bundle) deploy <code>pipelines/silver_dlt.py</code>
+and <code>pipelines/gold_dlt.py</code> as two serverless Lakeflow Declarative Pipelines, publishing into
+<code>acme_silver.sales</code> and <code>acme_gold.sales</code>: <code>databricks bundle deploy -t dev</code>, then
+<code>databricks bundle run silver_pipeline -t dev</code> / <code>gold_pipeline -t dev</code>. Bronze itself has no
+ingestion pipeline yet (see gap below) — <code>acme_bronze.*</code> tables in a dev/demo workspace are
+seeded directly from <code>scripts/generate_synthetic_data.py</code> output plus the envelope columns,
+as a stand-in for the templated Auto Loader/Lakeflow Connect ingestion <code>config/replication_sources.yaml</code>
+describes. <code>config/seed_layer_mappings.sql</code> seeds <code>cfg.layer_mappings</code> and the <code>fx_rates</code>
+reference table (kept in <code>acme_silver.ref</code>, not <code>acme_silver.sales</code> — the pipeline's own publish
+target — to avoid a self-referential DLT flow).</p>
+<h2>Querying &amp; lineage tracing</h2>
+<p><code>sql/*.sql</code> — ad hoc queries against the deployed catalogs: <code>01_explore_tables.sql</code> (structure/samples
+per layer), <code>02_trace_order_lineage.sql</code> (one order followed Bronze→Silver→Gold, including the DV2.0
+bridge/PIT tables), <code>03_full_lineage_reconciliation.sql</code> (bulk reconciliation across all source
+systems, using the deterministic <code>hk = sha2(source_system|src_order_id, 256)</code> to join layers directly
+without a lookup table). Run via Catalog Explorer's SQL editor (needs a SQL warehouse — none is
+provisioned in this workspace yet) or a notebook attached to any cluster/serverless compute.</p>
+<h2>Performance &amp; cost</h2>
+<p>Serverless DLT + SQL warehouses with auto-stop (10 min) and autoscale 1→4;
+liquid clustering on (order_date, customer_hk) — PIT on snapshot_date, bridge on order_date;
+materialized aggregates for BI; photon on; result + disk cache for dashboards;
+shallow clone for dev/test (zero-copy); budget policies + system.billing alerts;
+spot for non-critical jobs.</p>
+<h2>Observability</h2>
+<p>batch_log + dq_results + rejected_records tables; Lakeflow job notifications → webhook →
+healer agent; UC system tables for lineage + audit; SQL alerts on freshness SLOs;
+validate.py checks 13–14 assert PIT freshness and bridge referential integrity.</p>
+</div>
+<div id="p1" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/CODE_GRAPH.md</p>
+<h1>Code &amp; data-flow graph</h1>
+<pre class="mermaid">flowchart LR
+  subgraph Sources
+    SAP[SAP / Oracle EBS]; SQL[SQL Server / QAD]; SFDC[Salesforce]; OT[PLCs via Litmus Edge]
+  end
+  SAP --&gt;|GoldenGate avro_op| L[ADLS landing]
+  SFDC --&gt;|API export| L
+  OT --&gt;|UNS topics| EH[Event Hubs Kafka]
+  OT --&gt;|parquet| L
+  SQL --&gt;|Lakeflow Connect CDC| B
+  L --&gt;|Auto Loader| T1[ingestion/templates/bronze_ingest_template.py]
+  EH --&gt; T2[ingestion/litmus_ot/litmus_eventhub_dlt.py]
+  T1 --&gt; B[(acme_bronze)]
+  T2 --&gt; B
+  CFG[[config/replication_sources.yaml]] -.drives.-&gt; T1 &amp; T2 &amp; DEP[scripts/deploy.py]
+  B --&gt; S1[pipelines/silver_dlt.py] --&gt; S[(acme_silver 3NF insert-only, hk=sha256)]
+  S --&gt; G1[pipelines/gold_dlt.py] --&gt; G[(acme_gold star + agg)]
+  G1 --&gt; PIT[pit_customer DV2.0 point-in-time] &amp; BR[bridge_order_fulfillment DV2.0 bridge]
+  PIT --&gt; FS
+  BR --&gt; BI[AI/BI + Genie one-join lifecycle]
+  G --&gt; FS[ml/feature_store.py] &amp; VS[ai/vector_search_rag.py] &amp; P[data_products/publish_marketplace.sql]
+  P --&gt; MKT[Databricks Marketplace] &amp; UI[marketplace-ui/]
+  DQ[dq/dama_dq_framework.py] -.gates.-&gt; S &amp; G
+  DQ --&gt;|breach| RCA[agents/dq_rca_agent.md]
+  JOBFAIL[Lakeflow failure] --&gt; HEAL[agents/pipeline_healer.md]
+  VAL[scripts/validate.py] -.CI gate.-&gt; ALL[(all layers)]
+  DAB[[databricks.yml + resources/pipelines.yml]] -.deploys.-&gt; S1 &amp; G1
+  Q[sql/*.sql] -.traces.-&gt; B &amp; S &amp; G
+</pre>
+<p>Files referenced above that don't exist yet in this repo (<code>ingestion/templates/bronze_ingest_template.py</code>,
+<code>ingestion/litmus_ot/litmus_eventhub_dlt.py</code>, <code>scripts/deploy.py</code>, <code>ml/feature_store.py</code>,
+<code>ai/vector_search_rag.py</code>, <code>data_products/publish_marketplace.sql</code>, <code>marketplace-ui/</code>) describe the
+target design, not the current state — tracked as open gaps, same as <code>docs/SESSION_NOTES.md</code>'s
+2026-07-05 gap analysis. What's real and running today: <code>pipelines/silver_dlt.py</code> and
+<code>pipelines/gold_dlt.py</code>, deployed via <code>databricks.yml</code>/<code>resources/pipelines.yml</code>, reading from
+Bronze tables seeded directly from <code>scripts/generate_synthetic_data.py</code> output (no ingestion pipeline
+yet — see <code>docs/ARCHITECTURE.md</code>'s Deployment section) and <code>config/seed_layer_mappings.sql</code>-seeded
+config tables; <code>sql/*.sql</code> traces a row through all three layers end to end against that real data;
+and <code>agents/*.py</code> — six platform agents (DQ monitor+RCA, schema evolution, product creator,
+vector/content, deployment gate, operational intel) deployed as two serverless jobs via
+<code>resources/agents.yml</code>, sharing <code>agents/agent_core.py</code> (read-only-SQL tool guard, decision logging to
+<code>audit.agent_runs</code>, reports to <code>audit.agent_reports</code>). Agents run deterministic checks always and add
+Claude reasoning (claude-opus-4-8) when the Databricks secret <code>agents/anthropic_api_key</code> (or env
+<code>ANTHROPIC_API_KEY</code>) is present; without it they run in deterministic mode. The DQ agent populates
+<code>audit.dq_results</code> (closing validate.py check 10); the product creator ships
+<code>acme_products.sales.v_sales_orders_unified</code>; the content agent builds
+<code>acme_gold.sales.customer_narratives</code>.</p>
+</div>
+<div id="p2" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/DATA_VAULT_PIT_BRIDGE.md</p>
+<h1>Data Vault 2.0 — PIT &amp; Bridge use cases in Gold</h1>
+<p>How DV2.0 concepts map onto this lakehouse (methodology adopted; hub/link/sat objects not
+materialized — reasoning in JUSTIFICATION_NOTES #5):</p>
+<table>
+<thead>
+<tr>
+<th>DV2.0 concept</th>
+<th>Here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hub business key (hashed)</td>
+<td>Silver <code>hk = sha2(source_system\|pk, 256)</code></td>
+</tr>
+<tr>
+<td>Satellite (history, hashdiff)</td>
+<td>Silver insert-only versions: <code>effective_ts</code>, <code>record_hash</code></td>
+</tr>
+<tr>
+<td>Link</td>
+<td>Virtual — hash-key FKs inside 3NF entities</td>
+</tr>
+<tr>
+<td>PIT table</td>
+<td><code>acme_gold.sales.pit_customer</code></td>
+</tr>
+<tr>
+<td>Bridge table</td>
+<td><code>acme_gold.sales.bridge_order_fulfillment</code></td>
+</tr>
+<tr>
+<td>Information mart</td>
+<td>Gold star (dims/facts) + aggs</td>
+</tr>
+</tbody>
+</table>
+<h2>Use case 1 — <code>pit_customer</code> (point-in-time)</h2>
+<p><strong>Grain:</strong> one row per <code>(snapshot_date, customer_hk)</code>; <code>as_of_ts</code> points at the Silver customer
+version that was current on that date. Daily spine from first customer version to today.</p>
+<p>Solves: "history is cheap to store, expensive to query." Without PIT, every as-of question is a
+range join over all versions — easy to write wrong (label leakage) and slow at scale.</p>
+<ol>
+<li><strong>Leakage-free ML training sets</strong> — <code>ml/feature_store.py</code> joins labels to features via
+   <code>pit_customer</code> at <code>label_date</code>; the model never sees attributes newer than the label.</li>
+<li><strong>Reproducible month-end reporting</strong> — re-running a January report in July returns January's
+   customer attributes (name/country/region as they were), not today's.</li>
+<li><strong>Audit / region policy evidence</strong> — prove which region row-filter applied to a customer on a
+   given date (source_system was X on date D).</li>
+</ol>
+<pre><code class="language-sql">-- as-of join: 2 equality joins, no BETWEEN scan
+SELECT l.label_date, c.customer_name, c.country
+FROM   labels l
+JOIN   acme_gold.sales.pit_customer p
+       ON p.customer_hk = l.customer_hk AND p.snapshot_date = l.label_date
+JOIN   acme_silver.sales.customer c
+       ON c.hk = p.customer_hk AND c.effective_ts = p.as_of_ts;
+</code></pre>
+<h2>Use case 2 — <code>bridge_order_fulfillment</code> (order → shipment → invoice)</h2>
+<p><strong>Grain:</strong> one row per current order, pre-joined to its shipment and invoice hash keys
+(NULL until each lifecycle stage exists). Higher-level "table of keys + measures of interest"
+so consumers make ONE join instead of walking the lifecycle.</p>
+<ol>
+<li><strong>Order-to-cash cycle time</strong> — <code>datediff(invoice_date, order_date)</code> per region/source, no
+   3-table join for analysts or Genie.</li>
+<li><strong>Backlog dashboards</strong> — <code>is_shipped = false</code> / <code>is_invoiced = false</code> flags give unshipped and
+   shipped-not-billed backlog with a WHERE clause.</li>
+<li><strong>Genie/NL-friendly</strong> — natural-language questions ("orders not yet invoiced in EMEA") resolve
+   against one table; no join-path hallucination.</li>
+</ol>
+<pre><code class="language-sql">SELECT source_system,
+       avg(datediff(invoice_date, order_date)) AS order_to_cash_days,
+       count_if(NOT is_shipped)                AS backlog_orders
+FROM   acme_gold.sales.bridge_order_fulfillment
+GROUP  BY source_system;
+</code></pre>
+<h2>Load pattern &amp; scope notes</h2>
+<ul>
+<li>Both are batch materialized views in <code>pipelines/gold_dlt.py</code>, recomputed per pipeline run —
+  structural logic stays code (same precedent as <code>furnace_heat_5min</code>); entity/column semantics
+  stay in <code>cfg.layer_mappings</code>.</li>
+<li>Lifecycle sources seeded SAP-only in the pilot (LIPS → <code>shipment</code>, VBRP → <code>invoice</code>);
+  JDE/QAD onboarding = mapping rows in <code>config/seed_layer_mappings.sql</code>, no code change.</li>
+<li>Invoice currency deliberately omitted (lives on VBRK header, not VBRP item) — add a VBRK
+  mapping before using invoice amounts for finance; flagged so we don't misstate SAP schema.</li>
+<li>PIT spine is <strong>daily</strong> (ML need). At scale: restrict spine to business-relevant dates or switch
+  to an incremental snapshot job appending only the new day.</li>
+<li>Retention: PIT/bridge are derived — safe to <code>CREATE OR REPLACE</code>; truth stays in Silver history.</li>
+</ul>
+<h2>Validation (scripts/validate.py)</h2>
+<ul>
+<li>Check 13: <code>pit_customer</code> has today's snapshot (freshness).</li>
+<li>Check 14: no bridge order_hk missing from <code>fact_sales_orders</code> (referential integrity).</li>
+</ul>
+</div>
+<div id="p3" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/JUSTIFICATION_NOTES.md</p>
+<h1>Decision log — each with two rejected alternatives</h1>
+<ol>
+<li>
+<p><strong>Bronze landing via GoldenGate→ADLS→Auto Loader</strong> (Oracle/EBS)
+   Why: reuses existing OGG licenses/skills; ADLS landing decouples capture from compute; avro_op
+   carries op_type+CSN for exact replay. Alt A: Lakeflow Connect Oracle — cleanest long-term;
+   adopt when GA in tenant (YAML pattern swap only). Alt B: OGG→Kafka→streaming — lower latency,
+   chosen only if multiple consumers need the CDC stream; otherwise extra infra.</p>
+</li>
+<li>
+<p><strong>SQL Server via Lakeflow Connect, replacing Fabric Mirroring</strong>
+   Why: single governance plane (UC), managed CDC, no OneLake hop, serverless processing.
+   Alt A: keep Mirroring + external location/shortcut — cheapest, but split governance, two copies
+   of truth. Alt B: Debezium+Event Hubs — max control/latency, highest run cost &amp; on-call burden.</p>
+</li>
+<li>
+<p><strong>OT via Litmus → Event Hubs (default) with ADLS-parquet fallback</strong>
+   Why: Litmus already normalizes to UNS at the edge; Event Hubs Kafka API gives sub-minute
+   freshness to Bronze; parquet path stays for high-volume historians. Alt A: Azure IoT
+   Operations — duplicates Litmus's job. Alt B: direct historian JDBC pulls — batch-only, loses tags/UNS.</p>
+</li>
+<li>
+<p><strong>Insert-only Silver with SHA-256 hash keys</strong>
+   Why: deterministic keys across 3 ERPs (system|pk), full history for free, audit-trivial,
+   merge-free = fast streaming writes; "current" is a cheap window view. Alt A: SCD2 with
+   MERGE — familiar, but update-heavy, slower streams, key drift risk. Alt B: identity surrogate
+   keys — compact joins but non-deterministic across reloads/environments.</p>
+</li>
+<li>
+<p><strong>3NF Silver, star Gold joined on hash keys — DV2.0 methodology, not DV2.0 objects</strong>
+   (Revised 2026-07-11: requirement now names Data Vault 2.0 explicitly with PIT/bridge in Gold.)
+   Why: we adopt DV2.0's methodology — hashed business keys (hub keys), insert-only history with
+   hashdiff (satellites), and materialized PIT + bridge query-assist tables in Gold — while keeping
+   Silver 3NF instead of physical hub/link/sat objects: 3NF preserves source semantics, halves the
+   object count for one domain, and Gold shapes assemble by hash key without lookups.
+   Alt A: full raw vault (hubs/links/sats) — maximum auditability and multi-domain integration
+   pattern; 3–4x the tables/pipelines for a single-domain pilot, defensible at enterprise scale-out.
+   Alt B: One Big Table / plain Kimball star straight from Bronze — fastest to first dashboard, but
+   loses deterministic keys, history-by-default, and the PIT/bridge answers below.</p>
+</li>
+<li>
+<p><strong>Config tables for source→target mapping at each layer</strong>
+   Why: changes = versioned inserts (lineage built-in); agents and humans share one contract;
+   no code edits to onboard sources. Alt A: dbt-style code-as-mapping — great for analysts, weaker
+   for non-SQL OT pipelines. Alt B: hardcoded notebooks — fastest day 1, unscalable day 30.</p>
+</li>
+<li>
+<p><strong>DQ as DAMA 6 dimensions with quarantine + thresholds that fail jobs</strong>
+   Why: business-recognizable scoring, row-level rejects with reasons, breach triggers RCA agent.
+   Alt A: DLT expectations only — great inline, but no cross-table/dimension scoring. Alt B:
+   Great Expectations — rich but another runtime; revisit at multi-domain scale.</p>
+</li>
+<li>
+<p><strong>Region access via UC row filters keyed on source_system</strong>
+   Why: EUROPE→SAP, AMERICAS→JDE, EMEA→QAD maps 1:1 to source_system column; one function,
+   applied to every Gold table. Alt A: separate regional catalogs — strong isolation, triples
+   objects. Alt B: BI-tool security — bypassable via SQL, audit gap.</p>
+</li>
+<li>
+<p><strong>Marketplace = Delta Sharing/Databricks Marketplace + thin custom portal</strong>
+   Why: native listing handles entitlements; portal adds branded discovery + AI search without
+   owning access control. Alt A: portal-only with direct grants — re-implements entitlements.
+   Alt B: third-party catalog (Collibra/Atlan) — strong governance suite, heavy for a pilot.</p>
+</li>
+<li>
+<p><strong>PIT as a materialized daily-spine table (<code>pit_customer</code>), not query-time as-of joins</strong>
+   Why: equality joins (snapshot_date, customer_hk) replace BETWEEN range scans; one blessed
+   as-of path kills ML label leakage; reproducible month-end reports; derived — safe to rebuild.
+   Alt A: query-time AS OF / range joins on effective_ts — zero storage, but every consumer
+   rewrites (and mis-writes) temporal logic; slow at scale. Alt B: SCD2 dim with
+   valid_from/valid_to — familiar to BI, but needs UPDATE (breaks insert-only Silver) and still
+   range-joins at query time.</p>
+</li>
+<li>
+<p><strong>Bridge as pre-joined lifecycle keys (<code>bridge_order_fulfillment</code>), grain = current order</strong>
+   Why: order→shipment→invoice in ONE join for O2C cycle time, backlog flags, and Genie (no
+   join-path hallucination); NULLs mark incomplete lifecycle stages honestly.
+   Alt A: multi-hop joins in the semantic/BI layer — no extra storage, but every tool re-encodes
+   join paths and pays 3-table joins per query. Alt B: denormalize lifecycle into a wide
+   fact_sales_orders — fastest reads, but grain explosion (order vs shipment-line vs invoice-line)
+   and full reload whenever a late stage arrives.</p>
+</li>
+</ol>
+</div>
+<div id="p4" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/SESSION_NOTES.md</p>
+<h1>Session notes (append-only, dated) — required by CLAUDE.md rule 4</h1>
+<h2>2026-07-05 — Gap analysis + 2026 feature refresh</h2>
+<p>Compared repo vs requirement; produced docs/GAP_ANALYSIS.md. Fixed credibility gaps
+(config-driven Silver made real, batch_log/quarantine writers, source_registry inserts),
+added missing requirement artifacts (DQ trust dashboard, EBS/D365/MES sources, jobs,
+Lakebase online features, RAG agent, metric view), refreshed patterns for GA features
+(Oracle query-based connector, Zerobus, AUTO CDC). Open decisions in GAP_ANALYSIS §D.</p>
+<h2>2026-07-11 — Data Vault 2.0 methodology + PIT/bridge in Gold</h2>
+<p>Requirement now names DV2.0 explicitly. Adopted DV2.0 methodology over existing hash-key design
+(decision revised in JUSTIFICATION_NOTES #5; new #10 PIT, #11 bridge — 2 alternatives each).
+New: docs/DATA_VAULT_PIT_BRIDGE.md (use cases), gold pit_customer + bridge_order_fulfillment,
+silver shipment/invoice (config-driven; SAP LIPS/VBRP seed mappings + YAML sources + synthetic
+lips/vbrp), validate.py checks 13–14 (PIT freshness, bridge FK), ARCHITECTURE.md rewritten,
+presentation Gold layer text updated. User-confirmed scope: customer PIT + order-lifecycle
+bridge; JDE/QAD lifecycle onboarding deferred to mapping rows (no code).</p>
+<h2>2026-07-18 — First real deploy: DAB resources, bronze seeding, bug fixes, lineage queries</h2>
+<p>Went from "code exists" to "pipelines actually run against real data" for the first time. Added
+<code>databricks.yml</code> + <code>resources/pipelines.yml</code> (DAB) to deploy <code>silver_dlt.py</code>/<code>gold_dlt.py</code> as
+Lakeflow Declarative Pipelines. Workspace had none of the <code>acme_*</code> UC catalogs provisioned and no
+bronze ingestion pipeline exists in-repo (gap, see docs/CODE_GRAPH.md) — provisioned catalogs/schemas/
+cfg+audit tables directly and loaded <code>scripts/generate_synthetic_data.py</code> output into Bronze as a
+stand-in, since building the full templated ingestion layer was out of scope for getting the two
+existing pipelines running.</p>
+<p>Found and fixed 5 pre-existing bugs surfaced by actually running this for the first time:
+<code>config/seed_layer_mappings.sql</code>'s <code>MERGE ... USING (VALUES...) s(cols)</code> (column aliases not allowed
+on this Spark version → temp view instead), <code>uuid()</code> inside an inline <code>VALUES</code> table (non-deterministic,
+not foldable → moved to outer SELECT), <code>pipelines/{silver,gold}_dlt.py</code> had a UTF-8 BOM the Lakeflow
+parser rejects, <code>silver_dlt.py</code>'s <code>fx_rates</code> table read from its own publish target
+(<code>acme_silver.sales.fx_rates</code>) causing a DLT graph cycle — reference table moved to <code>acme_silver.ref</code>,
+and the three <code>_current</code> tables were <code>@dlt.view</code> (pipeline-local, never reach Unity Catalog) but
+<code>gold_dlt.py</code> reads them cross-pipeline by fully-qualified name — changed to <code>@dlt.table</code>.</p>
+<p><code>scripts/validate.py</code> needs a SQL warehouse (none provisioned); ran the same 14 checks via a
+serverless Spark Connect session instead — 10/14 pass. Failures are real, pre-existing gaps: no UC
+row filter/column mask exists anywhere in the repo (checks 8–9), no DQ framework exists to populate
+<code>audit.dq_results</code> (check 10), and <code>validate.py</code>'s expected active-source count (6) is stale against
+<code>replication_sources.yaml</code>'s current 14 (check 3) — never updated when EBS/D365/MES were added
+2026-07-05.</p>
+<p>Added <code>sql/01_explore_tables.sql</code>, <code>sql/02_trace_order_lineage.sql</code>,
+<code>sql/03_full_lineage_reconciliation.sql</code> — Bronze→Silver→Gold lineage queries, all verified against
+the live data (all 13,000 synthetic orders across SAP/JDE/QAD reconcile with zero orphans). Restyled
+<code>presentation/index.html</code>: swapped the orange/amber "molten glow" UI chrome for a restrained
+industrial-corporate palette (charcoal/steel-gray/green), in the tone of steel-sector sites like
+nucor.com (public site loads styling via external JS/CSS, so exact brand hex values weren't
+extractable — this is a stylistic approximation, not a literal brand match); kept the literal
+molten-steel SVG gradient warm since that's a realistic detail, and gave the Bronze/Silver/Gold
+medallion circles their literal metal colors instead of the old arbitrary orange/amber/blue mapping.</p>
+<p>Later same day: presentation expanded 14 → 17 slides, structure borrowed from the Vertiv V5 deck
+(same author's prior Snowflake platform presentation): title slide gained a platform-at-a-glance stat
+band using this build's verified numbers (4 catalogs · 14 sources/8 patterns · 32 tables · 40 mapping
+rows · 25.9K records · 13K orders zero-orphan · 14 CI checks · 99.0% avg DQ score); two new data-
+architecture slides (per-layer table/row-count model, field-level source→Bronze→Silver→Gold lineage
+matrix drawn from cfg.layer_mappings transforms); one new agentic-AI architecture slide (6 agents —
+DQ RCA, schema evolution, product creator, vector/content, deployment, operational intel — each mapped
+to the platform layer it owns, with triggers/orchestrator/tools strips and guardrails line); value
+slide upgraded with the Vertiv deck's ROI framing ($1.2M/yr with 4-driver breakdown, before/after
+table, $105K run cost, 11.4×/24× ROI, per-phase roadmap values). DQ slide got a live-result line
+(14 checks, 10 green, gaps named). All 5 changed slides verified via headless-Chrome screenshots.
+Then two more diagram slides (deck now 19): "Cloud architecture" — six-swimlane Azure/Databricks
+service-flow map (sources → ADLS/Event Hubs/Lakeflow Connect/Auto Loader/Zerobus → Bronze → the two
+DLT pipelines + UC → Delta Sharing/Genie/Vector Search/Lakebase → consumers) with a DevOps-spine strip;
+and "Agent stack" — five-band agentic services diagram (triggers → Claude Agent SDK orchestrator →
+MCP/API tools → six agents → platform surfaces acted on, write paths marked PR-only). Both verified
+via headless-Chrome screenshots.</p>
+<p>Final stretch: the six agents were BUILT AND DEPLOYED for real (agents/ + resources/agents.yml —
+two serverless jobs: acme_agents_scheduled with daily-06:00-UTC cron PAUSED, acme_agents_on_demand
+with a product_request job parameter). Design: deterministic work always runs (DAMA checks,
+drift scan, corpus build, gate, digest); Claude reasoning (claude-opus-4-8, adaptive thinking,
+manual tool loop with ONE read-only-SQL tool, everything logged to audit.agent_runs) activates when
+env ANTHROPIC_API_KEY or Databricks secret agents/anthropic_api_key exists — currently NEITHER is
+configured, so all validated runs were deterministic mode. To enable LLM mode: create secret scope
+"agents", put anthropic_api_key in it. Both jobs ran SUCCESS on serverless (env spec
+environment_version 3 + pip anthropic). One deploy bug fixed: <strong>file</strong> is undefined in serverless
+spark_python_task (script exec'd in IPython kernel) — path bootstrap falls back to sys.argv[0].
+Validated outputs: audit.dq_results now populated (10 checks, 9 pass; orders_arriving_30d fails
+by design — synthetic data max order_date ~2026-05); schema drift found for real (unmapped MATNR,
+SHLITM/SHKCOO/SHDOCO/SHDCTO, so_domain/so_part — the JDE key columns are consumed via a
+concat transform_expr with src_column NULL, so the scanner over-reports them: known limitation);
+acme_products.sales.v_sales_orders_unified created (13,000 rows); customer_narratives 1,001 rows;
+gate reads 9/14 — two NEW failures are side effects, not regressions (config-table count grew to 7
+because agents added agent_runs/agent_reports and validate.py expects exactly 5; PIT freshness
+fails because UTC date rolled past the last gold_pipeline run — rerun gold_pipeline to clear).</p>
+</div>
+</div>
+<script>
+function tab(btn,id){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected','false'));
+  btn.setAttribute('aria-selected','true');
+  document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+</script>
+</body>
+</html>

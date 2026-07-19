@@ -1,7 +1,7 @@
 """
 SILVER — 3NF, INSERT-ONLY. hk = sha2(source_system|pk, 256); versions via effective_ts.
 NOW ACTUALLY CONFIG-DRIVEN (gap A1): column mappings are read from
-nucor_bronze.cfg.layer_mappings (layer='silver', latest version, valid_to IS NULL) at
+acme_bronze.cfg.layer_mappings (layer='silver', latest version, valid_to IS NULL) at
 pipeline-graph build time. Adding/changing a column = INSERT a new mapping version
 (see config/seed_layer_mappings.sql) + pipeline refresh — no code edit, lineage kept.
 Note: Lakeflow Spark Declarative Pipelines is converging on `from pyspark import
@@ -16,7 +16,7 @@ def hash_key(system_col, *pk_cols):
 
 def load_mappings(tgt_table):
     """[(src_table, [(tgt_col, sql_expr)])] from config; deterministic column order."""
-    rows = (spark.table("nucor_bronze.cfg.layer_mappings")
+    rows = (spark.table("acme_bronze.cfg.layer_mappings")
         .filter((F.col("layer") == "silver") & (F.col("tgt_table") == tgt_table)
                 & F.col("valid_to").isNull())
         .withColumn("rn", F.row_number().over(
@@ -73,12 +73,15 @@ def invoice():
 
 @dlt.table(name="fx_rates", comment="Reference: seeded by config/seed_layer_mappings.sql")
 def fx_rates():
-    return spark.table("nucor_silver.sales.fx_rates")
+    # Read from the "ref" schema, not "sales" (the pipeline's own target schema) -- reading
+    # the fully qualified acme_silver.sales.fx_rates here would collide with this table's own
+    # publish target and DLT would report a self-referential graph cycle.
+    return spark.table("acme_silver.ref.fx_rates")
 
 # ---- OT: 5-min furnace aggregates (structural, stays code — no column mapping semantics) ----
 @dlt.table(name="furnace_heat_5min", comment="5-min OT aggregates from Litmus bronze")
 def furnace_heat_5min():
-    return (dlt.read_stream("nucor_bronze.ot.furnace_telemetry")
+    return (dlt.read_stream("acme_bronze.ot.furnace_telemetry")
         .withWatermark("ts", "15 minutes")
         .groupBy(F.window("ts", "5 minutes").alias("w"), "site", "asset", "tag")
         .agg(F.avg("value").alias("avg_value"), F.max("value").alias("max_value"),
@@ -89,15 +92,17 @@ def furnace_heat_5min():
                                              F.col("window_start").cast("string")), 256))
         .withColumn("effective_ts", F.current_timestamp()))
 
-# "Current" WITHOUT updates: latest version per hk
-@dlt.view(name="v_sales_order_header_current")
+# "Current" WITHOUT updates: latest version per hk. @dlt.table (not @dlt.view) because DLT
+# views are pipeline-local only and never published to Unity Catalog -- gold_dlt.py reads
+# these cross-pipeline by fully qualified name, which only works against a published table.
+@dlt.table(name="v_sales_order_header_current")
 def v_current():
     w = Window.partitionBy("hk").orderBy(F.col("effective_ts").desc())
     return (dlt.read("sales_order_header")
         .withColumn("rn", F.row_number().over(w)).filter("rn = 1").drop("rn"))
 
 def _register_current_view(entity):
-    @dlt.view(name=f"v_{entity}_current")
+    @dlt.table(name=f"v_{entity}_current")
     def _v():
         w = Window.partitionBy("hk").orderBy(F.col("effective_ts").desc())
         return (dlt.read(entity)
@@ -105,3 +110,4 @@ def _register_current_view(entity):
 
 for _e in ("shipment", "invoice"):
     _register_current_view(_e)
+

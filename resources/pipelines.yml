@@ -1,0 +1,23 @@
+resources:
+  pipelines:
+    silver_pipeline:
+      name: acme_silver_pipeline
+      catalog: acme_silver
+      schema: sales
+      serverless: true
+      photon: true
+      continuous: false
+      libraries:
+        - file:
+            path: ../pipelines/silver_dlt.py
+
+    gold_pipeline:
+      name: acme_gold_pipeline
+      catalog: acme_gold
+      schema: sales
+      serverless: true
+      photon: true
+      continuous: false
+      libraries:
+        - file:
+            path: ../pipelines/gold_dlt.py

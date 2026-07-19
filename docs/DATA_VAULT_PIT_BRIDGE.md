@@ -1,4 +1,4 @@
-# Data Vault 2.0 — PIT & Bridge use cases in Gold
+﻿# Data Vault 2.0 — PIT & Bridge use cases in Gold
 
 How DV2.0 concepts map onto this lakehouse (methodology adopted; hub/link/sat objects not
 materialized — reasoning in JUSTIFICATION_NOTES #5):
@@ -8,8 +8,8 @@ materialized — reasoning in JUSTIFICATION_NOTES #5):
 | Hub business key (hashed) | Silver `hk = sha2(source_system\|pk, 256)` |
 | Satellite (history, hashdiff) | Silver insert-only versions: `effective_ts`, `record_hash` |
 | Link | Virtual — hash-key FKs inside 3NF entities |
-| PIT table | `nucor_gold.sales.pit_customer` |
-| Bridge table | `nucor_gold.sales.bridge_order_fulfillment` |
+| PIT table | `acme_gold.sales.pit_customer` |
+| Bridge table | `acme_gold.sales.bridge_order_fulfillment` |
 | Information mart | Gold star (dims/facts) + aggs |
 
 ## Use case 1 — `pit_customer` (point-in-time)
@@ -30,9 +30,9 @@ range join over all versions — easy to write wrong (label leakage) and slow at
 -- as-of join: 2 equality joins, no BETWEEN scan
 SELECT l.label_date, c.customer_name, c.country
 FROM   labels l
-JOIN   nucor_gold.sales.pit_customer p
+JOIN   acme_gold.sales.pit_customer p
        ON p.customer_hk = l.customer_hk AND p.snapshot_date = l.label_date
-JOIN   nucor_silver.sales.customer c
+JOIN   acme_silver.sales.customer c
        ON c.hk = p.customer_hk AND c.effective_ts = p.as_of_ts;
 ```
 
@@ -52,7 +52,7 @@ so consumers make ONE join instead of walking the lifecycle.
 SELECT source_system,
        avg(datediff(invoice_date, order_date)) AS order_to_cash_days,
        count_if(NOT is_shipped)                AS backlog_orders
-FROM   nucor_gold.sales.bridge_order_fulfillment
+FROM   acme_gold.sales.bridge_order_fulfillment
 GROUP  BY source_system;
 ```
 
@@ -71,3 +71,4 @@ GROUP  BY source_system;
 ## Validation (scripts/validate.py)
 - Check 13: `pit_customer` has today's snapshot (freshness).
 - Check 14: no bridge order_hk missing from `fact_sales_orders` (referential integrity).
+

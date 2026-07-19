@@ -1,0 +1,22 @@
+# This is a Declarative Automation Bundle definition for modern-ai-data-platform-azure-databricks-dv2.
+# The Databricks extension requires databricks.yml configuration file.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+
+bundle:
+  name: modern-ai-data-platform-azure-databricks-dv2
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-7405618665227003.3.azuredatabricks.net
+
+  ## Optionally, there could be 'staging' or 'prod' targets here.
+  #
+  # prod:
+  #   workspace:
+  #     host: https://adb-7405618665227003.3.azuredatabricks.net
