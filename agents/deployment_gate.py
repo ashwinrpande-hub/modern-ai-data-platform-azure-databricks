@@ -53,7 +53,7 @@ def main():
     if not report:
         report = (f"# Deployment gate (deterministic)\n\n{passed}/{len(results)} checks passing.\n\n"
                   + result_desc
-                  + "\n\nLLM classification skipped (no API key); apply the known-gaps list manually.")
+                  + "\n\nLLM classification skipped (Anthropic key unavailable - see agent_runs log).")
     save_report(spark, "deployment_gate", f"Gate: {passed}/{len(results)} checks green", report)
     print("\n===== GATE REPORT =====\n" + report)
 

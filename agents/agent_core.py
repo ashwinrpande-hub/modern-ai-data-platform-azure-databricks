@@ -20,7 +20,7 @@ import uuid
 from datetime import datetime, timezone
 
 MODEL = "claude-opus-4-8"
-MAX_STEPS = 8
+MAX_STEPS = 12
 READONLY_PREFIXES = ("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC ")
 
 
@@ -46,15 +46,26 @@ def ensure_audit_tables(spark):
           title STRING, body STRING)""")
 
 
-def get_anthropic_key():
+def get_anthropic_key(log=None):
     key = os.environ.get("ANTHROPIC_API_KEY")
     if key:
         return key
+    # On serverless jobs the runtime-ambient dbutils is the reliable path;
+    # WorkspaceClient().dbutils has proven flaky there — keep it as fallback only.
+    errors = []
+    try:
+        from databricks.sdk.runtime import dbutils
+        return dbutils.secrets.get(scope="agents", key="anthropic_api_key")
+    except Exception as e:
+        errors.append(f"runtime dbutils: {str(e)[:120]}")
     try:
         from databricks.sdk import WorkspaceClient
         return WorkspaceClient().dbutils.secrets.get(scope="agents", key="anthropic_api_key")
-    except Exception:
-        return None
+    except Exception as e:
+        errors.append(f"WorkspaceClient dbutils: {str(e)[:120]}")
+    if log is not None:
+        log.append("secret retrieval failed — " + "; ".join(errors))
+    return None
 
 
 def safe_sql(spark, query, log, max_rows=50):
@@ -76,9 +87,9 @@ def safe_sql(spark, query, log, max_rows=50):
 
 def run_reasoning(spark, agent_name, system, user_prompt, log):
     """Claude tool loop. Returns final report text, or None in deterministic mode."""
-    key = get_anthropic_key()
+    key = get_anthropic_key(log)
     if not key:
-        log.append("no ANTHROPIC_API_KEY / secret agents/anthropic_api_key — deterministic mode")
+        log.append("no Anthropic key available — deterministic mode")
         return None
     import anthropic
     client = anthropic.Anthropic(api_key=key)
@@ -113,6 +124,18 @@ def run_reasoning(spark, agent_name, system, user_prompt, log):
         break
     if response is None:
         return None
+    if response.stop_reason == "tool_use":
+        # Tool budget exhausted mid-investigation: force a final report from the
+        # evidence gathered so far instead of persisting interim narration.
+        log.append(f"tool budget ({MAX_STEPS}) exhausted — forcing finalization turn")
+        messages.append({"role": "user", "content":
+                         "Tool budget exhausted. Write your final report NOW from the "
+                         "evidence you already gathered; note anything left unverified."})
+        response = client.messages.create(
+            model=MODEL, max_tokens=8000,
+            thinking={"type": "adaptive"}, output_config={"effort": "high"},
+            system=system, tools=tools, tool_choice={"type": "none"}, messages=messages,
+        )
     text = "".join(b.text for b in response.content if b.type == "text").strip()
     log.append(f"reasoning finished: stop_reason={response.stop_reason}, "
                f"out_tokens={response.usage.output_tokens}")

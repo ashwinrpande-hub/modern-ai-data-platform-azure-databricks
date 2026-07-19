@@ -1,10 +1,13 @@
 """Schema Evolution agent — owns the cfg.layer_mappings contract with Bronze.
 
 Deterministic: diffs each mapped Bronze table's actual columns (information_schema)
-against the columns cfg.layer_mappings consumes; unmapped, non-envelope columns are
-schema drift. LLM pass: drafts versioned mapping-row INSERT proposals for the drift —
-as a report for human review, never executed (config changes go through PRs).
+against the columns cfg.layer_mappings consumes — both direct src_column references and
+columns referenced inside transform_expr (e.g. JDE's concat_ws over its composite key).
+Unmapped, non-envelope columns are schema drift. LLM pass: drafts versioned mapping-row
+INSERT proposals for the drift — as a report for human review, never executed (config
+changes go through PRs).
 """
+import re
 import sys
 import os
 from datetime import datetime, timezone
@@ -30,12 +33,16 @@ def main():
     ensure_audit_tables(spark)
     log = []
 
-    mapped = spark.sql("""
-        SELECT DISTINCT src_table, src_column FROM acme_bronze.cfg.layer_mappings
-        WHERE valid_to IS NULL AND src_column IS NOT NULL""").collect()
-    by_table = {}
-    for r in mapped:
-        by_table.setdefault(r.src_table, set()).add(r.src_column)
+    rows = spark.sql("""
+        SELECT src_table, src_column, transform_expr FROM acme_bronze.cfg.layer_mappings
+        WHERE valid_to IS NULL""").collect()
+    by_table, exprs_by_table = {}, {}
+    for r in rows:
+        by_table.setdefault(r.src_table, set())
+        if r.src_column:
+            by_table[r.src_table].add(r.src_column)
+        if r.transform_expr:
+            exprs_by_table.setdefault(r.src_table, []).append(r.transform_expr)
 
     drift = {}
     for src_table, mapped_cols in sorted(by_table.items()):
@@ -46,7 +53,11 @@ def main():
                 f"SELECT column_name FROM {catalog}.information_schema.columns "
                 f"WHERE table_schema = '{schema}' AND table_name = '{table}'").collect()
         }
-        unmapped = sorted(c for c in actual - mapped_cols if not c.startswith("_"))
+        # a column referenced anywhere in a transform_expr counts as consumed
+        expr_text = " ".join(exprs_by_table.get(src_table, []))
+        consumed = mapped_cols | {
+            c for c in actual if re.search(rf"\b{re.escape(c)}\b", expr_text)}
+        unmapped = sorted(c for c in actual - consumed if not c.startswith("_"))
         if unmapped:
             drift[src_table] = unmapped
         log.append(f"{src_table}: {len(actual)} cols, {len(unmapped)} unmapped")
@@ -66,7 +77,7 @@ def main():
     if not report:
         report = ("# Schema drift (deterministic scan)\n\nUnmapped non-envelope Bronze columns:\n\n"
                   + drift_desc
-                  + "\n\nLLM proposal drafting skipped (no API key configured). "
+                  + "\n\nLLM proposal drafting skipped (Anthropic key unavailable - see agent_runs log). "
                     "Add mapping rows to config/seed_layer_mappings.sql via PR.")
     save_report(spark, "schema_evolution", f"Schema drift: {sum(len(v) for v in drift.values())} unmapped column(s)", report)
     print("\n===== PROPOSAL =====\n" + report)

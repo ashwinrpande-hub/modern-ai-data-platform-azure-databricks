@@ -448,6 +448,31 @@ acme_products.sales.v_sales_orders_unified created (13,000 rows); customer_narra
 gate reads 9/14 — two NEW failures are side effects, not regressions (config-table count grew to 7
 because agents added agent_runs/agent_reports and validate.py expects exactly 5; PIT freshness
 fails because UTC date rolled past the last gold_pipeline run — rerun gold_pipeline to clear).</p>
+<h2>2026-07-19 — Agents completed: LLM mode enabled and validated end-to-end</h2>
+<p>Secret scope "agents" created; user stored anthropic_api_key via interactive put-secret (key never
+in transcript). Three agent_core fixes from the first LLM runs: (1) secret retrieval now tries
+databricks.sdk.runtime.dbutils first (WorkspaceClient().dbutils proved flaky on serverless — one
+task got the key, its sibling didn't) with failure reasons logged; (2) tool budget raised 8→12 and
+a finalization turn added (tool_choice none, "write the report from gathered evidence") — first RCA
+came back truncated mid-investigation; (3) schema_evolution scanner now counts columns referenced
+inside transform_expr as consumed (JDE composite-key columns no longer false-positive).</p>
+<p>All six agents validated in mode=llm (see audit.agent_runs / agent_reports):
+- dq_monitor_rca: full evidence-backed RCA on orders_arriving_30d — correctly diagnosed
+  source-side staleness (fresh _ingest_ts, frozen business dates, single-batch snapshot reload,
+  identical cutoff across 3 ERPs) and proposed the bronze business-date freshness check that
+  would have caught it earlier.
+- operational_intel: digest with self-directed drill-downs (top backlog accounts per customer).
+- schema_evolution: sampled drifted columns, found MATNR/SHLITM/so_part share identical
+  harmonized product codes, proposed 3 mapping INSERTs to a common product_id, and correctly
+  recommended skipping so_domain (constant technical field).
+- product_creator: NL request → acme_products.sales.order_to_cash (13,000 rows), passed the
+  validation gate.
+- vector_content: QA caught a REAL artifact — all 501 JDE customers show backlog == orders
+  because shipment lifecycle sources are SAP-only in the pilot (LIPS mappings only); flagged as
+  ETL gap, plus GmbH-suffix-vs-country synthetic-data mismatch.
+- deployment_gate: classified all 5 failures with evidence and issued HOLD on the one genuine
+  regression (pit_customer 1 day stale) — cleared by rerunning gold_pipeline (PIT now current).
+Remaining known gaps unchanged: row filters/masks not built; validate.py counts stale (checks 2–3).</p>
 </div>
 </div>
 <script>

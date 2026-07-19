@@ -71,7 +71,7 @@ def main():
     if not report:
         report = (f"# Daily operations digest (deterministic)\n\n{metric_desc}\n\n"
                   f"Top 5 customers by revenue:\n{top_desc}\n\n"
-                  "LLM narrative skipped (no API key configured).")
+                  "LLM narrative skipped (Anthropic key unavailable - see agent_runs log).")
     save_report(spark, "operational_intel", f"Daily digest {started.date()}", report)
     print("\n===== DIGEST =====\n" + report)
 

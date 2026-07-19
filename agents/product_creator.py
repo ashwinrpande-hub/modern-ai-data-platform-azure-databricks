@@ -80,7 +80,7 @@ def main():
         if not sql:
             log.append("LLM output failed validation gate — falling back to hand-written view")
     if not sql:
-        sql, report = FALLBACK_SQL.strip(), (report or "Deterministic fallback product (no API key).")
+        sql, report = FALLBACK_SQL.strip(), (report or "Deterministic fallback product (Anthropic key unavailable - see agent_runs log).")
 
     view_name = re.search(r"acme_products\.sales\.([a-z0-9_]+)", sql, re.IGNORECASE).group(1)
     spark.sql(sql)
