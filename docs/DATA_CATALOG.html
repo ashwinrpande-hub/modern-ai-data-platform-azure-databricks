@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>acme Sales Lakehouse — Data Catalog &amp; Lineage</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-1:#fcfcfb; --surface-2:#f2f1ee; --page:#f9f9f7;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+  --border:rgba(11,11,11,0.10); --grid:#e1e0d9;
+  --accent:#2a78d6; --accent-soft:#e8f0fb;
+  --edge-flow:#8a8983; --edge-internal:#c3c2b7;
+  --pill-bg:#f2f1ee; --code-bg:#f2f1ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --surface-2:#222221; --page:#0d0d0d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --border:rgba(255,255,255,0.12); --grid:#2c2c2a;
+    --accent:#3987e5; --accent-soft:#132234;
+    --edge-flow:#5a5954; --edge-internal:#3a3a38;
+    --pill-bg:#25231f; --code-bg:#222221;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1:#1a1a19; --surface-2:#222221; --page:#0d0d0d;
+  --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+  --border:rgba(255,255,255,0.12); --grid:#2c2c2a;
+  --accent:#3987e5; --accent-soft:#132234;
+  --edge-flow:#5a5954; --edge-internal:#3a3a38;
+  --pill-bg:#25231f; --code-bg:#222221;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--text-primary);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+header.top { padding:22px 28px 14px; border-bottom:1px solid var(--border); background:var(--surface-1); }
+header.top h1 { margin:0 0 4px; font-size:1.5rem; }
+header.top p { margin:0; color:var(--text-secondary); font-size:0.9rem; }
+.stats { display:flex; gap:18px; margin-top:12px; flex-wrap:wrap; }
+.stat { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; }
+.stat b { display:block; font-size:1.15rem; }
+.stat span { color:var(--text-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:.04em; }
+nav.tabs { display:flex; gap:4px; padding:0 28px; background:var(--surface-1); border-bottom:1px solid var(--border); }
+nav.tabs button { background:none; border:none; padding:12px 18px; font-size:0.95rem; color:var(--text-secondary);
+  cursor:pointer; border-bottom:2px solid transparent; font-family:inherit; }
+nav.tabs button.active { color:var(--text-primary); border-bottom-color:var(--accent); font-weight:600; }
+main { padding:20px 28px 60px; max-width:1600px; margin:0 auto; }
+.tabpanel { display:none; }
+.tabpanel.show { display:block; }
+.legend { display:flex; gap:22px; flex-wrap:wrap; align-items:center; margin:0 0 14px; font-size:0.82rem; color:var(--text-secondary); }
+.legend .sw { display:inline-block; width:22px; height:2px; margin-right:6px; vertical-align:middle; }
+.legend .sw.flow { background:var(--edge-flow); }
+.legend .sw.internal { background:var(--edge-internal); border-top:2px dashed var(--edge-internal); height:0; }
+.lineage-wrap { display:flex; gap:18px; align-items:flex-start; }
+.svg-scroll { flex:1 1 auto; overflow:auto; background:var(--surface-1); border:1px solid var(--border);
+  border-radius:10px; padding:10px; max-height:78vh; }
+svg#lineageSvg { display:block; width:100%; height:auto; min-width:1100px; }
+.col-title { font-size:14px; font-weight:700; }
+.col-sub { font-size:10.5px; fill:var(--text-muted); }
+.schema-label { font-size:10.5px; fill:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+.node-rect { fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+.node { cursor:pointer; }
+.node .node-title { font-size:11.5px; font-weight:600; fill:var(--text-primary); }
+.node .node-sub { font-size:9.5px; fill:var(--text-muted); }
+.node.uninteg .node-rect { fill:var(--surface-1); }
+.warn-mark { fill:#d03b3b; }
+.edge { fill:none; stroke:var(--edge-flow); stroke-width:1.4; marker-end:url(#arrow); opacity:0.55; }
+.edge.internal { stroke:var(--edge-internal); stroke-dasharray:4,3; stroke-width:1.2; opacity:0.5; }
+.arrowhead { fill:var(--edge-flow); }
+svg.dimmed .node { opacity:0.25; }
+svg.dimmed .edge { opacity:0.06; }
+svg.dimmed .node.hl-self, svg.dimmed .node.hl-anc, svg.dimmed .node.hl-desc { opacity:1; }
+svg.dimmed .edge.hl { opacity:0.95; stroke-width:2.2; }
+.node.hl-self .node-rect { stroke:var(--accent); stroke-width:2; }
+.node.hl-anc .node-rect { stroke:#1baf7a; stroke-width:1.6; }
+.node.hl-desc .node-rect { stroke:#eb6834; stroke-width:1.6; }
+.edge.hl { stroke:var(--accent); }
+.detail-panel { width:340px; flex:0 0 340px; background:var(--surface-1); border:1px solid var(--border);
+  border-radius:10px; padding:16px; max-height:78vh; overflow:auto; position:sticky; top:16px; }
+.detail-panel h3 { margin:0 0 4px; font-size:1rem; }
+.detail-panel .muted { color:var(--text-muted); }
+.detail-panel .placeholder { color:var(--text-muted); font-size:0.9rem; }
+.detail-panel table { width:100%; border-collapse:collapse; font-size:0.78rem; margin-top:8px; }
+.detail-panel td, .detail-panel th { padding:3px 4px; border-bottom:1px solid var(--grid); text-align:left; }
+.dp-section { margin-top:12px; }
+.dp-section b { font-size:0.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); }
+.dp-list a { display:block; font-size:0.8rem; color:var(--accent); text-decoration:none; margin-top:2px; cursor:pointer; }
+.dp-list a:hover { text-decoration:underline; }
+.gap-note { margin-top:18px; background:var(--accent-soft); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; font-size:0.82rem; }
+.gap-note h4 { margin:0 0 6px; font-size:0.85rem; }
+.gap-note ul { margin:4px 0; padding-left:18px; }
+.gap-note code { background:var(--code-bg); padding:1px 5px; border-radius:4px; font-size:0.78rem; }
+input#searchBox { width:100%; max-width:420px; padding:9px 12px; border-radius:8px; border:1px solid var(--border);
+  background:var(--surface-1); color:var(--text-primary); font-size:0.9rem; margin-bottom:16px; }
+.cat-layer-title { border-left:5px solid; padding-left:10px; margin:26px 0 10px; font-size:1.15rem; }
+.cat-layer-sub { color:var(--text-muted); font-weight:400; font-size:0.85rem; }
+.cat-schema { color:var(--text-muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em;
+  margin:16px 0 6px; }
+details.cat-table { background:var(--surface-1); border:1px solid var(--border); border-radius:8px;
+  margin-bottom:8px; padding:0; }
+details.cat-table summary { padding:10px 14px; cursor:pointer; list-style:none; display:flex; gap:12px;
+  align-items:baseline; }
+details.cat-table summary::-webkit-details-marker { display:none; }
+details.cat-table[open] summary { border-bottom:1px solid var(--border); }
+.cat-table-name { font-weight:600; font-family:ui-monospace,Consolas,monospace; font-size:0.88rem; white-space:nowrap; }
+.cat-table-comment { color:var(--text-muted); font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cat-table-body { padding:12px 14px 16px; }
+.badges { margin-bottom:10px; }
+.pill { display:inline-block; background:var(--pill-bg); border:1px solid var(--border); border-radius:20px;
+  padding:2px 10px; font-size:0.72rem; margin:0 6px 6px 0; color:var(--text-secondary); }
+.pill-src { color:var(--accent); border-color:var(--accent); }
+.pill-warn { color:#d03b3b; border-color:#d03b3b; }
+.pill-gov { color:#8a6d1a; border-color:#c9a227; }
+table.col-table { width:100%; border-collapse:collapse; font-size:0.82rem; margin:6px 0; }
+table.col-table th { text-align:left; color:var(--text-muted); font-weight:600; font-size:0.72rem;
+  text-transform:uppercase; letter-spacing:.03em; padding:5px 8px; border-bottom:1px solid var(--border); }
+table.col-table td { padding:5px 8px; border-bottom:1px solid var(--grid); }
+.mono { font-family:ui-monospace,Consolas,monospace; }
+.lineage-text { font-size:0.82rem; margin-top:6px; }
+.lineage-text code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+.sample-note { margin-top:10px; font-size:0.78rem; color:var(--text-muted); }
+.sample-note code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+.gov-list { font-size:0.8rem; margin:6px 0; padding-left:18px; }
+.gap-card { border-color:#d03b3b !important; }
+footer.pagefoot { text-align:center; color:var(--text-muted); font-size:0.78rem; padding:24px; }
+@media (max-width: 980px) {
+  .lineage-wrap { flex-direction:column; }
+  .detail-panel { width:100%; flex:none; position:static; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>acme Sales Lakehouse — Data Catalog &amp; Lineage</h1>
+  <p>Generated 2026-07-29 directly from Unity Catalog on <code>adb-7405618665227003.3.azuredatabricks.net</code> —
+  table/column inventory via <code>system.information_schema</code>, Bronze→Silver lineage via the live
+  <code>acme_bronze.cfg.layer_mappings</code> config table, Gold→Products lineage via live
+  <code>SHOW CREATE TABLE</code> on each view, remaining edges from <code>pipelines/silver_dlt.py</code> /
+  <code>pipelines/gold_dlt.py</code>.</p>
+  <div class="stats">
+    <div class="stat"><b>47</b><span>tables / views</span></div>
+    <div class="stat"><b>11+9</b><span>bronze (+ audit/cfg)</span></div>
+    <div class="stat"><b>10</b><span>silver</span></div>
+    <div class="stat"><b>11</b><span>gold</span></div>
+    <div class="stat"><b>6</b><span>products</span></div>
+    <div class="stat"><b>45</b><span>lineage edges</span></div>
+    <div class="stat"><b>153,333</b><span>live rows (sum)</span></div>
+  </div>
+</header>
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="lineage">Lineage diagram</button>
+  <button class="tab-btn" data-tab="catalog">Data catalog</button>
+</nav>
+<main>
+  <section id="tab-lineage" class="tabpanel show">
+    <div class="legend">
+      <span><span class="sw flow"></span>data flow (Bronze→Silver→Gold→Products)</span>
+      <span><span class="sw internal"></span>internal derivation (same layer)</span>
+      <span>⚠ dashed border = landed, not yet consumed downstream</span>
+      <span>Click any table to trace its full upstream/downstream lineage</span>
+    </div>
+    <div class="lineage-wrap">
+      <div class="svg-scroll"><svg id="lineageSvg" viewBox="0 0 1378 1072" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" class="arrowhead"/>
+  </marker>
+</defs>
+<g class="col-header"><rect x="40" y="56" width="236" height="30" rx="6" fill="#b8752e"/><text x="158.0" y="76" text-anchor="middle" class="col-title" fill="#ffffff">Bronze</text></g>
+<text x="158.0" y="96" text-anchor="middle" class="col-sub">raw, source-shaped</text>
+<g class="col-header"><rect x="394" y="56" width="236" height="30" rx="6" fill="#8a8f98"/><text x="512.0" y="76" text-anchor="middle" class="col-title" fill="#ffffff">Silver</text></g>
+<text x="512.0" y="96" text-anchor="middle" class="col-sub">3NF, insert-only, hash-keyed</text>
+<g class="col-header"><rect x="748" y="56" width="236" height="30" rx="6" fill="#c9a227"/><text x="866.0" y="76" text-anchor="middle" class="col-title" fill="#1a1a1a">Gold</text></g>
+<text x="866.0" y="96" text-anchor="middle" class="col-sub">star schema + DV2.0 + ML/AI</text>
+<g class="col-header"><rect x="1102" y="56" width="236" height="30" rx="6" fill="#2a78d6"/><text x="1220.0" y="76" text-anchor="middle" class="col-title" fill="#ffffff">Products</text></g>
+<text x="1220.0" y="96" text-anchor="middle" class="col-sub">governed output ports</text>
+<text x="40" y="134" class="schema-label">sap</text>
+<text x="40" y="396" class="schema-label">jde</text>
+<text x="40" y="546" class="schema-label">qad</text>
+<text x="40" y="640" class="schema-label">d365</text>
+<text x="40" y="734" class="schema-label">sfdc</text>
+<text x="40" y="828" class="schema-label">ot</text>
+<text x="40" y="922" class="schema-label">mes</text>
+<text x="394" y="134" class="schema-label">sales</text>
+<text x="394" y="676" class="schema-label">ref</text>
+<text x="748" y="134" class="schema-label">sales</text>
+<text x="748" y="620" class="schema-label">ml</text>
+<text x="748" y="714" class="schema-label">ai</text>
+<text x="1102" y="134" class="schema-label">sales</text>
+<text x="1102" y="396" class="schema-label">ops</text>
+<text x="1102" y="490" class="schema-label">meta</text>
+<path d="M 276.0 163.0 C 335.0 163.0, 335.0 163.0, 394.0 163.0" class="edge flow" data-src="n_acme_bronze_sap_kna1" data-tgt="n_acme_silver_sales_customer" marker-end="url(#arrow)"/>
+<path d="M 276.0 425.0 C 335.0 425.0, 335.0 163.0, 394.0 163.0" class="edge flow" data-src="n_acme_bronze_jde_f0101" data-tgt="n_acme_silver_sales_customer" marker-end="url(#arrow)"/>
+<path d="M 276.0 275.0 C 335.0 275.0, 335.0 387.0, 394.0 387.0" class="edge flow" data-src="n_acme_bronze_sap_vbak" data-tgt="n_acme_silver_sales_sales_order_header" marker-end="url(#arrow)"/>
+<path d="M 276.0 481.0 C 335.0 481.0, 335.0 387.0, 394.0 387.0" class="edge flow" data-src="n_acme_bronze_jde_f4201" data-tgt="n_acme_silver_sales_sales_order_header" marker-end="url(#arrow)"/>
+<path d="M 276.0 575.0 C 335.0 575.0, 335.0 387.0, 394.0 387.0" class="edge flow" data-src="n_acme_bronze_qad_so_mstr" data-tgt="n_acme_silver_sales_sales_order_header" marker-end="url(#arrow)"/>
+<path d="M 276.0 219.0 C 335.0 219.0, 335.0 443.0, 394.0 443.0" class="edge flow" data-src="n_acme_bronze_sap_lips" data-tgt="n_acme_silver_sales_shipment" marker-end="url(#arrow)"/>
+<path d="M 276.0 331.0 C 335.0 331.0, 335.0 331.0, 394.0 331.0" class="edge flow" data-src="n_acme_bronze_sap_vbrp" data-tgt="n_acme_silver_sales_invoice" marker-end="url(#arrow)"/>
+<path d="M 276.0 857.0 C 335.0 857.0, 335.0 219.0, 394.0 219.0" class="edge flow" data-src="n_acme_bronze_ot_furnace_telemetry" data-tgt="n_acme_silver_sales_furnace_heat_5min" marker-end="url(#arrow)"/>
+<path d="M 630.0 705.0 C 676.0 705.0, 676.0 387.0, 630.0 387.0" class="edge internal" data-src="n_acme_silver_ref_fx_rates" data-tgt="n_acme_silver_sales_sales_order_header" marker-end="url(#arrow)"/>
+<path d="M 630.0 705.0 C 676.0 705.0, 676.0 275.0, 630.0 275.0" class="edge internal" data-src="n_acme_silver_ref_fx_rates" data-tgt="n_acme_silver_sales_fx_rates" marker-end="url(#arrow)"/>
+<path d="M 630.0 387.0 C 676.0 387.0, 676.0 555.0, 630.0 555.0" class="edge internal" data-src="n_acme_silver_sales_sales_order_header" data-tgt="n_acme_silver_sales_v_sales_order_header_current" marker-end="url(#arrow)"/>
+<path d="M 630.0 443.0 C 676.0 443.0, 676.0 611.0, 630.0 611.0" class="edge internal" data-src="n_acme_silver_sales_shipment" data-tgt="n_acme_silver_sales_v_shipment_current" marker-end="url(#arrow)"/>
+<path d="M 630.0 331.0 C 676.0 331.0, 676.0 499.0, 630.0 499.0" class="edge internal" data-src="n_acme_silver_sales_invoice" data-tgt="n_acme_silver_sales_v_invoice_current" marker-end="url(#arrow)"/>
+<path d="M 630.0 163.0 C 689.0 163.0, 689.0 331.0, 748.0 331.0" class="edge flow" data-src="n_acme_silver_sales_customer" data-tgt="n_acme_gold_sales_dim_customer" marker-end="url(#arrow)"/>
+<path d="M 630.0 555.0 C 689.0 555.0, 689.0 443.0, 748.0 443.0" class="edge flow" data-src="n_acme_silver_sales_v_sales_order_header_current" data-tgt="n_acme_gold_sales_fact_sales_orders" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1030.0 331.0, 1030.0 443.0, 984.0 443.0" class="edge internal" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_gold_sales_fact_sales_orders" marker-end="url(#arrow)"/>
+<path d="M 630.0 219.0 C 689.0 219.0, 689.0 387.0, 748.0 387.0" class="edge flow" data-src="n_acme_silver_sales_furnace_heat_5min" data-tgt="n_acme_gold_sales_fact_heat_quality" marker-end="url(#arrow)"/>
+<path d="M 630.0 163.0 C 689.0 163.0, 689.0 555.0, 748.0 555.0" class="edge flow" data-src="n_acme_silver_sales_customer" data-tgt="n_acme_gold_sales_pit_customer" marker-end="url(#arrow)"/>
+<path d="M 630.0 555.0 C 689.0 555.0, 689.0 219.0, 748.0 219.0" class="edge flow" data-src="n_acme_silver_sales_v_sales_order_header_current" data-tgt="n_acme_gold_sales_bridge_order_fulfillment" marker-end="url(#arrow)"/>
+<path d="M 630.0 611.0 C 689.0 611.0, 689.0 219.0, 748.0 219.0" class="edge flow" data-src="n_acme_silver_sales_v_shipment_current" data-tgt="n_acme_gold_sales_bridge_order_fulfillment" marker-end="url(#arrow)"/>
+<path d="M 630.0 499.0 C 689.0 499.0, 689.0 219.0, 748.0 219.0" class="edge flow" data-src="n_acme_silver_sales_v_invoice_current" data-tgt="n_acme_gold_sales_bridge_order_fulfillment" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1030.0 331.0, 1030.0 219.0, 984.0 219.0" class="edge internal" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_gold_sales_bridge_order_fulfillment" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1030.0 443.0, 1030.0 163.0, 984.0 163.0" class="edge internal" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_gold_sales_agg_sales_daily" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1030.0 443.0, 1030.0 499.0, 984.0 499.0" class="edge internal" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_gold_sales_mv_sales_metrics" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1030.0 443.0, 1030.0 649.0, 984.0 649.0" class="edge internal" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_gold_ml_customer_features" marker-end="url(#arrow)"/>
+<path d="M 984.0 219.0 C 1030.0 219.0, 1030.0 649.0, 984.0 649.0" class="edge internal" data-src="n_acme_gold_sales_bridge_order_fulfillment" data-tgt="n_acme_gold_ml_customer_features" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1030.0 331.0, 1030.0 275.0, 984.0 275.0" class="edge internal" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_gold_sales_customer_narratives" marker-end="url(#arrow)"/>
+<path d="M 984.0 219.0 C 1030.0 219.0, 1030.0 275.0, 984.0 275.0" class="edge internal" data-src="n_acme_gold_sales_bridge_order_fulfillment" data-tgt="n_acme_gold_sales_customer_narratives" marker-end="url(#arrow)"/>
+<path d="M 984.0 275.0 C 1030.0 275.0, 1030.0 799.0, 984.0 799.0" class="edge internal" data-src="n_acme_gold_sales_customer_narratives" data-tgt="n_acme_gold_ai_customer_profile_text" marker-end="url(#arrow)"/>
+<path d="M 984.0 799.0 C 1030.0 799.0, 1030.0 743.0, 984.0 743.0" class="edge internal" data-src="n_acme_gold_ai_customer_profile_text" data-tgt="n_acme_gold_ai_customer_profile_idx" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1043.0 443.0, 1043.0 275.0, 1102.0 275.0" class="edge flow" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_products_sales_v_sales_orders" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1043.0 443.0, 1043.0 331.0, 1102.0 331.0" class="edge flow" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_products_sales_v_sales_orders_unified" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1043.0 331.0, 1043.0 331.0, 1102.0 331.0" class="edge flow" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_products_sales_v_sales_orders_unified" marker-end="url(#arrow)"/>
+<path d="M 984.0 219.0 C 1043.0 219.0, 1043.0 331.0, 1102.0 331.0" class="edge flow" data-src="n_acme_gold_sales_bridge_order_fulfillment" data-tgt="n_acme_products_sales_v_sales_orders_unified" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1043.0 443.0, 1043.0 163.0, 1102.0 163.0" class="edge flow" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_products_sales_order_to_cash" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1043.0 331.0, 1043.0 163.0, 1102.0 163.0" class="edge flow" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_products_sales_order_to_cash" marker-end="url(#arrow)"/>
+<path d="M 984.0 219.0 C 1043.0 219.0, 1043.0 163.0, 1102.0 163.0" class="edge flow" data-src="n_acme_gold_sales_bridge_order_fulfillment" data-tgt="n_acme_products_sales_order_to_cash" marker-end="url(#arrow)"/>
+<path d="M 984.0 331.0 C 1043.0 331.0, 1043.0 219.0, 1102.0 219.0" class="edge flow" data-src="n_acme_gold_sales_dim_customer" data-tgt="n_acme_products_sales_v_customer_360" marker-end="url(#arrow)"/>
+<path d="M 984.0 275.0 C 1043.0 275.0, 1043.0 219.0, 1102.0 219.0" class="edge flow" data-src="n_acme_gold_sales_customer_narratives" data-tgt="n_acme_products_sales_v_customer_360" marker-end="url(#arrow)"/>
+<path d="M 984.0 219.0 C 1043.0 219.0, 1043.0 219.0, 1102.0 219.0" class="edge flow" data-src="n_acme_gold_sales_bridge_order_fulfillment" data-tgt="n_acme_products_sales_v_customer_360" marker-end="url(#arrow)"/>
+<path d="M 984.0 443.0 C 1043.0 443.0, 1043.0 219.0, 1102.0 219.0" class="edge flow" data-src="n_acme_gold_sales_fact_sales_orders" data-tgt="n_acme_products_sales_v_customer_360" marker-end="url(#arrow)"/>
+<path d="M 984.0 387.0 C 1043.0 387.0, 1043.0 425.0, 1102.0 425.0" class="edge flow" data-src="n_acme_gold_sales_fact_heat_quality" data-tgt="n_acme_products_ops_v_melt_to_margin" marker-end="url(#arrow)"/>
+<path d="M 984.0 163.0 C 1043.0 163.0, 1043.0 425.0, 1102.0 425.0" class="edge flow" data-src="n_acme_gold_sales_agg_sales_daily" data-tgt="n_acme_products_ops_v_melt_to_margin" marker-end="url(#arrow)"/>
+<g class="node" id="n_acme_bronze_sap_kna1" data-fq="acme_bronze.sap.kna1" tabindex="0">
+  <rect x="40" y="140" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="140" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="158" class="node-title">sap.kna1</text>
+  <text x="54" y="174" class="node-sub">SAP · goldengate · EUROPE</text>
+</g>
+<g class="node" id="n_acme_bronze_sap_lips" data-fq="acme_bronze.sap.lips" tabindex="0">
+  <rect x="40" y="196" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="196" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="214" class="node-title">sap.lips</text>
+  <text x="54" y="230" class="node-sub">SAP · goldengate · EUROPE</text>
+</g>
+<g class="node" id="n_acme_bronze_sap_vbak" data-fq="acme_bronze.sap.vbak" tabindex="0">
+  <rect x="40" y="252" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="252" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="270" class="node-title">sap.vbak</text>
+  <text x="54" y="286" class="node-sub">SAP · goldengate · EUROPE</text>
+</g>
+<g class="node" id="n_acme_bronze_sap_vbrp" data-fq="acme_bronze.sap.vbrp" tabindex="0">
+  <rect x="40" y="308" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="308" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="326" class="node-title">sap.vbrp</text>
+  <text x="54" y="342" class="node-sub">SAP · goldengate · EUROPE</text>
+</g>
+<g class="node" id="n_acme_bronze_jde_f0101" data-fq="acme_bronze.jde.f0101" tabindex="0">
+  <rect x="40" y="402" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="402" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="420" class="node-title">jde.f0101</text>
+  <text x="54" y="436" class="node-sub">JDE · goldengate · AMERICAS</text>
+</g>
+<g class="node" id="n_acme_bronze_jde_f4201" data-fq="acme_bronze.jde.f4201" tabindex="0">
+  <rect x="40" y="458" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="458" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="476" class="node-title">jde.f4201</text>
+  <text x="54" y="492" class="node-sub">JDE · goldengate · AMERICAS</text>
+</g>
+<g class="node" id="n_acme_bronze_qad_so_mstr" data-fq="acme_bronze.qad.so_mstr" tabindex="0">
+  <rect x="40" y="552" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="552" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="570" class="node-title">qad.so_mstr</text>
+  <text x="54" y="586" class="node-sub">QAD · lakeflow_sqlserver · EMEA</text>
+</g>
+<g class="node uninteg" id="n_acme_bronze_d365_salesorders" data-fq="acme_bronze.d365.salesorders" tabindex="0">
+  <rect x="40" y="646" width="236" height="46" rx="7" class="node-rect" stroke-dasharray="5,4"/>
+  <rect x="40" y="646" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="664" class="node-title"><tspan class="warn-mark">⚠</tspan> d365.salesorders</text>
+  <text x="54" y="680" class="node-sub">D365 · lakeflow_d365 · GLOBAL</text>
+</g>
+<g class="node uninteg" id="n_acme_bronze_sfdc_opportunity" data-fq="acme_bronze.sfdc.opportunity" tabindex="0">
+  <rect x="40" y="740" width="236" height="46" rx="7" class="node-rect" stroke-dasharray="5,4"/>
+  <rect x="40" y="740" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="758" class="node-title"><tspan class="warn-mark">⚠</tspan> sfdc.opportunity</text>
+  <text x="54" y="774" class="node-sub">SALESFORCE · autoloader_file · GLOBAL</text>
+</g>
+<g class="node" id="n_acme_bronze_ot_furnace_telemetry" data-fq="acme_bronze.ot.furnace_telemetry" tabindex="0">
+  <rect x="40" y="834" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="40" y="834" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="852" class="node-title">ot.furnace_telemetry</text>
+  <text x="54" y="868" class="node-sub">LITMUS · litmus_eventhub · AMERICAS</text>
+</g>
+<g class="node uninteg" id="n_acme_bronze_mes_rollmill_orders" data-fq="acme_bronze.mes.rollmill_orders" tabindex="0">
+  <rect x="40" y="928" width="236" height="46" rx="7" class="node-rect" stroke-dasharray="5,4"/>
+  <rect x="40" y="928" width="5" height="46" rx="2" fill="#b8752e"/>
+  <text x="54" y="946" class="node-title"><tspan class="warn-mark">⚠</tspan> mes.rollmill_orders</text>
+  <text x="54" y="962" class="node-sub">MES · litmus_eventhub · AMERICAS</text>
+</g>
+<g class="node" id="n_acme_silver_sales_customer" data-fq="acme_silver.sales.customer" tabindex="0">
+  <rect x="394" y="140" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="140" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="158" class="node-title">sales.customer</text>
+  <text x="408" y="174" class="node-sub">STREAM · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_furnace_heat_5min" data-fq="acme_silver.sales.furnace_heat_5min" tabindex="0">
+  <rect x="394" y="196" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="196" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="214" class="node-title">sales.furnace_heat_5min</text>
+  <text x="408" y="230" class="node-sub">STREAM · 639 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_fx_rates" data-fq="acme_silver.sales.fx_rates" tabindex="0">
+  <rect x="394" y="252" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="252" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="270" class="node-title">sales.fx_rates</text>
+  <text x="408" y="286" class="node-sub">MV · 4 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_invoice" data-fq="acme_silver.sales.invoice" tabindex="0">
+  <rect x="394" y="308" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="308" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="326" class="node-title">sales.invoice</text>
+  <text x="408" y="342" class="node-sub">STREAM · 2,767 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_sales_order_header" data-fq="acme_silver.sales.sales_order_header" tabindex="0">
+  <rect x="394" y="364" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="364" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="382" class="node-title">sales.sales_order_header</text>
+  <text x="408" y="398" class="node-sub">STREAM · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_shipment" data-fq="acme_silver.sales.shipment" tabindex="0">
+  <rect x="394" y="420" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="420" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="438" class="node-title">sales.shipment</text>
+  <text x="408" y="454" class="node-sub">STREAM · 3,478 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_v_invoice_current" data-fq="acme_silver.sales.v_invoice_current" tabindex="0">
+  <rect x="394" y="476" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="476" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="494" class="node-title">sales.v_invoice_current</text>
+  <text x="408" y="510" class="node-sub">MV · 2,767 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_v_sales_order_header_current" data-fq="acme_silver.sales.v_sales_order_header_current" tabindex="0">
+  <rect x="394" y="532" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="532" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="550" class="node-title">sales.v_sales_order_header_current</text>
+  <text x="408" y="566" class="node-sub">MV · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_silver_sales_v_shipment_current" data-fq="acme_silver.sales.v_shipment_current" tabindex="0">
+  <rect x="394" y="588" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="588" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="606" class="node-title">sales.v_shipment_current</text>
+  <text x="408" y="622" class="node-sub">MV · 3,478 rows</text>
+</g>
+<g class="node" id="n_acme_silver_ref_fx_rates" data-fq="acme_silver.ref.fx_rates" tabindex="0">
+  <rect x="394" y="682" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="394" y="682" width="5" height="46" rx="2" fill="#8a8f98"/>
+  <text x="408" y="700" class="node-title">ref.fx_rates</text>
+  <text x="408" y="716" class="node-sub">TABLE · 4 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_agg_sales_daily" data-fq="acme_gold.sales.agg_sales_daily" tabindex="0">
+  <rect x="748" y="140" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="140" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="158" class="node-title">sales.agg_sales_daily</text>
+  <text x="762" y="174" class="node-sub">MV · 1,499 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_bridge_order_fulfillment" data-fq="acme_gold.sales.bridge_order_fulfillment" tabindex="0">
+  <rect x="748" y="196" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="196" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="214" class="node-title">sales.bridge_order_fulfillment</text>
+  <text x="762" y="230" class="node-sub">MV · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_customer_narratives" data-fq="acme_gold.sales.customer_narratives" tabindex="0">
+  <rect x="748" y="252" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="252" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="270" class="node-title">sales.customer_narratives</text>
+  <text x="762" y="286" class="node-sub">TABLE · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_dim_customer" data-fq="acme_gold.sales.dim_customer" tabindex="0">
+  <rect x="748" y="308" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="308" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="326" class="node-title">sales.dim_customer</text>
+  <text x="762" y="342" class="node-sub">MV · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_fact_heat_quality" data-fq="acme_gold.sales.fact_heat_quality" tabindex="0">
+  <rect x="748" y="364" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="364" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="382" class="node-title">sales.fact_heat_quality</text>
+  <text x="762" y="398" class="node-sub">MV · 639 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_fact_sales_orders" data-fq="acme_gold.sales.fact_sales_orders" tabindex="0">
+  <rect x="748" y="420" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="420" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="438" class="node-title">sales.fact_sales_orders</text>
+  <text x="762" y="454" class="node-sub">MV · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_mv_sales_metrics" data-fq="acme_gold.sales.mv_sales_metrics" tabindex="0">
+  <rect x="748" y="476" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="476" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="494" class="node-title">sales.mv_sales_metrics</text>
+  <text x="762" y="510" class="node-sub">METRIC · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_gold_sales_pit_customer" data-fq="acme_gold.sales.pit_customer" tabindex="0">
+  <rect x="748" y="532" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="532" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="550" class="node-title">sales.pit_customer</text>
+  <text x="762" y="566" class="node-sub">MV · 2,002 rows</text>
+</g>
+<g class="node" id="n_acme_gold_ml_customer_features" data-fq="acme_gold.ml.customer_features" tabindex="0">
+  <rect x="748" y="626" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="626" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="644" class="node-title">ml.customer_features</text>
+  <text x="762" y="660" class="node-sub">TABLE · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_gold_ai_customer_profile_idx" data-fq="acme_gold.ai.customer_profile_idx" tabindex="0">
+  <rect x="748" y="720" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="720" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="738" class="node-title">ai.customer_profile_idx</text>
+  <text x="762" y="754" class="node-sub">INDEX · — rows</text>
+</g>
+<g class="node" id="n_acme_gold_ai_customer_profile_text" data-fq="acme_gold.ai.customer_profile_text" tabindex="0">
+  <rect x="748" y="776" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="748" y="776" width="5" height="46" rx="2" fill="#c9a227"/>
+  <text x="762" y="794" class="node-title">ai.customer_profile_text</text>
+  <text x="762" y="810" class="node-sub">TABLE · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_products_sales_order_to_cash" data-fq="acme_products.sales.order_to_cash" tabindex="0">
+  <rect x="1102" y="140" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="140" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="158" class="node-title">sales.order_to_cash</text>
+  <text x="1116" y="174" class="node-sub">VIEW · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_products_sales_v_customer_360" data-fq="acme_products.sales.v_customer_360" tabindex="0">
+  <rect x="1102" y="196" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="196" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="214" class="node-title">sales.v_customer_360</text>
+  <text x="1116" y="230" class="node-sub">VIEW · 1,001 rows</text>
+</g>
+<g class="node" id="n_acme_products_sales_v_sales_orders" data-fq="acme_products.sales.v_sales_orders" tabindex="0">
+  <rect x="1102" y="252" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="252" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="270" class="node-title">sales.v_sales_orders</text>
+  <text x="1116" y="286" class="node-sub">VIEW · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_products_sales_v_sales_orders_unified" data-fq="acme_products.sales.v_sales_orders_unified" tabindex="0">
+  <rect x="1102" y="308" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="308" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="326" class="node-title">sales.v_sales_orders_unified</text>
+  <text x="1116" y="342" class="node-sub">VIEW · 13,000 rows</text>
+</g>
+<g class="node" id="n_acme_products_ops_v_melt_to_margin" data-fq="acme_products.ops.v_melt_to_margin" tabindex="0">
+  <rect x="1102" y="402" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="402" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="420" class="node-title">ops.v_melt_to_margin</text>
+  <text x="1116" y="436" class="node-sub">VIEW · 36 rows</text>
+</g>
+<g class="node" id="n_acme_products_meta_v_product_trust_scores" data-fq="acme_products.meta.v_product_trust_scores" tabindex="0">
+  <rect x="1102" y="496" width="236" height="46" rx="7" class="node-rect"/>
+  <rect x="1102" y="496" width="5" height="46" rx="2" fill="#2a78d6"/>
+  <text x="1116" y="514" class="node-title">meta.v_product_trust_scores</text>
+  <text x="1116" y="530" class="node-sub">VIEW · 5 rows</text>
+</g>
+</svg></div>
+      <aside class="detail-panel" id="detailPanel">
+        <p class="placeholder">Click a table in the diagram to see its columns, row count, and full lineage trace.</p>
+        <div class="gap-note">
+          <h4>⚠ Landed but not yet consumed downstream</h4>
+          <ul><li><code>acme_bronze.d365.salesorders</code></li><li><code>acme_bronze.sfdc.opportunity</code></li><li><code>acme_bronze.mes.rollmill_orders</code></li></ul>
+          <h4 style="margin-top:10px">⚠ Registered in cfg.source_registry, no table in the metastore</h4>
+          <ul><li><code>bronze.ebs.oe_order_headers_all</code> (EBS, registered as <code>ebs_oe_order_headers</code>)</li><li><code>bronze.ebs.ra_customer_trx_all</code> (EBS, registered as <code>ebs_ra_customer_trx</code>)</li><li><code>bronze.ot.caster_history</code> (LITMUS, registered as <code>ot_caster_history</code>)</li></ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+  <section id="tab-catalog" class="tabpanel">
+    <input id="searchBox" type="text" placeholder="Search tables or columns (e.g. customer_hk, vbak, dim_customer)…">
+    <section class="cat-layer" data-layer="acme_bronze">
+<h2 class="cat-layer-title" style="border-color:#b8752e">Bronze <span class="cat-layer-sub">— raw, source-shaped</span></h2>
+<h3 class="cat-schema">acme_bronze.sap</h3>
+<details class="cat-table" id="cat_n_acme_bronze_sap_kna1">
+  <summary><span class="cat-table-name">sap.kna1</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">500 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">KUNNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NAME1</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">LAND1</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.kna1'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_bronze_sap_lips">
+  <summary><span class="cat-table-name">sap.lips</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">POSNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">VGBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">LFIMG</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">WERKS</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.shipment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.lips'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_bronze_sap_vbak">
+  <summary><span class="cat-table-name">sap.vbak</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">5,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">KUNNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NETWR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">WAERK</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">MATNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.vbak'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_bronze_sap_vbrp">
+  <summary><span class="cat-table-name">sap.vbrp</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">POSNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">AUBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">VGBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NETWR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.invoice</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.vbrp'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.jde</h3>
+<details class="cat-table" id="cat_n_acme_bronze_jde_f0101">
+  <summary><span class="cat-table-name">jde.f0101</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">JDE · goldengate · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">501 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">ABAN8</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ABALPH</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ABCTR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'jde.f0101'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_bronze_jde_f4201">
+  <summary><span class="cat-table-name">jde.f4201</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">JDE · goldengate · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">5,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">SHKCOO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHDOCO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHDCTO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHAN8</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHOTOT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHCRCD</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHTRDJ</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHLITM</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'jde.f4201'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.qad</h3>
+<details class="cat-table" id="cat_n_acme_bronze_qad_so_mstr">
+  <summary><span class="cat-table-name">qad.so_mstr</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">QAD · lakeflow_sqlserver · EMEA</span><span class="pill">MANAGED</span><span class="pill">3,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">so_domain</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_nbr</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_cust</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_t_amt</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_curr</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_ord_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_part</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'qad.so_mstr'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.d365</h3>
+<details class="cat-table" id="cat_n_acme_bronze_d365_salesorders">
+  <summary><span class="cat-table-name">d365.salesorders</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">D365 · lakeflow_d365 · GLOBAL</span><span class="pill">MANAGED</span><span class="pill">1,500 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">salesorderid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customerid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">totalamount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">transactioncurrencyid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">productcode</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">modifiedon</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'd365.salesorders'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.sfdc</h3>
+<details class="cat-table" id="cat_n_acme_bronze_sfdc_opportunity">
+  <summary><span class="cat-table-name">sfdc.opportunity</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SALESFORCE · autoloader_file · GLOBAL</span><span class="pill">MANAGED</span><span class="pill">2,000 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">Id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">AccountId</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">Amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">StageName</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">Product__c</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SystemModstamp</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sfdc.opportunity'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.ot</h3>
+<details class="cat-table" id="cat_n_acme_bronze_ot_furnace_telemetry">
+  <summary><span class="cat-table-name">ot.furnace_telemetry</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">LITMUS · litmus_eventhub · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">648 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">quality</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.furnace_heat_5min</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'ot.furnace_telemetry'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_bronze.mes</h3>
+<details class="cat-table" id="cat_n_acme_bronze_mes_rollmill_orders">
+  <summary><span class="cat-table-name">mes.rollmill_orders</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">MES · litmus_eventhub · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">1,500 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">topic</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">work_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">event</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">product</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'mes.rollmill_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table gap-card">
+  <summary><span class="cat-table-name">⚠ Registered but not landed</span>
+    <span class="cat-table-comment">3 sources in cfg.source_registry with no matching table in the metastore today</span></summary>
+  <div class="cat-table-body">
+    <table class="col-table">
+      <thead><tr><th>source_name</th><th>system</th><th>pattern</th><th>target (expected)</th></tr></thead>
+      <tbody><tr><td class='mono'>ebs_oe_order_headers</td><td>EBS</td><td class='mono'>goldengate</td><td class='mono muted'>bronze.ebs.oe_order_headers_all</td></tr><tr><td class='mono'>ebs_ra_customer_trx</td><td>EBS</td><td class='mono'>lakeflow_query</td><td class='mono muted'>bronze.ebs.ra_customer_trx_all</td></tr><tr><td class='mono'>ot_caster_history</td><td>LITMUS</td><td class='mono'>litmus_adls</td><td class='mono muted'>bronze.ot.caster_history</td></tr></tbody>
+    </table>
+    <p class="muted">Config says these should exist (registered ingestion sources); the live metastore has no
+    such table. This is an authentic gap — not a display bug — surfaced by cross-checking
+    <code>acme_bronze.cfg.source_registry</code> against <code>system.information_schema.tables</code>.</p>
+  </div>
+</details>
+</section>
+<section class="cat-layer" data-layer="acme_silver">
+<h2 class="cat-layer-title" style="border-color:#8a8f98">Silver <span class="cat-layer-sub">— 3NF, insert-only, hash-keyed</span></h2>
+<h3 class="cat-schema">acme_silver.sales</h3>
+<details class="cat-table" id="cat_n_acme_silver_sales_customer">
+  <summary><span class="cat-table-name">sales.customer</span>
+    <span class="cat-table-comment">3NF insert-only customer; config-driven; MDM survivorship in Gold</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.jde.f0101</code>, <code>acme_bronze.sap.kna1</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.pit_customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.customer'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_furnace_heat_5min">
+  <summary><span class="cat-table-name">sales.furnace_heat_5min</span>
+    <span class="cat-table-comment">5-min OT aggregates from Litmus bronze</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">639 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">window_start</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">max_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">samples</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.ot.furnace_telemetry</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.fact_heat_quality</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.furnace_heat_5min'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_fx_rates">
+  <summary><span class="cat-table-name">sales.fx_rates</span>
+    <span class="cat-table-comment">Reference: seeded by config/seed_layer_mappings.sql</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">4 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.ref.fx_rates</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.fx_rates'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_invoice">
+  <summary><span class="cat-table-name">sales.invoice</span>
+    <span class="cat-table-comment">3NF insert-only billing items (SAP VBRP); amount is doc-currency — join VBRK before finance use</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">invoice_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.sap.vbrp</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_invoice_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.invoice'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_sales_order_header">
+  <summary><span class="cat-table-name">sales.sales_order_header</span>
+    <span class="cat-table-comment">3NF insert-only; config-driven from cfg.layer_mappings</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.jde.f4201</code>, <code>acme_bronze.qad.so_mstr</code>, <code>acme_bronze.sap.vbak</code>, <code>acme_silver.ref.fx_rates</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_sales_order_header_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.sales_order_header'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_shipment">
+  <summary><span class="cat-table-name">sales.shipment</span>
+    <span class="cat-table-comment">3NF insert-only delivery items (SAP LIPS; JDE/QAD = mapping rows); config-driven</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">plant</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">qty</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.sap.lips</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_shipment_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.shipment'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_v_invoice_current">
+  <summary><span class="cat-table-name">sales.v_invoice_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">invoice_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.invoice</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_invoice_current'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_v_sales_order_header_current">
+  <summary><span class="cat-table-name">sales.v_sales_order_header_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_sales_order_header_current'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_silver_sales_v_shipment_current">
+  <summary><span class="cat-table-name">sales.v_shipment_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">plant</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">qty</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.shipment</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_shipment_current'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_silver.ref</h3>
+<details class="cat-table" id="cat_n_acme_silver_ref_fx_rates">
+  <summary><span class="cat-table-name">ref.fx_rates</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">4 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.fx_rates</code>, <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'ref.fx_rates'</code></div>
+  </div>
+</details>
+</section>
+<section class="cat-layer" data-layer="acme_gold">
+<h2 class="cat-layer-title" style="border-color:#c9a227">Gold <span class="cat-layer-sub">— star schema + DV2.0 + ML/AI</span></h2>
+<h3 class="cat-schema">acme_gold.sales</h3>
+<details class="cat-table" id="cat_n_acme_gold_sales_agg_sales_daily">
+  <summary><span class="cat-table-name">sales.agg_sales_daily</span>
+    <span class="cat-table-comment">Pre-aggregated for AI/BI dashboards + Genie</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">1,499 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_products.ops.v_melt_to_margin</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.agg_sales_daily'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_bridge_order_fulfillment">
+  <summary><span class="cat-table-name">sales.bridge_order_fulfillment</span>
+    <span class="cat-table-comment">DV2.0 bridge: order-&gt;shipment-&gt;invoice hash keys + lifecycle dates/flags. Grain: one row per current order. One join for O2C, backlog, Genie.</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">shipment_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_silver.sales.v_invoice_current</code>, <code>acme_silver.sales.v_sales_order_header_current</code>, <code>acme_silver.sales.v_shipment_current</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ml.customer_features</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.bridge_order_fulfillment'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_customer_narratives">
+  <summary><span class="cat-table-name">sales.customer_narratives</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">narrative</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ai.customer_profile_text</code>, <code>acme_products.sales.v_customer_360</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.customer_narratives'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_dim_customer">
+  <summary><span class="cat-table-name">sales.dim_customer</span>
+    <span class="cat-table-comment">MDM-survived customer dim; PK = customer_hk</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">1,001 rows</span><span class="pill pill-gov">🔒 Row filter</span><span class="pill pill-gov">🔒 Column mask</span><span class="pill pill-gov">🔒 PII tags</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    <ul class='gov-list'><li>Row filter: acme_gold.sec.region_filter ON (source_system) — analysts see only their region</li><li>Column mask: customer_name → acme_gold.sec.mask_customer_name (visible unmasked only to data_steward)</li><li>PII tags: customer_name=&#x27;name&#x27;, src_customer_id=&#x27;identifier&#x27;</li></ul>
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_gold.sales.fact_sales_orders</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.dim_customer'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_fact_heat_quality">
+  <summary><span class="cat-table-name">sales.fact_heat_quality</span>
+    <span class="cat-table-comment">OT-to-business: furnace conditions joined to daily shipped tonnage</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">639 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">heat_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">window_start</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">max_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.furnace_heat_5min</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_products.ops.v_melt_to_margin</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.fact_heat_quality'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_fact_sales_orders">
+  <summary><span class="cat-table-name">sales.fact_sales_orders</span>
+    <span class="cat-table-comment">Grain: one row per order per source; FKs are hash keys</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span><span class="pill pill-gov">🔒 Row filter</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    <ul class='gov-list'><li>Row filter: acme_gold.sec.region_filter ON (source_system)</li></ul>
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_silver.sales.v_sales_order_header_current</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ml.customer_features</code>, <code>acme_gold.sales.agg_sales_daily</code>, <code>acme_gold.sales.mv_sales_metrics</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.fact_sales_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_mv_sales_metrics">
+  <summary><span class="cat-table-name">sales.mv_sales_metrics</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">METRIC_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_count</td><td class="mono muted">LONG</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">avg_order_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.mv_sales_metrics'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_sales_pit_customer">
+  <summary><span class="cat-table-name">sales.pit_customer</span>
+    <span class="cat-table-comment">DV2.0 PIT: (snapshot_date, customer_hk) -&gt; as_of_ts of the Silver version current that day. Equality as-of joins; no BETWEEN scans, no label leakage.</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">2,002 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">snapshot_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.pit_customer'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_gold.ml</h3>
+<details class="cat-table" id="cat_n_acme_gold_ml_customer_features">
+  <summary><span class="cat-table-name">ml.customer_features</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">as_of_date</td><td class="mono muted">DATE</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">rev_l30d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">rev_l90d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">rev_l365d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_cnt_l365d</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">days_since_last_order</td><td class="mono muted">INT</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">backlog_orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">churn_risk_score</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">feature_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ml.customer_features'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_gold.ai</h3>
+<details class="cat-table" id="cat_n_acme_gold_ai_customer_profile_idx">
+  <summary><span class="cat-table-name">ai.customer_profile_idx</span>
+    <span class="cat-table-comment">Managed Vector Index with Delta Sync</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">FOREIGN</span><span class="pill">n/a rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">profile_text</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">__db_profile_text_vector</td><td class="mono muted">ARRAY</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.ai.customer_profile_text</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ai.customer_profile_idx'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_gold_ai_customer_profile_text">
+  <summary><span class="cat-table-name">ai.customer_profile_text</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">profile_text</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.customer_narratives</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ai.customer_profile_idx</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ai.customer_profile_text'</code></div>
+  </div>
+</details>
+</section>
+<section class="cat-layer" data-layer="acme_products">
+<h2 class="cat-layer-title" style="border-color:#2a78d6">Products <span class="cat-layer-sub">— governed output ports</span></h2>
+<h3 class="cat-schema">acme_products.sales</h3>
+<details class="cat-table" id="cat_n_acme_products_sales_order_to_cash">
+  <summary><span class="cat-table-name">sales.order_to_cash</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">lifecycle_status</td><td class="mono muted">STRING</td><td class="muted">NO</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.order_to_cash'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_products_sales_v_customer_360">
+  <summary><span class="cat-table-name">sales.v_customer_360</span>
+    <span class="cat-table-comment">DATA PRODUCT customer_360 | owner: sales-data-team | SLA: 60-min freshness, 99.5% | masked PII + row filter inherit from dim_customer</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">narrative</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">backlog_orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">last_order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">days_since_last_order</td><td class="mono muted">INT</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_customer_360'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_products_sales_v_sales_orders">
+  <summary><span class="cat-table-name">sales.v_sales_orders</span>
+    <span class="cat-table-comment">DATA PRODUCT sales_orders_unified | owner: sales-data-team | SLA: 30-min freshness, 99.5% | trust score: acme_products.meta.v_product_trust_scores</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_sales_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="cat_n_acme_products_sales_v_sales_orders_unified">
+  <summary><span class="cat-table-name">sales.v_sales_orders_unified</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_sales_orders_unified'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_products.ops</h3>
+<details class="cat-table" id="cat_n_acme_products_ops_v_melt_to_margin">
+  <summary><span class="cat-table-name">ops.v_melt_to_margin</span>
+    <span class="cat-table-comment">DATA PRODUCT melt_to_margin | owner: ot-data-team | SLA: 15-min freshness, 99.0% | OT furnace conditions joined to daily revenue</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">36 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">heat_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_reading</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">peak_reading</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.agg_sales_daily</code>, <code>acme_gold.sales.fact_heat_quality</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'ops.v_melt_to_margin'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema">acme_products.meta</h3>
+<details class="cat-table" id="cat_n_acme_products_meta_v_product_trust_scores">
+  <summary><span class="cat-table-name">meta.v_product_trust_scores</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">5 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">product_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">view_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">trust_score</td><td class="mono muted">DECIMAL</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">checks_evaluated</td><td class="mono muted">LONG</td><td class="muted">NO</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.audit.dq_results</code>, <code>acme_bronze.cfg.product_registry</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'meta.v_product_trust_scores'</code></div>
+  </div>
+</details>
+</section>
+  </section>
+</main>
+<footer class="pagefoot">acme Sales Lakehouse · data/exports/excel/*.xlsx has the full 500-row samples per table, layer by layer · see docs/DATA_MODEL.md for the plain-text data dictionary</footer>
+<script>
+const NODE_DATA = {"acme_bronze.d365.salesorders": {"id": "n_acme_bronze_d365_salesorders", "fq": "acme_bronze.d365.salesorders", "catalog": "acme_bronze", "schema": "d365", "table": "salesorders", "type": "MANAGED", "comment": "", "row_count": 1500, "sample_rows": 500, "columns": [{"name": "salesorderid", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customerid", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "totalamount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "transactioncurrencyid", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "productcode", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "modifiedon", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": [], "ancestors": [], "descendants": [], "governance": [], "source_badge": "D365 \u00b7 lakeflow_d365 \u00b7 GLOBAL", "uninteg": true, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'd365.salesorders'"}, "acme_bronze.jde.f0101": {"id": "n_acme_bronze_jde_f0101", "fq": "acme_bronze.jde.f0101", "catalog": "acme_bronze", "schema": "jde", "table": "f0101", "type": "MANAGED", "comment": "", "row_count": 501, "sample_rows": 500, "columns": [{"name": "ABAN8", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ABALPH", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ABCTR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.customer"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_gold.sales.pit_customer", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.customer"], "governance": [], "source_badge": "JDE \u00b7 goldengate \u00b7 AMERICAS", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'jde.f0101'"}, "acme_bronze.jde.f4201": {"id": "n_acme_bronze_jde_f4201", "fq": "acme_bronze.jde.f4201", "catalog": "acme_bronze", "schema": "jde", "table": "f4201", "type": "MANAGED", "comment": "", "row_count": 5000, "sample_rows": 500, "columns": [{"name": "SHKCOO", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHDOCO", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHDCTO", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHAN8", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHOTOT", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHCRCD", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHTRDJ", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SHLITM", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.sales_order_header"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "governance": [], "source_badge": "JDE \u00b7 goldengate \u00b7 AMERICAS", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'jde.f4201'"}, "acme_bronze.mes.rollmill_orders": {"id": "n_acme_bronze_mes_rollmill_orders", "fq": "acme_bronze.mes.rollmill_orders", "catalog": "acme_bronze", "schema": "mes", "table": "rollmill_orders", "type": "MANAGED", "comment": "", "row_count": 1500, "sample_rows": 500, "columns": [{"name": "topic", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "work_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "event", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "product", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": [], "ancestors": [], "descendants": [], "governance": [], "source_badge": "MES \u00b7 litmus_eventhub \u00b7 AMERICAS", "uninteg": true, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'mes.rollmill_orders'"}, "acme_bronze.ot.furnace_telemetry": {"id": "n_acme_bronze_ot_furnace_telemetry", "fq": "acme_bronze.ot.furnace_telemetry", "catalog": "acme_bronze", "schema": "ot", "table": "furnace_telemetry", "type": "MANAGED", "comment": "", "row_count": 648, "sample_rows": 500, "columns": [{"name": "site", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "asset", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "tag", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "value", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "quality", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.furnace_heat_5min"], "ancestors": [], "descendants": ["acme_gold.sales.fact_heat_quality", "acme_products.ops.v_melt_to_margin", "acme_silver.sales.furnace_heat_5min"], "governance": [], "source_badge": "LITMUS \u00b7 litmus_eventhub \u00b7 AMERICAS", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'ot.furnace_telemetry'"}, "acme_bronze.qad.so_mstr": {"id": "n_acme_bronze_qad_so_mstr", "fq": "acme_bronze.qad.so_mstr", "catalog": "acme_bronze", "schema": "qad", "table": "so_mstr", "type": "MANAGED", "comment": "", "row_count": 3000, "sample_rows": 500, "columns": [{"name": "so_domain", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_nbr", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_cust", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_t_amt", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_curr", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_ord_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "so_part", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.sales_order_header"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "governance": [], "source_badge": "QAD \u00b7 lakeflow_sqlserver \u00b7 EMEA", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'qad.so_mstr'"}, "acme_bronze.sap.kna1": {"id": "n_acme_bronze_sap_kna1", "fq": "acme_bronze.sap.kna1", "catalog": "acme_bronze", "schema": "sap", "table": "kna1", "type": "MANAGED", "comment": "", "row_count": 500, "sample_rows": 500, "columns": [{"name": "KUNNR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "NAME1", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "LAND1", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.customer"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_gold.sales.pit_customer", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.customer"], "governance": [], "source_badge": "SAP \u00b7 goldengate \u00b7 EUROPE", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'sap.kna1'"}, "acme_bronze.sap.lips": {"id": "n_acme_bronze_sap_lips", "fq": "acme_bronze.sap.lips", "catalog": "acme_bronze", "schema": "sap", "table": "lips", "type": "MANAGED", "comment": "", "row_count": 3478, "sample_rows": 500, "columns": [{"name": "VBELN", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "POSNR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "VGBEL", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "LFIMG", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ERDAT", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "WERKS", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.shipment"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.shipment", "acme_silver.sales.v_shipment_current"], "governance": [], "source_badge": "SAP \u00b7 goldengate \u00b7 EUROPE", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'sap.lips'"}, "acme_bronze.sap.vbak": {"id": "n_acme_bronze_sap_vbak", "fq": "acme_bronze.sap.vbak", "catalog": "acme_bronze", "schema": "sap", "table": "vbak", "type": "MANAGED", "comment": "", "row_count": 5000, "sample_rows": 500, "columns": [{"name": "VBELN", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "KUNNR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "NETWR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "WAERK", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ERDAT", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "MATNR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.sales_order_header"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "governance": [], "source_badge": "SAP \u00b7 goldengate \u00b7 EUROPE", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'sap.vbak'"}, "acme_bronze.sap.vbrp": {"id": "n_acme_bronze_sap_vbrp", "fq": "acme_bronze.sap.vbrp", "catalog": "acme_bronze", "schema": "sap", "table": "vbrp", "type": "MANAGED", "comment": "", "row_count": 2767, "sample_rows": 500, "columns": [{"name": "VBELN", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "POSNR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "AUBEL", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "VGBEL", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "NETWR", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ERDAT", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.invoice"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.invoice", "acme_silver.sales.v_invoice_current"], "governance": [], "source_badge": "SAP \u00b7 goldengate \u00b7 EUROPE", "uninteg": false, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'sap.vbrp'"}, "acme_bronze.sfdc.opportunity": {"id": "n_acme_bronze_sfdc_opportunity", "fq": "acme_bronze.sfdc.opportunity", "catalog": "acme_bronze", "schema": "sfdc", "table": "opportunity", "type": "MANAGED", "comment": "", "row_count": 2000, "sample_rows": 500, "columns": [{"name": "Id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "AccountId", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "Amount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "StageName", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "Product__c", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "SystemModstamp", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_ingest_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "_batch_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_op_type", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "_seq", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "_raw", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": [], "downstream": [], "ancestors": [], "descendants": [], "governance": [], "source_badge": "SALESFORCE \u00b7 autoloader_file \u00b7 GLOBAL", "uninteg": true, "excel_sheet": "acme_bronze.xlsx \u2192 sheet 'sfdc.opportunity'"}, "acme_gold.ai.customer_profile_idx": {"id": "n_acme_gold_ai_customer_profile_idx", "fq": "acme_gold.ai.customer_profile_idx", "catalog": "acme_gold", "schema": "ai", "table": "customer_profile_idx", "type": "FOREIGN", "comment": "Managed Vector Index with Delta Sync", "row_count": null, "sample_rows": 0, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "profile_text", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "__db_profile_text_vector", "type": "ARRAY", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.ai.customer_profile_text"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.ai.customer_profile_text", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'ai.customer_profile_idx'"}, "acme_gold.ai.customer_profile_text": {"id": "n_acme_gold_ai_customer_profile_text", "fq": "acme_gold.ai.customer_profile_text", "catalog": "acme_gold", "schema": "ai", "table": "customer_profile_text", "type": "MANAGED", "comment": "", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "profile_text", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.customer_narratives"], "downstream": ["acme_gold.ai.customer_profile_idx"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": ["acme_gold.ai.customer_profile_idx"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'ai.customer_profile_text'"}, "acme_gold.ml.customer_features": {"id": "n_acme_gold_ml_customer_features", "fq": "acme_gold.ml.customer_features", "catalog": "acme_gold", "schema": "ml", "table": "customer_features", "type": "MANAGED", "comment": "", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "NO", "comment": null}, {"name": "as_of_date", "type": "DATE", "nullable": "NO", "comment": null}, {"name": "rev_l30d_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "rev_l90d_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "rev_l365d_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "order_cnt_l365d", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "days_since_last_order", "type": "INT", "nullable": "YES", "comment": null}, {"name": "backlog_orders", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "churn_risk_score", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "feature_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'ml.customer_features'"}, "acme_gold.sales.agg_sales_daily": {"id": "n_acme_gold_sales_agg_sales_daily", "fq": "acme_gold.sales.agg_sales_daily", "catalog": "acme_gold", "schema": "sales", "table": "agg_sales_daily", "type": "MATERIALIZED_VIEW", "comment": "Pre-aggregated for AI/BI dashboards + Genie", "row_count": 1499, "sample_rows": 500, "columns": [{"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "revenue_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "orders", "type": "LONG", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.fact_sales_orders"], "downstream": ["acme_products.ops.v_melt_to_margin"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.vbak", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "descendants": ["acme_products.ops.v_melt_to_margin"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.agg_sales_daily'"}, "acme_gold.sales.bridge_order_fulfillment": {"id": "n_acme_gold_sales_bridge_order_fulfillment", "fq": "acme_gold.sales.bridge_order_fulfillment", "catalog": "acme_gold", "schema": "sales", "table": "bridge_order_fulfillment", "type": "MATERIALIZED_VIEW", "comment": "DV2.0 bridge: order->shipment->invoice hash keys + lifecycle dates/flags. Grain: one row per current order. One join for O2C, backlog, Genie.", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "order_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "shipment_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "invoice_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ship_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "invoice_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "is_shipped", "type": "BOOLEAN", "nullable": "YES", "comment": null}, {"name": "is_invoiced", "type": "BOOLEAN", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.dim_customer", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "downstream": ["acme_gold.ml.customer_features", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.dim_customer", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.bridge_order_fulfillment'"}, "acme_gold.sales.customer_narratives": {"id": "n_acme_gold_sales_customer_narratives", "fq": "acme_gold.sales.customer_narratives", "catalog": "acme_gold", "schema": "sales", "table": "customer_narratives", "type": "MANAGED", "comment": "", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "narrative", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer"], "downstream": ["acme_gold.ai.customer_profile_text", "acme_products.sales.v_customer_360"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_products.sales.v_customer_360"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.customer_narratives'"}, "acme_gold.sales.dim_customer": {"id": "n_acme_gold_sales_dim_customer", "fq": "acme_gold.sales.dim_customer", "catalog": "acme_gold", "schema": "sales", "table": "dim_customer", "type": "MATERIALIZED_VIEW", "comment": "MDM-survived customer dim; PK = customer_hk", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_customer_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "country", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.customer"], "downstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.sap.kna1", "acme_silver.sales.customer"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified"], "governance": ["Row filter: acme_gold.sec.region_filter ON (source_system) \u2014 analysts see only their region", "Column mask: customer_name \u2192 acme_gold.sec.mask_customer_name (visible unmasked only to data_steward)", "PII tags: customer_name='name', src_customer_id='identifier'"], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.dim_customer'"}, "acme_gold.sales.fact_heat_quality": {"id": "n_acme_gold_sales_fact_heat_quality", "fq": "acme_gold.sales.fact_heat_quality", "catalog": "acme_gold", "schema": "sales", "table": "fact_heat_quality", "type": "MATERIALIZED_VIEW", "comment": "OT-to-business: furnace conditions joined to daily shipped tonnage", "row_count": 639, "sample_rows": 500, "columns": [{"name": "heat_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "site", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "asset", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "tag", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "window_start", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "avg_value", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "max_value", "type": "DOUBLE", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.furnace_heat_5min"], "downstream": ["acme_products.ops.v_melt_to_margin"], "ancestors": ["acme_bronze.ot.furnace_telemetry", "acme_silver.sales.furnace_heat_5min"], "descendants": ["acme_products.ops.v_melt_to_margin"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.fact_heat_quality'"}, "acme_gold.sales.fact_sales_orders": {"id": "n_acme_gold_sales_fact_sales_orders", "fq": "acme_gold.sales.fact_sales_orders", "catalog": "acme_gold", "schema": "sales", "table": "fact_sales_orders", "type": "MATERIALIZED_VIEW", "comment": "Grain: one row per order per source; FKs are hash keys", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "order_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.dim_customer", "acme_silver.sales.v_sales_order_header_current"], "downstream": ["acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.mv_sales_metrics", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.vbak", "acme_gold.sales.dim_customer", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "descendants": ["acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified"], "governance": ["Row filter: acme_gold.sec.region_filter ON (source_system)"], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.fact_sales_orders'"}, "acme_gold.sales.mv_sales_metrics": {"id": "n_acme_gold_sales_mv_sales_metrics", "fq": "acme_gold.sales.mv_sales_metrics", "catalog": "acme_gold", "schema": "sales", "table": "mv_sales_metrics", "type": "METRIC_VIEW", "comment": "", "row_count": 13000, "sample_rows": 0, "columns": [{"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "revenue_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "order_count", "type": "LONG", "nullable": "NO", "comment": null}, {"name": "avg_order_value", "type": "DOUBLE", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.vbak", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.mv_sales_metrics'"}, "acme_gold.sales.pit_customer": {"id": "n_acme_gold_sales_pit_customer", "fq": "acme_gold.sales.pit_customer", "catalog": "acme_gold", "schema": "sales", "table": "pit_customer", "type": "MATERIALIZED_VIEW", "comment": "DV2.0 PIT: (snapshot_date, customer_hk) -> as_of_ts of the Silver version current that day. Equality as-of joins; no BETWEEN scans, no label leakage.", "row_count": 2002, "sample_rows": 500, "columns": [{"name": "snapshot_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "as_of_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.customer"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.sap.kna1", "acme_silver.sales.customer"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_gold.xlsx \u2192 sheet 'sales.pit_customer'"}, "acme_products.meta.v_product_trust_scores": {"id": "n_acme_products_meta_v_product_trust_scores", "fq": "acme_products.meta.v_product_trust_scores", "catalog": "acme_products", "schema": "meta", "table": "v_product_trust_scores", "type": "VIEW", "comment": "", "row_count": 5, "sample_rows": 5, "columns": [{"name": "product_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "view_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "trust_score", "type": "DECIMAL", "nullable": "YES", "comment": null}, {"name": "checks_evaluated", "type": "LONG", "nullable": "NO", "comment": null}], "upstream": ["acme_bronze.audit.dq_results", "acme_bronze.cfg.product_registry"], "downstream": [], "ancestors": ["acme_bronze.audit.dq_results", "acme_bronze.cfg.product_registry"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'meta.v_product_trust_scores'"}, "acme_products.ops.v_melt_to_margin": {"id": "n_acme_products_ops_v_melt_to_margin", "fq": "acme_products.ops.v_melt_to_margin", "catalog": "acme_products", "schema": "ops", "table": "v_melt_to_margin", "type": "VIEW", "comment": "DATA PRODUCT melt_to_margin | owner: ot-data-team | SLA: 15-min freshness, 99.0% | OT furnace conditions joined to daily revenue", "row_count": 36, "sample_rows": 36, "columns": [{"name": "site", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "asset", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "tag", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "heat_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "avg_reading", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "peak_reading", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "revenue_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "orders", "type": "LONG", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.agg_sales_daily", "acme_gold.sales.fact_heat_quality"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.ot.furnace_telemetry", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.vbak", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_heat_quality", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.furnace_heat_5min", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'ops.v_melt_to_margin'"}, "acme_products.sales.order_to_cash": {"id": "n_acme_products_sales_order_to_cash", "fq": "acme_products.sales.order_to_cash", "catalog": "acme_products", "schema": "sales", "table": "order_to_cash", "type": "VIEW", "comment": "", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "country", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "is_shipped", "type": "BOOLEAN", "nullable": "NO", "comment": null}, {"name": "is_invoiced", "type": "BOOLEAN", "nullable": "NO", "comment": null}, {"name": "ship_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "invoice_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "lifecycle_status", "type": "STRING", "nullable": "NO", "comment": null}], "upstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'sales.order_to_cash'"}, "acme_products.sales.v_customer_360": {"id": "n_acme_products_sales_v_customer_360", "fq": "acme_products.sales.v_customer_360", "catalog": "acme_products", "schema": "sales", "table": "v_customer_360", "type": "VIEW", "comment": "DATA PRODUCT customer_360 | owner: sales-data-team | SLA: 60-min freshness, 99.5% | masked PII + row filter inherit from dim_customer", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "country", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "narrative", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "orders", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "revenue_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "backlog_orders", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "last_order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "days_since_last_order", "type": "INT", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'sales.v_customer_360'"}, "acme_products.sales.v_sales_orders": {"id": "n_acme_products_sales_v_sales_orders", "fq": "acme_products.sales.v_sales_orders", "catalog": "acme_products", "schema": "sales", "table": "v_sales_orders", "type": "VIEW", "comment": "DATA PRODUCT sales_orders_unified | owner: sales-data-team | SLA: 30-min freshness, 99.5% | trust score: acme_products.meta.v_product_trust_scores", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "order_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.vbak", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'sales.v_sales_orders'"}, "acme_products.sales.v_sales_orders_unified": {"id": "n_acme_products_sales_v_sales_orders_unified", "fq": "acme_products.sales.v_sales_orders_unified", "catalog": "acme_products", "schema": "sales", "table": "v_sales_orders_unified", "type": "VIEW", "comment": "", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "order_hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "country", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ship_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "invoice_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "is_shipped", "type": "BOOLEAN", "nullable": "YES", "comment": null}, {"name": "is_invoiced", "type": "BOOLEAN", "nullable": "YES", "comment": null}], "upstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders"], "downstream": [], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.kna1", "acme_bronze.sap.lips", "acme_bronze.sap.vbak", "acme_bronze.sap.vbrp", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_silver.ref.fx_rates", "acme_silver.sales.customer", "acme_silver.sales.invoice", "acme_silver.sales.sales_order_header", "acme_silver.sales.shipment", "acme_silver.sales.v_invoice_current", "acme_silver.sales.v_sales_order_header_current", "acme_silver.sales.v_shipment_current"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_products.xlsx \u2192 sheet 'sales.v_sales_orders_unified'"}, "acme_silver.ref.fx_rates": {"id": "n_acme_silver_ref_fx_rates", "fq": "acme_silver.ref.fx_rates", "catalog": "acme_silver", "schema": "ref", "table": "fx_rates", "type": "MANAGED", "comment": "", "row_count": 4, "sample_rows": 4, "columns": [{"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "usd_rate", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "as_of", "type": "DATE", "nullable": "YES", "comment": null}], "upstream": [], "downstream": ["acme_silver.sales.fx_rates", "acme_silver.sales.sales_order_header"], "ancestors": [], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.fx_rates", "acme_silver.sales.sales_order_header", "acme_silver.sales.v_sales_order_header_current"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'ref.fx_rates'"}, "acme_silver.sales.customer": {"id": "n_acme_silver_sales_customer", "fq": "acme_silver.sales.customer", "catalog": "acme_silver", "schema": "sales", "table": "customer", "type": "STREAMING_TABLE", "comment": "3NF insert-only customer; config-driven; MDM survivorship in Gold", "row_count": 1001, "sample_rows": 500, "columns": [{"name": "country", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "customer_name", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_customer_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_bronze.jde.f0101", "acme_bronze.sap.kna1"], "downstream": ["acme_gold.sales.dim_customer", "acme_gold.sales.pit_customer"], "ancestors": ["acme_bronze.jde.f0101", "acme_bronze.sap.kna1"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.dim_customer", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_gold.sales.pit_customer", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.customer'"}, "acme_silver.sales.furnace_heat_5min": {"id": "n_acme_silver_sales_furnace_heat_5min", "fq": "acme_silver.sales.furnace_heat_5min", "catalog": "acme_silver", "schema": "sales", "table": "furnace_heat_5min", "type": "STREAMING_TABLE", "comment": "5-min OT aggregates from Litmus bronze", "row_count": 639, "sample_rows": 500, "columns": [{"name": "window_start", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "site", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "asset", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "tag", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "avg_value", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "max_value", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "samples", "type": "LONG", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_bronze.ot.furnace_telemetry"], "downstream": ["acme_gold.sales.fact_heat_quality"], "ancestors": ["acme_bronze.ot.furnace_telemetry"], "descendants": ["acme_gold.sales.fact_heat_quality", "acme_products.ops.v_melt_to_margin"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.furnace_heat_5min'"}, "acme_silver.sales.fx_rates": {"id": "n_acme_silver_sales_fx_rates", "fq": "acme_silver.sales.fx_rates", "catalog": "acme_silver", "schema": "sales", "table": "fx_rates", "type": "MATERIALIZED_VIEW", "comment": "Reference: seeded by config/seed_layer_mappings.sql", "row_count": 4, "sample_rows": 4, "columns": [{"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "usd_rate", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "as_of", "type": "DATE", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.ref.fx_rates"], "downstream": [], "ancestors": ["acme_silver.ref.fx_rates"], "descendants": [], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.fx_rates'"}, "acme_silver.sales.invoice": {"id": "n_acme_silver_sales_invoice", "fq": "acme_silver.sales.invoice", "catalog": "acme_silver", "schema": "sales", "table": "invoice", "type": "STREAMING_TABLE", "comment": "3NF insert-only billing items (SAP VBRP); amount is doc-currency \u2014 join VBRK before finance use", "row_count": 2767, "sample_rows": 500, "columns": [{"name": "invoice_amount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "invoice_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_invoice_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_invoice_line", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_bronze.sap.vbrp"], "downstream": ["acme_silver.sales.v_invoice_current"], "ancestors": ["acme_bronze.sap.vbrp"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.v_invoice_current"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.invoice'"}, "acme_silver.sales.sales_order_header": {"id": "n_acme_silver_sales_sales_order_header", "fq": "acme_silver.sales.sales_order_header", "catalog": "acme_silver", "schema": "sales", "table": "sales_order_header", "type": "STREAMING_TABLE", "comment": "3NF insert-only; config-driven from cfg.layer_mappings", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_customer_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "usd_rate", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "as_of", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}], "upstream": ["acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.vbak", "acme_silver.ref.fx_rates"], "downstream": ["acme_silver.sales.v_sales_order_header_current"], "ancestors": ["acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.vbak", "acme_silver.ref.fx_rates"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.v_sales_order_header_current"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.sales_order_header'"}, "acme_silver.sales.shipment": {"id": "n_acme_silver_sales_shipment", "fq": "acme_silver.sales.shipment", "catalog": "acme_silver", "schema": "sales", "table": "shipment", "type": "STREAMING_TABLE", "comment": "3NF insert-only delivery items (SAP LIPS; JDE/QAD = mapping rows); config-driven", "row_count": 3478, "sample_rows": 500, "columns": [{"name": "plant", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "qty", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ship_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_line", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_bronze.sap.lips"], "downstream": ["acme_silver.sales.v_shipment_current"], "ancestors": ["acme_bronze.sap.lips"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified", "acme_silver.sales.v_shipment_current"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.shipment'"}, "acme_silver.sales.v_invoice_current": {"id": "n_acme_silver_sales_v_invoice_current", "fq": "acme_silver.sales.v_invoice_current", "catalog": "acme_silver", "schema": "sales", "table": "v_invoice_current", "type": "MATERIALIZED_VIEW", "comment": "", "row_count": 2767, "sample_rows": 500, "columns": [{"name": "invoice_amount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "invoice_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_invoice_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_invoice_line", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.invoice"], "downstream": ["acme_gold.sales.bridge_order_fulfillment"], "ancestors": ["acme_bronze.sap.vbrp", "acme_silver.sales.invoice"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.v_invoice_current'"}, "acme_silver.sales.v_sales_order_header_current": {"id": "n_acme_silver_sales_v_sales_order_header_current", "fq": "acme_silver.sales.v_sales_order_header_current", "catalog": "acme_silver", "schema": "sales", "table": "v_sales_order_header_current", "type": "MATERIALIZED_VIEW", "comment": "", "row_count": 13000, "sample_rows": 500, "columns": [{"name": "currency_code", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_amount", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "order_date", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_customer_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}, {"name": "usd_rate", "type": "DOUBLE", "nullable": "YES", "comment": null}, {"name": "as_of", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "order_amount_usd", "type": "DOUBLE", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.sales_order_header"], "downstream": ["acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.fact_sales_orders"], "ancestors": ["acme_bronze.jde.f4201", "acme_bronze.qad.so_mstr", "acme_bronze.sap.vbak", "acme_silver.ref.fx_rates", "acme_silver.sales.sales_order_header"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.agg_sales_daily", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_gold.sales.fact_sales_orders", "acme_gold.sales.mv_sales_metrics", "acme_products.ops.v_melt_to_margin", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders", "acme_products.sales.v_sales_orders_unified"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.v_sales_order_header_current'"}, "acme_silver.sales.v_shipment_current": {"id": "n_acme_silver_sales_v_shipment_current", "fq": "acme_silver.sales.v_shipment_current", "catalog": "acme_silver", "schema": "sales", "table": "v_shipment_current", "type": "MATERIALIZED_VIEW", "comment": "", "row_count": 3478, "sample_rows": 500, "columns": [{"name": "plant", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "qty", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "ship_date", "type": "DATE", "nullable": "YES", "comment": null}, {"name": "source_system", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_order_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_id", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "src_shipment_line", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "hk", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "record_hash", "type": "STRING", "nullable": "YES", "comment": null}, {"name": "effective_ts", "type": "TIMESTAMP", "nullable": "YES", "comment": null}], "upstream": ["acme_silver.sales.shipment"], "downstream": ["acme_gold.sales.bridge_order_fulfillment"], "ancestors": ["acme_bronze.sap.lips", "acme_silver.sales.shipment"], "descendants": ["acme_gold.ai.customer_profile_idx", "acme_gold.ai.customer_profile_text", "acme_gold.ml.customer_features", "acme_gold.sales.bridge_order_fulfillment", "acme_gold.sales.customer_narratives", "acme_products.sales.order_to_cash", "acme_products.sales.v_customer_360", "acme_products.sales.v_sales_orders_unified"], "governance": [], "source_badge": null, "uninteg": false, "excel_sheet": "acme_silver.xlsx \u2192 sheet 'sales.v_shipment_current'"}};
+
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('show'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('show');
+}));
+
+const svg = document.getElementById('lineageSvg');
+const panel = document.getElementById('detailPanel');
+
+function fmtRows(n) { return (typeof n === 'number') ? n.toLocaleString() : 'n/a'; }
+
+function renderDetail(nd) {
+  const cols = nd.columns.map(c =>
+    `<tr><td class="mono">${c.name}</td><td class="mono muted">${c.type}</td><td class="muted">${c.nullable}</td></tr>`
+  ).join('');
+  const upLinks = nd.upstream.length ? nd.upstream.map(f =>
+    `<a onclick="selectNode('${'n_' + f.replace(/\./g,'_')}')">${f}</a>`).join('') : '<span class="muted">none (landing table)</span>';
+  const downLinks = nd.downstream.length ? nd.downstream.map(f =>
+    `<a onclick="selectNode('${'n_' + f.replace(/\./g,'_')}')">${f}</a>`).join('') : '<span class="muted">none (terminal)</span>';
+  const gov = nd.governance.length ? `<div class="dp-section"><b>Governance</b><ul class="gov-list">${nd.governance.map(g=>`<li>${g}</li>`).join('')}</ul></div>` : '';
+  panel.innerHTML = `
+    <h3>${nd.schema}.${nd.table}</h3>
+    <div class="muted">${nd.catalog} · ${nd.type}</div>
+    <p>${nd.comment || ''}</p>
+    <div><b>${fmtRows(nd.row_count)}</b> live rows &nbsp;·&nbsp; ${nd.sample_rows} sampled to Excel</div>
+    ${gov}
+    <div class="dp-section"><b>Columns (${nd.columns.length})</b>
+      <table>${cols}</table>
+    </div>
+    <div class="dp-section"><b>Reads from (direct)</b><div class="dp-list">${upLinks}</div></div>
+    <div class="dp-section"><b>Feeds (direct)</b><div class="dp-list">${downLinks}</div></div>
+    <div class="dp-section"><b>Full ancestor count</b>: ${nd.ancestors.length} tables upstream, ${nd.descendants.length} downstream</div>
+    <div class="sample-note">Sample: <code>data/exports/excel/${nd.excel_sheet}</code></div>
+  `;
+}
+
+function selectNode(id) {
+  const nd = Object.values(NODE_DATA).find(n => n.id === id);
+  if (!nd) return;
+  svg.classList.add('dimmed');
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('hl-self','hl-anc','hl-desc'));
+  document.querySelectorAll('.edge').forEach(e => e.classList.remove('hl'));
+  const ancIds = new Set(nd.ancestors.map(f => 'n_' + f.replace(/\./g,'_')));
+  const descIds = new Set(nd.descendants.map(f => 'n_' + f.replace(/\./g,'_')));
+  document.getElementById(id)?.classList.add('hl-self');
+  ancIds.forEach(a => document.getElementById(a)?.classList.add('hl-anc'));
+  descIds.forEach(d => document.getElementById(d)?.classList.add('hl-desc'));
+  document.querySelectorAll('.edge').forEach(e => {
+    const s = e.dataset.src, t = e.dataset.tgt;
+    if (s === id || t === id || (ancIds.has(s) && (ancIds.has(t) || t===id)) || (descIds.has(t) && (descIds.has(s) || s===id))) {
+      e.classList.add('hl');
+    }
+  });
+  renderDetail(nd);
+  document.getElementById(id)?.scrollIntoView({block:'center', inline:'center', behavior:'smooth'});
+}
+
+document.querySelectorAll('.node').forEach(n => {
+  n.addEventListener('click', () => selectNode(n.id));
+  n.addEventListener('keypress', (e) => { if (e.key === 'Enter') selectNode(n.id); });
+});
+
+const search = document.getElementById('searchBox');
+search.addEventListener('input', () => {
+  const q = search.value.trim().toLowerCase();
+  document.querySelectorAll('details.cat-table').forEach(card => {
+    if (!q) { card.style.display = ''; card.open = false; return; }
+    const hit = card.innerText.toLowerCase().includes(q);
+    card.style.display = hit ? '' : 'none';
+    if (hit) card.open = true;
+  });
+  document.querySelectorAll('.cat-layer').forEach(sec => {
+    const anyVisible = Array.from(sec.querySelectorAll('details.cat-table')).some(c => c.style.display !== 'none');
+    sec.style.display = (!q || anyVisible) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>acme Sales Lakehouse — Data Model</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-1:#fcfcfb; --surface-2:#f2f1ee; --page:#f9f9f7;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+  --border:rgba(11,11,11,0.10); --grid:#e1e0d9;
+  --accent:#2a78d6; --accent-soft:#e8f0fb;
+  --pill-bg:#f2f1ee; --code-bg:#f2f1ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --surface-2:#222221; --page:#0d0d0d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --border:rgba(255,255,255,0.12); --grid:#2c2c2a;
+    --accent:#3987e5; --accent-soft:#132234;
+    --pill-bg:#25231f; --code-bg:#222221;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1:#1a1a19; --surface-2:#222221; --page:#0d0d0d;
+  --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+  --border:rgba(255,255,255,0.12); --grid:#2c2c2a;
+  --accent:#3987e5; --accent-soft:#132234;
+  --pill-bg:#25231f; --code-bg:#222221;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--text-primary);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+header.top { padding:22px 28px 14px; border-bottom:1px solid var(--border); background:var(--surface-1); }
+header.top h1 { margin:0 0 4px; font-size:1.5rem; }
+header.top p { margin:0; color:var(--text-secondary); font-size:0.9rem; max-width:1000px; }
+header.top .links { margin-top:10px; font-size:0.82rem; }
+header.top .links a { color:var(--accent); text-decoration:none; margin-right:16px; }
+header.top .links a:hover { text-decoration:underline; }
+.stats { display:flex; gap:18px; margin-top:12px; flex-wrap:wrap; }
+.stat { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; }
+.stat b { display:block; font-size:1.15rem; }
+.stat span { color:var(--text-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:.04em; }
+.layout { display:flex; align-items:flex-start; max-width:1500px; margin:0 auto; padding:24px 28px 80px; gap:26px; }
+nav.toc { width:230px; flex:0 0 230px; position:sticky; top:20px; max-height:92vh; overflow:auto;
+  font-size:0.82rem; border-right:1px solid var(--border); padding-right:16px; }
+.toc-layer { margin-bottom:16px; }
+.toc-layer-link { display:block; font-weight:700; border-left:4px solid; padding-left:8px;
+  color:var(--text-primary); text-decoration:none; margin-bottom:4px; }
+nav.toc ul { list-style:none; margin:2px 0 0; padding-left:10px; }
+nav.toc li.toc-schema > a { color:var(--text-muted); text-transform:uppercase; font-size:0.72rem; letter-spacing:.04em; }
+nav.toc a { color:var(--text-secondary); text-decoration:none; display:block; padding:2px 0; }
+nav.toc a:hover { color:var(--accent); }
+main.doc { flex:1 1 auto; min-width:0; }
+.cat-layer-title { border-left:5px solid; padding-left:10px; margin:30px 0 12px; font-size:1.3rem; scroll-margin-top:16px; }
+.cat-layer-sub { color:var(--text-muted); font-weight:400; font-size:0.9rem; }
+.cat-schema { color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:.05em;
+  margin:20px 0 8px; scroll-margin-top:16px; }
+details.cat-table { background:var(--surface-1); border:1px solid var(--border); border-radius:8px;
+  margin-bottom:10px; padding:0; scroll-margin-top:16px; }
+details.cat-table summary { padding:11px 16px; cursor:pointer; list-style:none; display:flex; gap:12px;
+  align-items:baseline; flex-wrap:wrap; }
+details.cat-table summary::-webkit-details-marker { display:none; }
+details.cat-table[open] summary { border-bottom:1px solid var(--border); }
+.cat-table-name { font-weight:600; font-family:ui-monospace,Consolas,monospace; font-size:0.92rem; }
+.cat-table-comment { color:var(--text-muted); font-size:0.85rem; }
+.cat-table-body { padding:12px 16px 18px; }
+.badges { margin-bottom:10px; }
+.pill { display:inline-block; background:var(--pill-bg); border:1px solid var(--border); border-radius:20px;
+  padding:2px 10px; font-size:0.72rem; margin:0 6px 6px 0; color:var(--text-secondary); }
+.pill-src { color:var(--accent); border-color:var(--accent); }
+.pill-warn { color:#d03b3b; border-color:#d03b3b; }
+.pill-gov { color:#8a6d1a; border-color:#c9a227; }
+table.col-table { width:100%; border-collapse:collapse; font-size:0.84rem; margin:6px 0; }
+table.col-table th { text-align:left; color:var(--text-muted); font-weight:600; font-size:0.72rem;
+  text-transform:uppercase; letter-spacing:.03em; padding:5px 8px; border-bottom:1px solid var(--border); }
+table.col-table td { padding:5px 8px; border-bottom:1px solid var(--grid); }
+.mono { font-family:ui-monospace,Consolas,monospace; }
+.muted { color:var(--text-muted); }
+.lineage-text { font-size:0.84rem; margin-top:6px; }
+.lineage-text code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+.sample-note { margin-top:10px; font-size:0.8rem; color:var(--text-muted); }
+.sample-note code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+.gov-list { font-size:0.82rem; margin:6px 0; padding-left:18px; }
+.gap-card { border-color:#d03b3b !important; }
+footer.pagefoot { text-align:center; color:var(--text-muted); font-size:0.78rem; padding:24px; }
+@media (max-width: 900px) {
+  .layout { flex-direction:column; }
+  nav.toc { width:100%; flex:none; position:static; max-height:none; border-right:none; border-bottom:1px solid var(--border); padding-bottom:12px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>acme Sales Lakehouse — Data Model</h1>
+  <p>Generated 2026-07-29 directly from the live Unity Catalog metastore on <code>adb-7405618665227003.3.azuredatabricks.net</code> —
+  table/column inventory via <code>system.information_schema</code>, Bronze→Silver lineage via the live
+  <code>acme_bronze.cfg.layer_mappings</code> config table, Gold→Products lineage via live
+  <code>SHOW CREATE TABLE</code> on each view, remaining edges from the deployed pipeline code
+  (<code>pipelines/silver_dlt.py</code>, <code>pipelines/gold_dlt.py</code>, <code>ml/build_features.py</code>,
+  <code>ai/provision_vector_search.py</code>, <code>agents/vector_content.py</code>).</p>
+  <div class="links">
+    <a href="DATA_CATALOG.html">→ Interactive lineage diagram (DATA_CATALOG.html)</a>
+    <a href="DATA_MODEL.md">→ Plain-text version (DATA_MODEL.md)</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>47</b><span>tables / views</span></div>
+    <div class="stat"><b>11+9</b><span>bronze (+ audit/cfg)</span></div>
+    <div class="stat"><b>10</b><span>silver</span></div>
+    <div class="stat"><b>11</b><span>gold</span></div>
+    <div class="stat"><b>6</b><span>products</span></div>
+    <div class="stat"><b>45</b><span>lineage edges</span></div>
+    <div class="stat"><b>153,333</b><span>live rows (sum)</span></div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="toc"><div class="toc-layer"><a class="toc-layer-link" href="#layer_acme_bronze" style="border-color:#b8752e">Bronze</a><ul><li class="toc-schema"><a href="#schema_acme_bronze_sap">sap</a><ul><li><a href="#doc_n_acme_bronze_sap_kna1">kna1</a></li><li><a href="#doc_n_acme_bronze_sap_lips">lips</a></li><li><a href="#doc_n_acme_bronze_sap_vbak">vbak</a></li><li><a href="#doc_n_acme_bronze_sap_vbrp">vbrp</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_jde">jde</a><ul><li><a href="#doc_n_acme_bronze_jde_f0101">f0101</a></li><li><a href="#doc_n_acme_bronze_jde_f4201">f4201</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_qad">qad</a><ul><li><a href="#doc_n_acme_bronze_qad_so_mstr">so_mstr</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_d365">d365</a><ul><li><a href="#doc_n_acme_bronze_d365_salesorders">salesorders</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_sfdc">sfdc</a><ul><li><a href="#doc_n_acme_bronze_sfdc_opportunity">opportunity</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_ot">ot</a><ul><li><a href="#doc_n_acme_bronze_ot_furnace_telemetry">furnace_telemetry</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_bronze_mes">mes</a><ul><li><a href="#doc_n_acme_bronze_mes_rollmill_orders">rollmill_orders</a></li></ul></li><li><a href="#doc_governance">audit / cfg (governance)</a></li></ul></div>
+<div class="toc-layer"><a class="toc-layer-link" href="#layer_acme_silver" style="border-color:#8a8f98">Silver</a><ul><li class="toc-schema"><a href="#schema_acme_silver_sales">sales</a><ul><li><a href="#doc_n_acme_silver_sales_customer">customer</a></li><li><a href="#doc_n_acme_silver_sales_furnace_heat_5min">furnace_heat_5min</a></li><li><a href="#doc_n_acme_silver_sales_fx_rates">fx_rates</a></li><li><a href="#doc_n_acme_silver_sales_invoice">invoice</a></li><li><a href="#doc_n_acme_silver_sales_sales_order_header">sales_order_header</a></li><li><a href="#doc_n_acme_silver_sales_shipment">shipment</a></li><li><a href="#doc_n_acme_silver_sales_v_invoice_current">v_invoice_current</a></li><li><a href="#doc_n_acme_silver_sales_v_sales_order_header_current">v_sales_order_header_current</a></li><li><a href="#doc_n_acme_silver_sales_v_shipment_current">v_shipment_current</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_silver_ref">ref</a><ul><li><a href="#doc_n_acme_silver_ref_fx_rates">fx_rates</a></li></ul></li></ul></div>
+<div class="toc-layer"><a class="toc-layer-link" href="#layer_acme_gold" style="border-color:#c9a227">Gold</a><ul><li class="toc-schema"><a href="#schema_acme_gold_sales">sales</a><ul><li><a href="#doc_n_acme_gold_sales_agg_sales_daily">agg_sales_daily</a></li><li><a href="#doc_n_acme_gold_sales_bridge_order_fulfillment">bridge_order_fulfillment</a></li><li><a href="#doc_n_acme_gold_sales_customer_narratives">customer_narratives</a></li><li><a href="#doc_n_acme_gold_sales_dim_customer">dim_customer</a></li><li><a href="#doc_n_acme_gold_sales_fact_heat_quality">fact_heat_quality</a></li><li><a href="#doc_n_acme_gold_sales_fact_sales_orders">fact_sales_orders</a></li><li><a href="#doc_n_acme_gold_sales_mv_sales_metrics">mv_sales_metrics</a></li><li><a href="#doc_n_acme_gold_sales_pit_customer">pit_customer</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_gold_ml">ml</a><ul><li><a href="#doc_n_acme_gold_ml_customer_features">customer_features</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_gold_ai">ai</a><ul><li><a href="#doc_n_acme_gold_ai_customer_profile_idx">customer_profile_idx</a></li><li><a href="#doc_n_acme_gold_ai_customer_profile_text">customer_profile_text</a></li></ul></li></ul></div>
+<div class="toc-layer"><a class="toc-layer-link" href="#layer_acme_products" style="border-color:#2a78d6">Products</a><ul><li class="toc-schema"><a href="#schema_acme_products_sales">sales</a><ul><li><a href="#doc_n_acme_products_sales_order_to_cash">order_to_cash</a></li><li><a href="#doc_n_acme_products_sales_v_customer_360">v_customer_360</a></li><li><a href="#doc_n_acme_products_sales_v_sales_orders">v_sales_orders</a></li><li><a href="#doc_n_acme_products_sales_v_sales_orders_unified">v_sales_orders_unified</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_products_ops">ops</a><ul><li><a href="#doc_n_acme_products_ops_v_melt_to_margin">v_melt_to_margin</a></li></ul></li><li class="toc-schema"><a href="#schema_acme_products_meta">meta</a><ul><li><a href="#doc_n_acme_products_meta_v_product_trust_scores">v_product_trust_scores</a></li></ul></li></ul></div></nav>
+  <main class="doc">
+    <section class="cat-layer" id="layer_acme_bronze" data-layer="acme_bronze">
+<h2 class="cat-layer-title" style="border-color:#b8752e">Bronze <span class="cat-layer-sub">— raw, source-shaped</span></h2>
+<h3 class="cat-schema" id="schema_acme_bronze_sap">acme_bronze.sap</h3>
+<details class="cat-table" id="doc_n_acme_bronze_sap_kna1" open>
+  <summary><span class="cat-table-name">sap.kna1</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">500 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">KUNNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NAME1</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">LAND1</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.kna1'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_bronze_sap_lips" open>
+  <summary><span class="cat-table-name">sap.lips</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">POSNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">VGBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">LFIMG</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">WERKS</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.shipment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.lips'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_bronze_sap_vbak" open>
+  <summary><span class="cat-table-name">sap.vbak</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">5,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">KUNNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NETWR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">WAERK</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">MATNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.vbak'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_bronze_sap_vbrp" open>
+  <summary><span class="cat-table-name">sap.vbrp</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SAP · goldengate · EUROPE</span><span class="pill">MANAGED</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">VBELN</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">POSNR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">AUBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">VGBEL</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">NETWR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ERDAT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.invoice</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sap.vbrp'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_jde">acme_bronze.jde</h3>
+<details class="cat-table" id="doc_n_acme_bronze_jde_f0101" open>
+  <summary><span class="cat-table-name">jde.f0101</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">JDE · goldengate · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">501 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">ABAN8</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ABALPH</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ABCTR</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'jde.f0101'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_bronze_jde_f4201" open>
+  <summary><span class="cat-table-name">jde.f4201</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">JDE · goldengate · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">5,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">SHKCOO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHDOCO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHDCTO</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHAN8</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHOTOT</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHCRCD</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHTRDJ</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SHLITM</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'jde.f4201'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_qad">acme_bronze.qad</h3>
+<details class="cat-table" id="doc_n_acme_bronze_qad_so_mstr" open>
+  <summary><span class="cat-table-name">qad.so_mstr</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">QAD · lakeflow_sqlserver · EMEA</span><span class="pill">MANAGED</span><span class="pill">3,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">so_domain</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_nbr</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_cust</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_t_amt</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_curr</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_ord_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">so_part</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'qad.so_mstr'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_d365">acme_bronze.d365</h3>
+<details class="cat-table" id="doc_n_acme_bronze_d365_salesorders" open>
+  <summary><span class="cat-table-name">d365.salesorders</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">D365 · lakeflow_d365 · GLOBAL</span><span class="pill">MANAGED</span><span class="pill">1,500 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">salesorderid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customerid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">totalamount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">transactioncurrencyid</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">productcode</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">modifiedon</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'd365.salesorders'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_sfdc">acme_bronze.sfdc</h3>
+<details class="cat-table" id="doc_n_acme_bronze_sfdc_opportunity" open>
+  <summary><span class="cat-table-name">sfdc.opportunity</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">SALESFORCE · autoloader_file · GLOBAL</span><span class="pill">MANAGED</span><span class="pill">2,000 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">Id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">AccountId</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">Amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">StageName</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">Product__c</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">SystemModstamp</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'sfdc.opportunity'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_ot">acme_bronze.ot</h3>
+<details class="cat-table" id="doc_n_acme_bronze_ot_furnace_telemetry" open>
+  <summary><span class="cat-table-name">ot.furnace_telemetry</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">LITMUS · litmus_eventhub · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">648 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">quality</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.furnace_heat_5min</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'ot.furnace_telemetry'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_bronze_mes">acme_bronze.mes</h3>
+<details class="cat-table" id="doc_n_acme_bronze_mes_rollmill_orders" open>
+  <summary><span class="cat-table-name">mes.rollmill_orders</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill pill-src">MES · litmus_eventhub · AMERICAS</span><span class="pill">MANAGED</span><span class="pill">1,500 rows</span><span class="pill pill-warn">⚠ not yet consumed downstream</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">topic</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">work_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">event</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">product</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_ingest_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_batch_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_op_type</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_seq</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">_raw</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_bronze.xlsx → sheet 'mes.rollmill_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table gap-card">
+  <summary><span class="cat-table-name">⚠ Registered but not landed</span>
+    <span class="cat-table-comment">3 sources in cfg.source_registry with no matching table in the metastore today</span></summary>
+  <div class="cat-table-body">
+    <table class="col-table">
+      <thead><tr><th>source_name</th><th>system</th><th>pattern</th><th>target (expected)</th></tr></thead>
+      <tbody><tr><td class='mono'>ebs_oe_order_headers</td><td>EBS</td><td class='mono'>goldengate</td><td class='mono muted'>bronze.ebs.oe_order_headers_all</td></tr><tr><td class='mono'>ebs_ra_customer_trx</td><td>EBS</td><td class='mono'>lakeflow_query</td><td class='mono muted'>bronze.ebs.ra_customer_trx_all</td></tr><tr><td class='mono'>ot_caster_history</td><td>LITMUS</td><td class='mono'>litmus_adls</td><td class='mono muted'>bronze.ot.caster_history</td></tr></tbody>
+    </table>
+    <p class="muted">Config says these should exist (registered ingestion sources); the live metastore has no
+    such table. This is an authentic gap — not a display bug — surfaced by cross-checking
+    <code>acme_bronze.cfg.source_registry</code> against <code>system.information_schema.tables</code>.</p>
+  </div>
+</details>
+<details class="cat-table" id="doc_governance" open>
+  <summary><span class="cat-table-name">acme_bronze.audit / acme_bronze.cfg</span>
+    <span class="cat-table-comment">Platform &amp; governance tables — not part of the medallion data flow, omitted from the lineage diagram</span></summary>
+  <div class="cat-table-body">
+    <table class="col-table">
+      <thead><tr><th>Schema</th><th>Table</th><th>Type</th><th>Live rows</th><th>Comment</th></tr></thead>
+      <tbody><tr><td>audit</td><td class='mono'>agent_reports</td><td>MANAGED</td><td>12</td><td class='muted'></td></tr><tr><td>audit</td><td class='mono'>agent_runs</td><td>MANAGED</td><td>14</td><td class='muted'></td></tr><tr><td>audit</td><td class='mono'>batch_log</td><td>MANAGED</td><td>0</td><td class='muted'></td></tr><tr><td>audit</td><td class='mono'>dq_results</td><td>MANAGED</td><td>30</td><td class='muted'></td></tr><tr><td>audit</td><td class='mono'>rejected_records</td><td>MANAGED</td><td>0</td><td class='muted'></td></tr><tr><td>cfg</td><td class='mono'>layer_mappings</td><td>MANAGED</td><td>40</td><td class='muted'></td></tr><tr><td>cfg</td><td class='mono'>pipeline_registry</td><td>MANAGED</td><td>0</td><td class='muted'></td></tr><tr><td>cfg</td><td class='mono'>product_registry</td><td>MANAGED</td><td>5</td><td class='muted'></td></tr><tr><td>cfg</td><td class='mono'>source_registry</td><td>MANAGED</td><td>14</td><td class='muted'></td></tr></tbody>
+    </table>
+  </div>
+</details>
+</section>
+<section class="cat-layer" id="layer_acme_silver" data-layer="acme_silver">
+<h2 class="cat-layer-title" style="border-color:#8a8f98">Silver <span class="cat-layer-sub">— 3NF, insert-only, hash-keyed</span></h2>
+<h3 class="cat-schema" id="schema_acme_silver_sales">acme_silver.sales</h3>
+<details class="cat-table" id="doc_n_acme_silver_sales_customer" open>
+  <summary><span class="cat-table-name">sales.customer</span>
+    <span class="cat-table-comment">3NF insert-only customer; config-driven; MDM survivorship in Gold</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.jde.f0101</code>, <code>acme_bronze.sap.kna1</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.pit_customer</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.customer'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_furnace_heat_5min" open>
+  <summary><span class="cat-table-name">sales.furnace_heat_5min</span>
+    <span class="cat-table-comment">5-min OT aggregates from Litmus bronze</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">639 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">window_start</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">max_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">samples</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.ot.furnace_telemetry</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.fact_heat_quality</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.furnace_heat_5min'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_fx_rates" open>
+  <summary><span class="cat-table-name">sales.fx_rates</span>
+    <span class="cat-table-comment">Reference: seeded by config/seed_layer_mappings.sql</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">4 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.ref.fx_rates</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.fx_rates'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_invoice" open>
+  <summary><span class="cat-table-name">sales.invoice</span>
+    <span class="cat-table-comment">3NF insert-only billing items (SAP VBRP); amount is doc-currency — join VBRK before finance use</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">invoice_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.sap.vbrp</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_invoice_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.invoice'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_sales_order_header" open>
+  <summary><span class="cat-table-name">sales.sales_order_header</span>
+    <span class="cat-table-comment">3NF insert-only; config-driven from cfg.layer_mappings</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.jde.f4201</code>, <code>acme_bronze.qad.so_mstr</code>, <code>acme_bronze.sap.vbak</code>, <code>acme_silver.ref.fx_rates</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_sales_order_header_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.sales_order_header'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_shipment" open>
+  <summary><span class="cat-table-name">sales.shipment</span>
+    <span class="cat-table-comment">3NF insert-only delivery items (SAP LIPS; JDE/QAD = mapping rows); config-driven</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">STREAMING_TABLE</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">plant</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">qty</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.sap.lips</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.v_shipment_current</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.shipment'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_v_invoice_current" open>
+  <summary><span class="cat-table-name">sales.v_invoice_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">2,767 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">invoice_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_invoice_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.invoice</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_invoice_current'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_v_sales_order_header_current" open>
+  <summary><span class="cat-table-name">sales.v_sales_order_header_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_sales_order_header_current'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_silver_sales_v_shipment_current" open>
+  <summary><span class="cat-table-name">sales.v_shipment_current</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">3,478 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">plant</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">qty</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_shipment_line</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">record_hash</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">effective_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.shipment</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'sales.v_shipment_current'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_silver_ref">acme_silver.ref</h3>
+<details class="cat-table" id="doc_n_acme_silver_ref_fx_rates" open>
+  <summary><span class="cat-table-name">ref.fx_rates</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">4 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">usd_rate</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <em>none (landing table)</em></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_silver.sales.fx_rates</code>, <code>acme_silver.sales.sales_order_header</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_silver.xlsx → sheet 'ref.fx_rates'</code></div>
+  </div>
+</details>
+</section>
+<section class="cat-layer" id="layer_acme_gold" data-layer="acme_gold">
+<h2 class="cat-layer-title" style="border-color:#c9a227">Gold <span class="cat-layer-sub">— star schema + DV2.0 + ML/AI</span></h2>
+<h3 class="cat-schema" id="schema_acme_gold_sales">acme_gold.sales</h3>
+<details class="cat-table" id="doc_n_acme_gold_sales_agg_sales_daily" open>
+  <summary><span class="cat-table-name">sales.agg_sales_daily</span>
+    <span class="cat-table-comment">Pre-aggregated for AI/BI dashboards + Genie</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">1,499 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_products.ops.v_melt_to_margin</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.agg_sales_daily'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_bridge_order_fulfillment" open>
+  <summary><span class="cat-table-name">sales.bridge_order_fulfillment</span>
+    <span class="cat-table-comment">DV2.0 bridge: order-&gt;shipment-&gt;invoice hash keys + lifecycle dates/flags. Grain: one row per current order. One join for O2C, backlog, Genie.</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">shipment_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_silver.sales.v_invoice_current</code>, <code>acme_silver.sales.v_sales_order_header_current</code>, <code>acme_silver.sales.v_shipment_current</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ml.customer_features</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.bridge_order_fulfillment'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_customer_narratives" open>
+  <summary><span class="cat-table-name">sales.customer_narratives</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">narrative</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ai.customer_profile_text</code>, <code>acme_products.sales.v_customer_360</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.customer_narratives'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_dim_customer" open>
+  <summary><span class="cat-table-name">sales.dim_customer</span>
+    <span class="cat-table-comment">MDM-survived customer dim; PK = customer_hk</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">1,001 rows</span><span class="pill pill-gov">🔒 Row filter</span><span class="pill pill-gov">🔒 Column mask</span><span class="pill pill-gov">🔒 PII tags</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">src_customer_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    <ul class='gov-list'><li>Row filter: acme_gold.sec.region_filter ON (source_system) — analysts see only their region</li><li>Column mask: customer_name → acme_gold.sec.mask_customer_name (visible unmasked only to data_steward)</li><li>PII tags: customer_name=&#x27;name&#x27;, src_customer_id=&#x27;identifier&#x27;</li></ul>
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_gold.sales.fact_sales_orders</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.dim_customer'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_fact_heat_quality" open>
+  <summary><span class="cat-table-name">sales.fact_heat_quality</span>
+    <span class="cat-table-comment">OT-to-business: furnace conditions joined to daily shipped tonnage</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">639 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">heat_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">window_start</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">max_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.furnace_heat_5min</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_products.ops.v_melt_to_margin</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.fact_heat_quality'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_fact_sales_orders" open>
+  <summary><span class="cat-table-name">sales.fact_sales_orders</span>
+    <span class="cat-table-comment">Grain: one row per order per source; FKs are hash keys</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">13,000 rows</span><span class="pill pill-gov">🔒 Row filter</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    <ul class='gov-list'><li>Row filter: acme_gold.sec.region_filter ON (source_system)</li></ul>
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.dim_customer</code>, <code>acme_silver.sales.v_sales_order_header_current</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ml.customer_features</code>, <code>acme_gold.sales.agg_sales_daily</code>, <code>acme_gold.sales.mv_sales_metrics</code>, <code>acme_products.sales.order_to_cash</code>, <code>acme_products.sales.v_customer_360</code>, <code>acme_products.sales.v_sales_orders</code>, <code>acme_products.sales.v_sales_orders_unified</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.fact_sales_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_mv_sales_metrics" open>
+  <summary><span class="cat-table-name">sales.mv_sales_metrics</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">METRIC_VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_count</td><td class="mono muted">LONG</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">avg_order_value</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.mv_sales_metrics'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_sales_pit_customer" open>
+  <summary><span class="cat-table-name">sales.pit_customer</span>
+    <span class="cat-table-comment">DV2.0 PIT: (snapshot_date, customer_hk) -&gt; as_of_ts of the Silver version current that day. Equality as-of joins; no BETWEEN scans, no label leakage.</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MATERIALIZED_VIEW</span><span class="pill">2,002 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">snapshot_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">as_of_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_silver.sales.customer</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'sales.pit_customer'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_gold_ml">acme_gold.ml</h3>
+<details class="cat-table" id="doc_n_acme_gold_ml_customer_features" open>
+  <summary><span class="cat-table-name">ml.customer_features</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">as_of_date</td><td class="mono muted">DATE</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">rev_l30d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">rev_l90d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">rev_l365d_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_cnt_l365d</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">days_since_last_order</td><td class="mono muted">INT</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">backlog_orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">churn_risk_score</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">feature_ts</td><td class="mono muted">TIMESTAMP</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ml.customer_features'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_gold_ai">acme_gold.ai</h3>
+<details class="cat-table" id="doc_n_acme_gold_ai_customer_profile_idx" open>
+  <summary><span class="cat-table-name">ai.customer_profile_idx</span>
+    <span class="cat-table-comment">Managed Vector Index with Delta Sync</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">FOREIGN</span><span class="pill">n/a rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">profile_text</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">__db_profile_text_vector</td><td class="mono muted">ARRAY</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.ai.customer_profile_text</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ai.customer_profile_idx'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_gold_ai_customer_profile_text" open>
+  <summary><span class="cat-table-name">ai.customer_profile_text</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">MANAGED</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">profile_text</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.customer_narratives</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <code>acme_gold.ai.customer_profile_idx</code></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_gold.xlsx → sheet 'ai.customer_profile_text'</code></div>
+  </div>
+</details>
+</section>
+<section class="cat-layer" id="layer_acme_products" data-layer="acme_products">
+<h2 class="cat-layer-title" style="border-color:#2a78d6">Products <span class="cat-layer-sub">— governed output ports</span></h2>
+<h3 class="cat-schema" id="schema_acme_products_sales">acme_products.sales</h3>
+<details class="cat-table" id="doc_n_acme_products_sales_order_to_cash" open>
+  <summary><span class="cat-table-name">sales.order_to_cash</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_id</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">NO</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">lifecycle_status</td><td class="mono muted">STRING</td><td class="muted">NO</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.order_to_cash'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_products_sales_v_customer_360" open>
+  <summary><span class="cat-table-name">sales.v_customer_360</span>
+    <span class="cat-table-comment">DATA PRODUCT customer_360 | owner: sales-data-team | SLA: 60-min freshness, 99.5% | masked PII + row filter inherit from dim_customer</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">1,001 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">narrative</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">backlog_orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">last_order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">days_since_last_order</td><td class="mono muted">INT</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.customer_narratives</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_customer_360'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_products_sales_v_sales_orders" open>
+  <summary><span class="cat-table-name">sales.v_sales_orders</span>
+    <span class="cat-table-comment">DATA PRODUCT sales_orders_unified | owner: sales-data-team | SLA: 30-min freshness, 99.5% | trust score: acme_products.meta.v_product_trust_scores</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_sales_orders'</code></div>
+  </div>
+</details>
+<details class="cat-table" id="doc_n_acme_products_sales_v_sales_orders_unified" open>
+  <summary><span class="cat-table-name">sales.v_sales_orders_unified</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">13,000 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">order_hk</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">customer_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">country</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">source_system</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_date</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">order_amount_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">currency_code</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">ship_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">invoice_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_shipped</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">is_invoiced</td><td class="mono muted">BOOLEAN</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.bridge_order_fulfillment</code>, <code>acme_gold.sales.dim_customer</code>, <code>acme_gold.sales.fact_sales_orders</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'sales.v_sales_orders_unified'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_products_ops">acme_products.ops</h3>
+<details class="cat-table" id="doc_n_acme_products_ops_v_melt_to_margin" open>
+  <summary><span class="cat-table-name">ops.v_melt_to_margin</span>
+    <span class="cat-table-comment">DATA PRODUCT melt_to_margin | owner: ot-data-team | SLA: 15-min freshness, 99.0% | OT furnace conditions joined to daily revenue</span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">36 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">site</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">asset</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">tag</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">heat_date</td><td class="mono muted">DATE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">avg_reading</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">peak_reading</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">revenue_usd</td><td class="mono muted">DOUBLE</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">orders</td><td class="mono muted">LONG</td><td class="muted">YES</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_gold.sales.agg_sales_daily</code>, <code>acme_gold.sales.fact_heat_quality</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'ops.v_melt_to_margin'</code></div>
+  </div>
+</details>
+<h3 class="cat-schema" id="schema_acme_products_meta">acme_products.meta</h3>
+<details class="cat-table" id="doc_n_acme_products_meta_v_product_trust_scores" open>
+  <summary><span class="cat-table-name">meta.v_product_trust_scores</span>
+    <span class="cat-table-comment"></span></summary>
+  <div class="cat-table-body">
+    <div class="badges"><span class="pill">VIEW</span><span class="pill">5 rows</span></div>
+    <table class="col-table">
+      <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Comment</th></tr></thead>
+      <tbody><tr><td class="mono">product_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">view_name</td><td class="mono muted">STRING</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">trust_score</td><td class="mono muted">DECIMAL</td><td class="muted">YES</td><td class="muted"></td></tr><tr><td class="mono">checks_evaluated</td><td class="mono muted">LONG</td><td class="muted">NO</td><td class="muted"></td></tr></tbody>
+    </table>
+    
+    <div class="lineage-text"><b>Reads from:</b> <code>acme_bronze.audit.dq_results</code>, <code>acme_bronze.cfg.product_registry</code></div>
+    <div class="lineage-text"><b>Feeds:</b> <em>none (terminal / not yet consumed)</em></div>
+    <div class="sample-note">500-row sample: <code>data/exports/excel/acme_products.xlsx → sheet 'meta.v_product_trust_scores'</code></div>
+  </div>
+</details>
+</section>
+  </main>
+</div>
+<footer class="pagefoot">acme Sales Lakehouse · data/exports/excel/*.xlsx has the full 500-row samples per table, layer by layer · docs/DATA_CATALOG.html has the clickable lineage diagram</footer>
+</body>
+</html>
