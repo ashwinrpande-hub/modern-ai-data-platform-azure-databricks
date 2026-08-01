@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>acme Platform Agents — Control &amp; Azure Deployment</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true, theme:'dark', themeVariables:{fontFamily:'IBM Plex Sans'}});
+</script>
+<style>
+:root{
+  --bg:#111315; --plate:#1A1D21; --line:#2B3037; --txt:#C6CBD1; --bright:#F5F6F7;
+  --dim:#7D848C; --acc:#1F6F4F; --acc2:#3FA378; --cool:#5C7A93;
+  --ok:#3FA378; --warn:#C99A3D; --bad:#C15B4A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.65 "IBM Plex Sans",sans-serif;padding:0 0 70px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+header{border-bottom:1px solid var(--line);padding:38px 0 24px;margin-bottom:0}
+.eyebrow{font:600 12px "IBM Plex Mono";letter-spacing:.18em;color:var(--acc2);text-transform:uppercase;margin-bottom:8px}
+header h1{font:800 40px/1.05 "Saira Condensed";color:var(--bright);text-transform:uppercase}
+.tabs{display:flex;gap:8px;margin:22px 0 0;flex-wrap:wrap;position:sticky;top:0;
+  background:rgba(17,19,21,.96);backdrop-filter:blur(4px);padding:12px 0 0;z-index:9}
+.tabs button{background:var(--plate);border:1px solid var(--line);color:var(--txt);padding:9px 18px;
+  border-radius:6px 6px 0 0;font:600 13.5px "IBM Plex Sans";cursor:pointer}
+.tabs button[aria-selected="true"]{background:#0E1114;border-bottom-color:#0E1114;color:var(--acc2);border-top:2px solid var(--acc)}
+.tabpanel{display:none;background:#0E1114;border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:26px 30px 34px}
+.tabpanel.show{display:block}
+.srcfile{font:500 11px "IBM Plex Mono";color:var(--dim);margin-bottom:14px;letter-spacing:.05em}
+.tabpanel h1{font:700 30px/1.15 "Saira Condensed";color:var(--bright);text-transform:uppercase;margin:6px 0 14px}
+.tabpanel h2{font:700 22px/1.15 "Saira Condensed";color:var(--bright);text-transform:uppercase;
+  margin:26px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+.tabpanel h3{font:600 16px "IBM Plex Sans";color:var(--bright);margin:18px 0 8px}
+.tabpanel p{margin:9px 0;max-width:92ch}
+.tabpanel ul,.tabpanel ol{margin:9px 0 9px 24px}
+.tabpanel li{margin:4px 0}
+.tabpanel a{color:var(--acc2)}
+.tabpanel strong{color:var(--bright)}
+code{font:13px "IBM Plex Mono";color:var(--acc2);background:#15181C;border:1px solid #232A33;
+  border-radius:3px;padding:1px 5px}
+pre{background:#15181C;border:1px solid var(--line);border-radius:6px;padding:14px 16px;
+  font:12.5px/1.55 "IBM Plex Mono";color:#B7C6D3;overflow-x:auto;margin:12px 0}
+pre code{background:none;border:none;padding:0;color:inherit}
+pre.mermaid{background:#15181C;text-align:center}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th{font:600 11px "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid #232A33;vertical-align:top}
+td:first-child{color:var(--bright)}
+.pill{display:inline-block;font:600 11px "IBM Plex Mono";padding:2px 8px;border-radius:10px;letter-spacing:.04em}
+.pill.ok{background:#16261F;color:var(--ok);border:1px solid #24422F}
+.pill.warn{background:#2A2213;color:var(--warn);border:1px solid #4A3B1A}
+.pill.bad{background:#2B1917;color:var(--bad);border:1px solid #4A2620}
+.pill.paused{background:#1C2026;color:var(--cool);border:1px solid #2E3A47}
+details{background:#15181C;border:1px solid var(--line);border-radius:6px;margin:10px 0;padding:0}
+details summary{cursor:pointer;padding:10px 14px;font:600 13px "IBM Plex Mono";color:var(--acc2);list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:"▸ ";color:var(--dim)}
+details[open] summary::before{content:"▾ "}
+details pre{margin:0;border:none;border-top:1px solid var(--line);border-radius:0 0 6px 6px}
+.note{background:#15181C;border-left:3px solid var(--cool);padding:10px 14px;margin:12px 0;font-size:14px;color:var(--dim)}
+.note strong{color:var(--txt)}
+@media print{
+  body{background:#fff;color:#222}
+  .tabs{display:none}
+  .tabpanel{display:block;border-color:#bbb;background:#fff;page-break-before:always}
+  .tabpanel h1,.tabpanel h2,.tabpanel h3,td:first-child,.tabpanel strong{color:#000}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="eyebrow">acme · Sales Lakehouse on Azure Databricks · Agent Subsystem</div>
+  <h1>Platform Agents — Control &amp; Azure Deployment</h1>
+</div></header>
+<div class="wrap">
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" onclick="tab(this,'p0')">Agent Control</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p1')">Azure Deployment</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p2')">Configuration Reference</button>
+    <button role="tab" aria-selected="false" onclick="tab(this,'p3')">Live Run — 2026-07-31</button>
+  </div>
+
+<div id="p0" class="tabpanel show" role="tabpanel">
+<p class="srcfile">source: agents/agent_core.py, agents/README.md</p>
+<h1>Agent control model</h1>
+<p>Six platform agents live in <code>agents/</code> and share one contract, defined once in
+<code>agents/agent_core.py</code> and imported by every agent script. The design principle: <strong>the platform
+never depends on a model being up.</strong> Deterministic work always runs; an LLM reasoning pass is
+strictly additive.</p>
+
+<h2>Two-phase execution contract</h2>
+<ol>
+<li><strong>Deterministic phase (always runs)</strong> — checks, table builds, drift scans, corpus rebuilds.
+  Produces the agent's artifact (a table write, a report row) with or without a model available.</li>
+<li><strong>Reasoning phase (conditional)</strong> — if an Anthropic API key resolves (env
+  <code>ANTHROPIC_API_KEY</code>, else Databricks secret <code>agents/anthropic_api_key</code>), a Claude tool-loop
+  runs on top of the deterministic evidence and produces the narrative report. Without a key, the
+  agent logs <code>"deterministic mode"</code> and still completes.</li>
+</ol>
+
+<h2>Guardrails (deliberate, load-bearing for the design)</h2>
+<ul>
+<li><strong>One tool, read-only:</strong> the model's only action surface is <code>run_sql</code>, hard-guarded in
+  <code>safe_sql()</code> to a single statement starting with <code>SELECT / WITH / SHOW / DESCRIBE</code>. Anything
+  else (a semicolon, a write verb) is rejected before it reaches Spark and logged as
+  <code>"REJECTED non-read-only query"</code>.</li>
+<li><strong>All writes happen in deterministic framework code</strong>, after the reasoning pass — the model
+  narrates and proposes (e.g. a schema-mapping <code>INSERT</code> as SQL text in its report), it never
+  executes a write directly.</li>
+<li><strong>Full audit trail:</strong> every run is logged to <code>acme_bronze.audit.agent_runs</code> (run_id, agent,
+  mode, status, started_at, finished_at, decision_log — every tool call + result summary,
+  truncated to 8,000 chars). Narrative output is persisted to
+  <code>acme_bronze.audit.agent_reports</code> (report_id, agent, created_at, title, body).</li>
+<li><strong>Human gate:</strong> agents open PRs / propose fixes; they never auto-merge to main
+  (<code>agents/README.md</code>).</li>
+<li><strong>Tool budget:</strong> <code>MAX_STEPS = 12</code> turns. If exhausted mid-investigation, the loop forces one
+  final turn with <code>tool_choice: none</code> and the instruction <em>"write your final report NOW from
+  evidence already gathered"</em> — so a truncated investigation still yields a usable report instead
+  of dangling mid-tool-call.</li>
+</ul>
+
+<pre class="mermaid">sequenceDiagram
+  participant J as Databricks Job Task
+  participant D as Deterministic phase
+  participant K as get_anthropic_key()
+  participant C as Claude (claude-opus-4-8)
+  participant SQL as safe_sql() -&gt; Spark/UC
+  participant A as audit.agent_runs / agent_reports
+
+  J-&gt;&gt;D: run checks / build tables / scan drift
+  D-&gt;&gt;A: artifact written (always)
+  J-&gt;&gt;K: resolve Anthropic key
+  alt key found (env or secret agents/anthropic_api_key)
+    K-&gt;&gt;C: system + user prompt, tools=[run_sql]
+    loop up to 12 turns
+      C-&gt;&gt;SQL: run_sql(query)
+      SQL--&gt;&gt;C: rows (read-only only, non-SELECT rejected)
+    end
+    C--&gt;&gt;J: final narrative report
+    J-&gt;&gt;A: log_run(mode=llm) + save_report(title, body)
+  else no key
+    K--&gt;&gt;J: None
+    J-&gt;&gt;A: log_run(mode=deterministic)
+  end
+</pre>
+
+<h2>The six deployed agents</h2>
+<table>
+<thead><tr><th>Script</th><th>Job / task</th><th>Deterministic output</th><th>LLM reasoning adds</th></tr></thead>
+<tbody>
+<tr><td>dq_monitor_rca.py</td><td>acme_agents_scheduled → dq_monitor_rca</td>
+  <td>Runs DAMA DQ checks, writes <code>audit.dq_results</code></td>
+  <td>Root-cause analysis narrative on any breach</td></tr>
+<tr><td>operational_intel.py</td><td>acme_agents_scheduled → operational_intel (depends_on dq_monitor_rca)</td>
+  <td>Builds the daily digest dataset</td>
+  <td>Self-directed drill-downs (e.g. top backlog accounts)</td></tr>
+<tr><td>schema_evolution.py</td><td>acme_agents_on_demand → schema_evolution</td>
+  <td>Scans Bronze for columns not covered by <code>cfg.layer_mappings</code></td>
+  <td>Evidence-backed mapping proposals (INSERT drafts, not executed)</td></tr>
+<tr><td>vector_content.py</td><td>acme_agents_on_demand → vector_content</td>
+  <td>Rebuilds the narrative/embedding corpus table</td>
+  <td>QA review of the corpus for retrieval-quality issues</td></tr>
+<tr><td>deployment_gate.py</td><td>acme_agents_on_demand → deployment_gate</td>
+  <td>Runs the validate.py-style check suite</td>
+  <td>Classifies failures (known gap vs. real regression), issues GO/HOLD</td></tr>
+<tr><td>product_creator.py</td><td>acme_agents_on_demand → product_creator (param: product_request)</td>
+  <td>—</td>
+  <td>NL request → SQL view definition in <code>acme_products</code>, passed through the gate</td></tr>
+</tbody>
+</table>
+
+<div class="note"><strong>Note on agents/*.md specs:</strong> <code>agents/README.md</code> additionally documents
+four agent <em>specs</em> — Pipeline Healer (<code>pipeline_healer.md</code>, trigger: Lakeflow job failure
+webhook), DQ Root-Cause (<code>dq_rca_agent.md</code>), Ingestion Registrar (<code>ingestion_registrar.md</code>,
+trigger: new row in <code>replication_sources.yaml</code>), and Docs/Lineage (<code>lineage_doc_agent.md</code>,
+trigger: nightly). These are design docs for agent behavior; they don't map 1:1 by filename to the
+six <code>.py</code> scripts actually wired into <code>resources/agents.yml</code> above — treat the table above as
+"what's live," and the <code>.md</code> files as the broader design estate (some overlapping in intent,
+e.g. dq_rca_agent.md ≈ dq_monitor_rca.py).</div>
+</div>
+
+<div id="p1" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: databricks.yml, resources/agents.yml — verified live against the workspace</p>
+<h1>Azure deployment</h1>
+<p>Deployed as a <strong>Databricks Asset Bundle</strong> (declarative automation bundle) — no hand-built jobs,
+no notebook-click-ops. <code>databricks.yml</code> declares the bundle and target; <code>resources/agents.yml</code>
+declares the two jobs. Deploy with <code>databricks bundle deploy -t dev</code>; the CLI diffs
+declared vs. live state and reconciles.</p>
+
+<h2>Bundle target</h2>
+<table>
+<tbody>
+<tr><td>Bundle name</td><td><code>modern-ai-data-platform-azure-databricks-dv2</code></td></tr>
+<tr><td>Target</td><td><code>dev</code> (default; <code>staging</code>/<code>prod</code> stubbed but commented out)</td></tr>
+<tr><td>Workspace host</td><td><code>https://adb-7405618665227003.3.azuredatabricks.net</code></td></tr>
+<tr><td>Mode</td><td><code>development</code> (per-developer job names prefixed <code>[dev &lt;username&gt;]</code>)</td></tr>
+</tbody>
+</table>
+
+<h2>Job 1 — acme_agents_scheduled</h2>
+<pre class="mermaid">flowchart LR
+  T[Cron 0 0 6 * * ? UTC — PAUSED] -.would trigger.-&gt; A[dq_monitor_rca]
+  A --&gt; B[operational_intel]
+  A -.writes.-&gt; DQ[(audit.dq_results)]
+  B -.reads.-&gt; DQ
+</pre>
+<p>Two tasks, <strong>sequential</strong> (<code>operational_intel</code> has <code>depends_on: dq_monitor_rca</code>). Cron is
+defined but <code>pause_status: PAUSED</code> — it has never fired on schedule; every run to date has been
+<code>trigger: ONE_TIME</code> (manually invoked).</p>
+
+<h2>Job 2 — acme_agents_on_demand</h2>
+<pre class="mermaid">flowchart LR
+  P[job param: product_request] --&gt; SE[schema_evolution]
+  P --&gt; VC[vector_content]
+  P --&gt; DG[deployment_gate]
+  P --&gt; PC[product_creator]
+</pre>
+<p>Four tasks, <strong>no depends_on between them</strong> — confirmed from the 2026-07-31 live run below: all
+four started at the identical <code>start_time</code> and ran concurrently on separate serverless compute.
+Only <code>product_creator</code> consumes the <code>product_request</code> parameter.</p>
+
+<h2>Compute &amp; environment</h2>
+<ul>
+<li><strong>No clusters defined</strong> in either job — both run on <strong>serverless</strong> job compute
+  (<code>spark_python_task</code>, no <code>job_clusters</code> block).</li>
+<li>Shared environment key <code>agent_env</code>: <code>environment_version: "3"</code>, one pip dependency —
+  <code>anthropic</code>.</li>
+<li>Serverless quirk: a <code>spark_python_task</code> exec()s the script inside an IPython kernel, so
+  <code>__file__</code> is undefined — agents bootstrap paths via
+  <code>globals().get("__file__") or sys.argv[0]</code>.</li>
+</ul>
+
+<h2>What actually lands in the workspace</h2>
+<p>Bundle deploy pushes the repo's <code>agents/*.py</code> into the user's workspace bundle folder; each task's
+<code>spark_python_task.python_file</code> points at the deployed copy, not the local repo path:</p>
+<pre>/Workspace/Users/ashwin.r.pande@gmail.com/.bundle/modern-ai-data-platform-azure-databricks-dv2/dev/files/agents/&lt;script&gt;.py</pre>
+<p>Both jobs carry <code>deployment.kind: BUNDLE</code> and <code>edit_mode: UI_LOCKED</code> — the Jobs UI will not allow
+manual edits; the bundle is the only mutation path (<code>databricks bundle deploy</code> again). Bundle
+state/metadata lives at:</p>
+<pre>/Workspace/Users/ashwin.r.pande@gmail.com/.bundle/modern-ai-data-platform-azure-databricks-dv2/dev/state/metadata.json</pre>
+</div>
+
+<div id="p2" class="tabpanel" role="tabpanel">
+<p class="srcfile">verified live 2026-07-31 via databricks CLI (jobs list, secrets list-scopes, current-user)</p>
+<h1>Configuration reference</h1>
+<p>Everything below was confirmed against the live workspace and local tooling today — not pulled
+from docs alone.</p>
+
+<h2>Workspace &amp; identity</h2>
+<table>
+<tbody>
+<tr><td>Databricks workspace URL</td><td><code>adb-7405618665227003.3.azuredatabricks.net</code></td></tr>
+<tr><td>Workspace numeric ID</td><td><code>7405618665227003</code></td></tr>
+<tr><td>Databricks user</td><td>Ashwin Pande — <code>ashwin.r.pande@gmail.com</code></td></tr>
+<tr><td>User externalId</td><td><code>3d927479-e0f5-41cb-a30b-c1ca17caddde</code></td></tr>
+<tr><td>Entitlements</td><td><code>allow-cluster-create</code>, <code>allow-instance-pool-create</code></td></tr>
+</tbody>
+</table>
+
+<h2>Jobs (live job IDs)</h2>
+<table>
+<thead><tr><th>Job name</th><th>Job ID</th><th>Trigger</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>acme_agents_scheduled</td><td><code>978513723564428</code></td><td>Cron 0 0 6 * * ? UTC</td>
+  <td><span class="pill paused">PAUSED</span></td></tr>
+<tr><td>acme_agents_on_demand</td><td><code>134811292500312</code></td><td>Manual / job param</td>
+  <td><span class="pill ok">ACTIVE</span></td></tr>
+<tr><td>acme_ml_features <em>(not an agent job)</em></td><td><code>760845021911509</code></td>
+  <td>Manual</td><td><span class="pill ok">ACTIVE</span></td></tr>
+</tbody>
+</table>
+
+<h2>Secrets</h2>
+<table>
+<tbody>
+<tr><td>Secret scope</td><td><code>agents</code> (backend: DATABRICKS)</td></tr>
+<tr><td>Secret key</td><td><code>anthropic_api_key</code></td></tr>
+<tr><td>Last rotated</td><td>2026-07-19 04:49:04 UTC</td></tr>
+<tr><td>Resolution order in code</td><td><code>ANTHROPIC_API_KEY</code> env var, else
+  <code>databricks.sdk.runtime.dbutils.secrets.get(scope="agents", key="anthropic_api_key")</code>,
+  else <code>WorkspaceClient().dbutils</code> fallback (kept only as fallback — proved flaky on
+  serverless per <code>agent_core.py</code> comment)</td></tr>
+</tbody>
+</table>
+
+<h2>Local developer tooling (this machine)</h2>
+<table>
+<tbody>
+<tr><td>Databricks CLI binary</td>
+  <td><code>C:\Users\ashwi\.vscode\extensions\databricks.databricks-2.12.3-win32-x64\bin\databricks.exe</code>
+  (bundled with the VS Code extension — no standalone CLI on PATH; version dir changes on
+  extension update)</td></tr>
+<tr><td>CLI profile</td><td><code>Azure_data_bricks_dv2</code> (in <code>~/.databrickscfg</code>)</td></tr>
+<tr><td><code>DATABRICKS_CLI_PATH</code></td><td>must point at the exe above — databricks-connect's SDK
+  shells out to the CLI for auth</td></tr>
+<tr><td><code>DATABRICKS_CONFIG_PROFILE</code></td><td><code>Azure_data_bricks_dv2</code> (needed alongside
+  <code>DATABRICKS_CLI_PATH</code> for local serverless connect sessions)</td></tr>
+</tbody>
+</table>
+
+<h2>Workspace paths</h2>
+<table>
+<tbody>
+<tr><td>Bundle root (workspace)</td>
+  <td><code>/Workspace/Users/ashwin.r.pande@gmail.com/.bundle/modern-ai-data-platform-azure-databricks-dv2/dev/</code></td></tr>
+<tr><td>Deployed agent scripts</td><td><code>.../dev/files/agents/*.py</code></td></tr>
+<tr><td>Bundle state/metadata</td><td><code>.../dev/state/metadata.json</code></td></tr>
+<tr><td>Repo path (local)</td><td><code>agents/*.py</code>, <code>agents/agent_core.py</code>,
+  <code>databricks.yml</code>, <code>resources/agents.yml</code></td></tr>
+</tbody>
+</table>
+
+<h2>Audit &amp; storage (Unity Catalog)</h2>
+<table>
+<tbody>
+<tr><td>Run log table</td><td><code>acme_bronze.audit.agent_runs</code> — run_id, agent, mode, status,
+  started_at, finished_at, decision_log</td></tr>
+<tr><td>Report table</td><td><code>acme_bronze.audit.agent_reports</code> — report_id, agent, created_at,
+  title, body</td></tr>
+</tbody>
+</table>
+
+<h2>LLM reasoning parameters</h2>
+<table>
+<tbody>
+<tr><td>Model</td><td><code>claude-opus-4-8</code> (<code>agent_core.py</code> <code>MODEL</code> constant)</td></tr>
+<tr><td>Tool budget</td><td><code>MAX_STEPS = 12</code> turns before forced finalization</td></tr>
+<tr><td>Thinking mode</td><td><code>adaptive</code>; <code>output_config.effort = "high"</code></td></tr>
+<tr><td>Max output tokens</td><td>8,000 per turn</td></tr>
+<tr><td>Tool</td><td><code>run_sql</code> — single statement, prefixes allowed:
+  <code>SELECT, WITH, SHOW, DESCRIBE, DESC</code></td></tr>
+<tr><td>Query result cap</td><td>50 rows, JSON-serialized and truncated to 4,000 chars per tool result</td></tr>
+</tbody>
+</table>
+</div>
+
+<div id="p3" class="tabpanel" role="tabpanel">
+<p class="srcfile">Both agent jobs triggered live via <code>databricks jobs run-now</code> on 2026-07-31 for this
+document — logs captured with <code>databricks jobs get-run-output</code>, not fabricated.</p>
+<h1>Live run capture — 2026-07-31</h1>
+
+<h2>acme_agents_on_demand — run 434501734946825</h2>
+<table>
+<tbody>
+<tr><td>Started</td><td>2026-07-31 23:44:30 UTC</td></tr>
+<tr><td>Ended</td><td>2026-07-31 23:48:31 UTC</td></tr>
+<tr><td>Duration</td><td>4m 0s (all 4 tasks ran concurrently — no depends_on)</td></tr>
+<tr><td>Result</td><td><span class="pill ok">SUCCESS</span> — all 4 tasks SUCCESS</td></tr>
+<tr><td>product_request param</td><td>"Order-to-cash data product: current orders with customer
+  name, country, USD amounts, and shipped/invoiced lifecycle status, for BI consumption."</td></tr>
+</tbody>
+</table>
+
+<h3>schema_evolution — task run 928161508082256 (199s)</h3>
+<p>Detected drift on 3 Bronze columns not covered by <code>cfg.layer_mappings</code>, sampled their value
+domains, found <code>SHLITM</code> (JDE) / <code>so_part</code> (QAD) / <code>MATNR</code> (SAP) share an identical 6-code product
+domain, and proposed 3 versioned <code>INSERT</code> drafts adding <code>src_product_id</code> to
+<code>sales_order_header</code> — while correctly recommending <em>against</em> mapping <code>so_domain</code> (a constant,
+single-value QAD technical column). No writes executed; drafts only.</p>
+<details><summary>Full captured output</summary><pre>Schema drift detected:
+- acme_bronze.jde.f4201: SHLITM
+- acme_bronze.qad.so_mstr: so_domain, so_part
+- acme_bronze.sap.vbak: MATNR
+
+===== PROPOSAL =====
+Investigation complete. Here's what the data shows.
+
+## Evidence summary
+
+| Bronze column | Rows | Distinct | Nulls | Sample values | Reading |
+|---|---|---|---|---|---|
+| jde.f4201.SHLITM | 5,000 | 6 | 0 | REBAR-G60, PLATE-A36, SBQ-4140, CRC-1045, HRC-1018, WIRE-1080 | Item/short-item number |
+| qad.so_mstr.so_part | 3,000 | 6 | 0 | WIRE-1080, CRC-1045, HRC-1018, ... | Part number |
+| sap.vbak.MATNR | 5,000 | 6 | 0 | WIRE-1080, HRC-1018, CRC-1045, ... | Material number |
+| qad.so_mstr.so_domain | 3,000 | 1 | 0 | EMEA (constant) | QAD tenancy/domain partition key |
+
+Key finding: SHLITM, so_part, and MATNR share an identical value domain (the same 6 product codes)
+and all three source tables (sap.vbak, qad.so_mstr, jde.f4201) already converge on
+sales_order_header. That table currently maps src_order_id, src_customer_id, order_date,
+order_amount, currency_code, source_system -- but no product/material identifier. These three
+columns are the missing product key across all three ERPs -> one new Silver column, three
+version-1 rows.
+
+so_domain is a constant (EMEA, single value, no discrimination) technical QAD domain key ->
+recommend leaving it unmapped.
+
+---
+# Mapping Proposal -- add src_product_id to sales_order_header
+
+Rationale: New Silver column sales_order_header.src_product_id unifies the per-ERP item/material
+identifier. Follows the existing src_* naming convention. Values are clean product codes (no
+transform needed); NOT NULL dq_rule mirrors the other src_* key mappings. Each source gets its own
+version 1 row for the new tgt_column.
+
+### 1. JDE -- f4201.SHLITM
+INSERT INTO acme_bronze.cfg.layer_mappings
+  (mapping_id, layer, src_table, src_column, tgt_table, tgt_column,
+   transform_expr, dq_rule, version, valid_from, valid_to, changed_by)
+VALUES
+  (uuid(), 'silver', 'acme_bronze.jde.f4201', 'SHLITM',
+   'sales_order_header', 'src_product_id',
+   NULL, 'NOT NULL', 1, current_timestamp(), NULL, 'schema-evolution-agent');
+
+### 2. QAD -- so_mstr.so_part
+INSERT INTO acme_bronze.cfg.layer_mappings (...)
+VALUES (uuid(), 'silver', 'acme_bronze.qad.so_mstr', 'so_part',
+   'sales_order_header', 'src_product_id', NULL, 'NOT NULL', 1,
+   current_timestamp(), NULL, 'schema-evolution-agent');
+
+### 3. SAP -- vbak.MATNR
+INSERT INTO acme_bronze.cfg.layer_mappings (...)
+VALUES (uuid(), 'silver', 'acme_bronze.sap.vbak', 'MATNR',
+   'sales_order_header', 'src_product_id', NULL, 'NOT NULL', 1,
+   current_timestamp(), NULL, 'schema-evolution-agent');
+
+Optional hardening: all values match ^[A-Z]+-[A-Z0-9]+$. If a stricter contract than NOT NULL is
+wanted, swap the dq_rule to RLIKE '^[A-Z0-9]+-[A-Z0-9]+$'. SAP MATNR is often zero-padded in raw
+form; if that appears here later, add transform_expr = ltrim('0', MATNR). Current sample shows no
+padding, so left NULL.
+
+---
+# Recommended: leave qad.so_mstr.so_domain unmapped
+
+so_domain is QAD's multi-tenancy domain partition key. In this dataset it is a single constant
+value (EMEA) across all 3,000 rows, so it carries zero discriminating information at Silver and
+has no analog in SAP/JDE. This looks like a technical/infrastructure column, not a business
+attribute. Do not force it into sales_order_header. If the modeling team later wants an org/region
+dimension, so_domain would be a QAD-only source and should be modeled deliberately -- not
+auto-mapped from a lone constant.
+
+### Reviewer checklist before merge
+- Confirm src_product_id is the desired column name (vs. material_number / product_code).
+- Add the physical src_product_id STRING column to acme_silver.sales.sales_order_header and its
+  v_sales_order_header_current view as part of the same PR.
+- Confirm no existing version 1 row already claims sales_order_header.src_product_id (verified
+  none exists at inspection time).
+
+All statements above are INSERT drafts only -- no writes were executed.</pre></details>
+
+<h3>product_creator — task run 794583036066522 (121s)</h3>
+<p>NL request → SQL view, created and passed the gate.</p>
+<pre>Created acme_products.sales.order_to_cash — 13000 rows
+product_creator finished: mode=llm</pre>
+
+<h3>vector_content — task run 336548424956275 (210s)</h3>
+<p>Rebuilt the narrative corpus (1,001 rows) and self-QA'd it — <strong>caught a real data artifact</strong>:
+100% of JDE customers show a fabricated shipment backlog because JDE/QAD have zero populated
+shipment records (pipeline coverage gap, not real backlog), and flagged three retrieval-quality
+issues (ETL jargon in embedded text, no recency signal, raw counts instead of natural language).</p>
+<details><summary>Full captured output</summary><pre>customer_narratives rebuilt: 1001 rows
+
+===== QA REVIEW =====
+# Content-QA Report -- acme_gold.ai.customer_profile_text (Customer Profile Narratives)
+
+Corpus: 1,001 narratives, all with distinct customer_hk and distinct text. Length 142-179 chars
+(avg ~176). Composition: 500 SAP / 501 JDE. Countries skew MX (186), US (158), CA (157), then EU.
+
+## CRITICAL -- a data artifact is being embedded as a business signal
+
+Every one of the 501 JDE (Americas Metals) customers shows 100% of orders unshipped (backlog =
+order count), vs. SAP customers averaging a 30% backlog ratio and none fully unshipped. Root cause
+confirmed in bridge_order_fulfillment:
+
+| source_system | bridge rows | shipped | unshipped |
+|---|---|---|---|
+| SAP | 5,000 | 3,478 | 1,522 |
+| JDE | 5,000 | 0 | 5,000 |
+| QAD | 3,000 | 0 | 3,000 |
+
+JDE (and QAD) have no shipment records populated -- is_shipped is false for 100% of rows. So "Has
+open fulfillment backlog awaiting shipment" on all 501 JDE customers is a pipeline coverage gap,
+not a real backlog. Embedding this will flood any "who has shipping backlog / stuck orders"
+retrieval with 501 false positives and bury the genuinely-backlogged SAP accounts.
+
+Action: Do not emit backlog language for source systems whose fulfillment feed is unshipped-only.
+Suppress or flag the signal until JDE/QAD shipment data lands.
+
+## QAD customers appear missing from the corpus
+The narrative set is only SAP+JDE (1,001), but bridge_order_fulfillment contains 3,000 QAD order
+rows. QAD-sourced customers may be absent from dim_customer/narratives entirely. Left unverified
+(tool budget) -- recommend confirming corpus completeness against all three source systems.
+
+## Retrieval-relevance issues in the narrative template
+1. Internal jargon a seller would never query ("source system SAP / JDE") -- drop or move to
+   metadata.
+2. No recency -> churn cannot be phrased. Add a recency phrase (e.g. "Last ordered 2026-02, ~3
+   months ago; ordering has slowed").
+3. Backlog phrased as a raw count, not seller language -- add natural synonyms + USD value.
+4. Revenue formatting -- no separators/rounding, no time window.
+5. Cosmetic: "order(s)" pluralization.
+
+## What's fine
+No bare hash keys/opaque codes inside profile_text; currency units stated; country ISO code
+present and consistent.
+
+Bottom line: structure and units are acceptable, but the corpus currently embeds a
+fulfillment-data gap as a fake backlog signal on half the customers, omits the recency needed for
+churn search, and leans on ETL jargon. Fix the JDE/QAD backlog handling first.
+vector_content finished: mode=llm</pre></details>
+
+<h3>deployment_gate — task run 1108036001458356 (232s) — verdict: <span class="pill bad">HOLD</span></h3>
+<p>Ran the 14-check validation suite, classified every failure as either a known/stale-baseline
+issue or a genuine regression, and correctly distinguished them instead of flagging everything red.</p>
+<table>
+<thead><tr><th>#</th><th>Check</th><th>Result</th><th>Got / Want</th><th>Classification</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Catalogs exist</td><td><span class="pill ok">PASS</span></td><td>4 / 4</td><td>—</td></tr>
+<tr><td>2</td><td>Config tables</td><td><span class="pill bad">FAIL</span></td><td>9 / 5</td><td>Stale expectation, not a data regression</td></tr>
+<tr><td>3</td><td>Sources registered</td><td><span class="pill bad">FAIL</span></td><td>14 / 6</td><td>Known gap (stale active-source count)</td></tr>
+<tr><td>4</td><td>Bronze envelope present</td><td><span class="pill ok">PASS</span></td><td>11 / ≥6</td><td>—</td></tr>
+<tr><td>5</td><td>Silver insert-only</td><td><span class="pill ok">PASS</span></td><td>0 / 0</td><td>—</td></tr>
+<tr><td>6</td><td>Hash keys 64-char hex</td><td><span class="pill ok">PASS</span></td><td>0 / 0</td><td>—</td></tr>
+<tr><td>7</td><td>Gold FK integrity</td><td><span class="pill ok">PASS</span></td><td>0 / 0</td><td>—</td></tr>
+<tr><td>8</td><td>Row filter active</td><td><span class="pill ok">PASS</span></td><td>1 / 1</td><td>—</td></tr>
+<tr><td>9</td><td>Mask active</td><td><span class="pill ok">PASS</span></td><td>1 / 1</td><td>—</td></tr>
+<tr><td>10</td><td>DQ ran in 24h</td><td><span class="pill bad">FAIL</span></td><td>0 / ≥6</td><td><strong>REGRESSION</strong> — no DQ runs since 2026-07-19 (12d stale)</td></tr>
+<tr><td>11</td><td>Rejects logged w/ dimension</td><td><span class="pill ok">PASS</span></td><td>0 / 0</td><td>—</td></tr>
+<tr><td>12</td><td>Products published</td><td><span class="pill ok">PASS</span></td><td>37 / ≥1</td><td>—</td></tr>
+<tr><td>13</td><td>PIT has today's snapshot</td><td><span class="pill bad">FAIL</span></td><td>0 / ≥1</td><td><strong>REGRESSION</strong> — no snapshot since 2026-07-19 (12d stale)</td></tr>
+<tr><td>14</td><td>Bridge FK integrity (orders)</td><td><span class="pill ok">PASS</span></td><td>0 / 0</td><td>—</td></tr>
+</tbody>
+</table>
+<div class="note"><strong>Recommendation: HOLD.</strong> The agent traced checks 10 and 13 to one root
+cause — the scheduled DQ and PIT-snapshot pipeline runs stopped on 2026-07-19 and had not produced
+anything for 12 days as of this run. Checks 2–3 are stale <code>validate.py</code> baselines (config
+footprint legitimately grew), not blockers. This finding held before the scheduled job (right)
+was re-run today.</div>
+
+<h2>acme_agents_scheduled — run 1078823281605847</h2>
+<table>
+<tbody>
+<tr><td>Started</td><td>2026-07-31 23:58:33 UTC</td></tr>
+<tr><td>Ended</td><td>2026-08-01 00:04:24 UTC</td></tr>
+<tr><td>Duration</td><td>5m 51s (sequential: dq_monitor_rca then operational_intel, per <code>depends_on</code>)</td></tr>
+<tr><td>Result</td><td><span class="pill ok">SUCCESS</span> — both tasks SUCCESS</td></tr>
+<tr><td>Trigger</td><td>ONE_TIME (manual — cron remains PAUSED; this run did not come from the schedule)</td></tr>
+</tbody>
+</table>
+
+<div class="note"><strong>Cross-check with the on-demand run above:</strong> this run independently
+confirms the deployment_gate's HOLD verdict — the RCA agent traced it to the same root cause with
+harder numbers: bronze hasn't ingested in <strong>313 hours (~13 days)</strong>, and no order has
+arrived anywhere in the medallion for <strong>77 days</strong> (last business date 2026-05-16). Two
+agents, two independent evidence trails, same conclusion.</div>
+
+<h3>dq_monitor_rca — task run 83492572561749 (225s)</h3>
+<p>Ran 10 DAMA-dimension checks (8 pass), then investigated both failures via read-only SQL and
+filed a full RCA: both timeliness failures are one incident — the SAP bronze feed (vbak/kna1/lips/vbrp)
+has landed exactly <strong>one batch</strong>, on 2026-07-18, and that batch's newest business date was
+already 2026-05-16 — a stalled ingestion job, not a transform defect. Confidence rated explicitly
+(~0.9 / ~0.85) per finding, with a secondary signal flagged (63-day gap between newest business
+record and its own ingest time, suggesting the source extract may have been lagging even before
+ingestion stopped).</p>
+<details><summary>Full captured output</summary><pre>PASS  [completeness] order_keys_not_null (violations=0)
+PASS  [completeness] customer_name_not_null (violations=0)
+PASS  [validity    ] hash_key_64_hex (violations=0)
+PASS  [validity    ] currency_in_fx_reference (violations=0)
+PASS  [uniqueness  ] no_duplicate_current_orders (violations=0)
+PASS  [consistency ] fact_customer_fk_resolves (violations=0)
+PASS  [consistency ] silver_gold_row_parity (violations=0)
+PASS  [accuracy    ] usd_amount_reconciles (violations=0)
+FAIL  [timeliness  ] bronze_ingest_fresh_24h (violations=1)
+FAIL  [timeliness  ] orders_arriving_30d (violations=1)
+
+===== RCA REPORT =====
+I have enough evidence to complete the RCA. Both failures share a single upstream root cause.
+
+# RCA Report -- DQ Run 586215c4-2a21-4ef0-bd11-12377c47fafc
+
+## Executive summary
+Both failing checks are symptoms of one underlying condition: the SAP (and broader sales)
+ingestion has not run since a single one-time bulk load on 2026-07-18, and even that load
+contained business data only through 2026-05-16. Nothing new has landed in bronze in ~13 days,
+and no new orders have flowed anywhere in the medallion for 77 days. This is a
+staleness / stalled-pipeline root cause, not a data-content or transform-logic defect.
+
+## Check 1 -- bronze_ingest_fresh_24h on acme_bronze.sap.vbak
+| metric | value |
+|---|---|
+| max _ingest_ts | 2026-07-18 22:26:57 |
+| now | 2026-08-01 00:00 |
+| hours stale | 313h (threshold 24h) |
+| distinct batches | 1 (7bf662fa...) |
+| rows | 5,000 |
+
+Earliest evidence: vbak contains exactly one _batch_id, ingested on 2026-07-18 -- a single
+historical dump, not an ongoing feed.
+
+Scope is the whole SAP feed, not just vbak:
+| table | last ingest | batches |
+|---|---|---|
+| vbak | 2026-07-18 22:26:57 | 1 |
+| kna1 | 2026-07-18 22:27:02 | 1 |
+| lips | 2026-07-18 22:27:05 | 1 |
+| vbrp | 2026-07-18 22:27:08 | 1 |
+
+Blast radius: vbak -> acme_silver.sales.sales_order_header -> acme_gold.sales.fact_sales_orders
+-> agg_sales_daily, mv_sales_metrics, bridge_order_fulfillment. Every order-related downstream is
+frozen.
+
+Root cause classification: Staleness / stalled ingestion pipeline (operational, not data
+content). Confidence: high (~0.9).
+
+Notable secondary signal: the newest ERDAT (business date) in vbak is 2026-05-16, yet it was
+ingested 2026-07-18 -- a ~63-day gap between newest business record and ingest time. Suggests the
+2026-07-18 load itself was a stale/historical extract.
+
+## Check 2 -- orders_arriving_30d on acme_gold.sales.fact_sales_orders
+| metric | value |
+|---|---|
+| max order_date | 2026-05-16 |
+| today | 2026-08-01 |
+| days since last order | 77 days (threshold 30d) |
+| rows | 13,000 |
+
+Order volume is steady daily (~16-36 orders/day) right up to 2026-05-16, then stops abruptly --
+identical across all three source systems (SAP 5,000 / JDE 5,000 / QAD 3,000 rows), each maxing
+at 2026-05-16.
+
+Traced through the full lineage -- the cliff exists at every layer:
+| layer | table | max order/business date |
+|---|---|---|
+| bronze | sap.vbak (ERDAT) | 2026-05-16 |
+| silver | sales_order_header (all 3 systems) | 2026-05-16 |
+| gold | fact_sales_orders (all 3 systems) | 2026-05-16 |
+| gold | agg_sales_daily | 2026-05-16 |
+| gold | mv_sales_metrics | 2026-05-16 |
+
+Because the gap is present already in bronze and is uniform across independent source systems,
+this is not a silver-versioning or gold-transform defect -- the data simply never arrived past
+2026-05-16.
+
+Root cause classification: Staleness -- same stalled ingestion as Check 1. Confidence: high
+(~0.85) that this is upstream/ingest, not pipeline logic; medium on whether 2026-05-16 is an
+ingest gap vs. a source-side extract cutoff.
+
+## Root-cause relationship
+Check 1 and Check 2 are the same incident viewed at two layers: ingest stopped after a single
+2026-07-18 load, and that load's newest business date was already 2026-05-16. Fixing ingestion
+clears both, provided the source actually has post-2026-05-16 data to send.
+
+## Prioritized remediation (recommendations only -- a human owns every change)
+1. [P1] Restart / investigate the SAP sales ingestion job -- confirm why no _batch_id has landed
+   since 2026-07-18 across vbak/kna1/lips/vbrp.
+2. [P1] Verify source freshness at the extract layer -- confirm with source owners whether real
+   orders exist after 2026-05-16.
+3. [P2] Add an ingest-liveness/heartbeat alert (hours-since-last-batch &gt; 24h).
+4. [P2] Add a business-date-vs-ingest-lag check (max ERDAT vs _ingest_ts).
+5. [P3] Flag downstream consumers as stale -- notify report/dashboard owners.
+6. [P3] After ingestion resumes, backfill and re-run this DQ suite.
+
+All findings verified via direct read-only queries against bronze, silver, and gold. No writes
+proposed.
+dq_monitor_rca finished: mode=llm, status=RCA_FILED</pre></details>
+
+<h3>operational_intel — task run 987136586505097 (114s)</h3>
+<p>Built the daily digest on top of the DQ agent's findings (task dependency = shared context),
+surfacing business impact in dollar terms: a $3.99B backlog sitting on data that's now nearly two
+weeks stale.</p>
+<details><summary>Full captured output</summary><pre>bronze_order_rows: 5000
+silver_order_versions: 13000
+gold_fact_rows: 13000
+bronze_ingest_age_hours: 313
+backlog_orders: 9522
+backlog_value_usd: 3994969852
+shipped_not_invoiced: 711
+dq_failures_today: 2
+
+===== DIGEST =====
+# Daily Operations Digest -- Acme Sales Lakehouse
+As of latest DQ run: 2026-08-01 00:00 UTC
+
+## Headlines
+- Fulfillment backlog stands at $3.99 billion USD across 9,522 open orders -- an average of
+  ~$419,600 USD per open order, the single largest number on the board today.
+- Bronze ingestion is severely stale at 313 hours (~13 days) old, well beyond the 24-hour
+  freshness target. This is the day's biggest operational red flag.
+- 2 data-quality checks failed today -- both timeliness checks, both pointing at the same
+  stale-ingest root cause.
+- 711 orders are shipped but not yet invoiced -- trapped order-to-cash revenue.
+- Top 5 customers are all EU Steelworks entities, together contributing ~$55.3 million USD in
+  revenue, led by EU Steelworks 356 GmbH at $12.59 million USD -- heavy revenue concentration in
+  a single account family.
+- Silver-to-Gold layer parity is intact at 13,000 rows on each side -- the pipeline is
+  consistent even though it is not fresh.
+
+## Pipeline Health
+Bronze holds 5,000 order rows; Silver carries 13,000 order versions flowing 1:1 into 13,000 Gold
+fact rows (verified). silver_gold_row_parity and usd_amount_reconciles both passed -- the concern
+is timeliness, not correctness.
+
+## Fulfillment Backlog
+9,522 open orders worth $3,994,969,852 USD; 711 shipped-but-not-invoiced.
+| Customer | Revenue (USD) |
+|---|---|
+| EU Steelworks 356 GmbH | $12,591,890 |
+| EU Steelworks 461 GmbH | $11,001,747 |
+| EU Steelworks 395 GmbH | $10,852,194 |
+| EU Steelworks 196 GmbH | $10,470,887 |
+| EU Steelworks 296 GmbH | $10,420,366 |
+
+## Data Quality
+2 of today's checks failed, both timeliness:
+1. bronze_ingest_fresh_24h on acme_bronze.sap.vbak
+2. orders_arriving_30d on acme_gold.sales.fact_sales_orders
+All completeness, validity, uniqueness, consistency, and accuracy checks passed.
+Recommended action: investigate the SAP VBAK ingestion job first; restoring that feed should
+clear both DQ failures.</pre></details>
+</div>
+</div>
+</div>
+<script>
+function tab(btn,id){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected','false'));
+  btn.setAttribute('aria-selected','true');
+  document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+</script>
+</body>
+</html>

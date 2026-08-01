@@ -48,7 +48,7 @@ Verification anchors: `scripts/validate.py` = 14/14 green (2026-07-19);
 |----|-------------|----------|--------|
 | R4.1 | ML feature store: PIT correctness, versioning, low-latency | `ml/build_features.py` + `resources/ml.yml` job (deployed; strict `order_date < as_of_date`; 1,001 rows; append per as_of_date = versioning); Lakebase online serving in `ml/feature_store.py` | 🟡 Offline deployed; online serving design-only |
 | R4.2 | BI: dimensional model, aggregations, query performance | Gold star + `agg_sales_daily` + metric view `mv_sales_metrics` (deployed, MEASURE()-queryable); `dashboards/dq_trust_dashboard.sql` (design) | ✅ |
-| R4.3 | AI-ready: embeddings, semantic search, RAG | `customer_narratives` + `ai.customer_profile_text` (CDF, deployed); `ai/provision_vector_search.py` (endpoint `acme-vs` provisioning); `ai/vector_search_rag.py`, `ai/rag_agent.py` (design) | 🟡 |
+| R4.3 | AI-ready: embeddings, semantic search, RAG | `customer_narratives` + `ai.customer_profile_text` (CDF); `ai/provision_vector_search.py` — endpoint `acme-vs` ONLINE, delta-sync index `customer_profile_idx` ready, 1,001 rows embedded (`databricks-gte-large-en`), live query verified (churn/backlog search returns correct matches by meaning, not keyword); RAG generation layer (`ai/vector_search_rag.py`, `ai/rag_agent.py`, Model Serving) still design-only | 🟡 retrieval deployed; generation (RAG) design-only |
 | R4.4 | Clustering, MVs, search optimization | Liquid clustering on fact/PIT/bridge (`gold_dlt.py cluster_by`); DLT materialized views; Photon (serverless default) | ✅ |
 | R4.5 | Warehouse sizing/auto-scaling; cost optimization | `docs/ARCHITECTURE.md` (auto-stop, autoscale, budget alerts, shallow clones); serverless everywhere in practice | 🟡 Documented + serverless; no SQL warehouse provisioned |
 
@@ -105,7 +105,7 @@ Verification anchors: `scripts/validate.py` = 14/14 green (2026-07-19);
 | 2 | `rejected_records`/`batch_log` never written by pipelines (R3.9) | Wire `dq/quarantine_writer.py` logic into `silver_dlt.py` expectations, or extend the DQ agent to snapshot DLT expectation metrics per run |
 | 3 | Delta Share / Marketplace listing (R5.3) | Metastore admin grants CREATE SHARE, then run `data_products/publish_marketplace.sql` |
 | 4 | Account groups for regional RBAC (R3.10) | Account admin creates `sales_analyst_*`/`data_engineer`/`data_steward`; rerun grants in `security/unity_catalog_policies.sql` |
-| 5 | Vector index + RAG serving (R4.3) | Rerun `ai/provision_vector_search.py` once `acme-vs` is ONLINE; then `ai/rag_agent.py` needs a serving endpoint |
+| 5 | RAG generation layer (R4.3) | Index is live and queryable (proof above) — remaining work is `ai/rag_agent.py`: retrieval-augmented prompt + a Model Serving endpoint |
 | 6 | Marketplace UI not deployed (R6) | Azure App Service / Static Web App deploy of `marketplace-ui/`; point backend at `cfg.product_registry` + trust view |
 | 7 | Trust dashboard not live (R5.2) | Create SQL warehouse → import `dashboards/dq_trust_dashboard.sql` as AI/BI dashboard |
 | 8 | Read-only interview access (R8.1) | Workspace admin invites reviewer as workspace user with SELECT-only grants on the 4 catalogs |
