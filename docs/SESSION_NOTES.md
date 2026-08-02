@@ -183,3 +183,83 @@ read-only access) or scoped as production/stretch work (bronze ingestion templat
 writer wiring, RAG generation layer, marketplace UI, trust dashboard) are now framed as
 consciously out of scope for this exercise rather than unfinished work. Nothing in that table
 blocks the demo.
+
+## 2026-08-02 (later) — Presentation expanded 19 → 23 slides: platform-depth showcase + live proof
+User asked for interview-ready slides on advanced Databricks/Azure/AI-BI/agentic capabilities,
+sourced from docs/, inserted after "Data products" and before "Value" (deck stayed at
+`presentation/index.html`; the root-level `presentation.html` is the stale pre-rename original,
+untouched). Four new slides, each self-contained (eyebrow + lead so they don't need narration):
+- **Databricks depth** — capability matrix across 4 categories (Lakeflow/orchestration,
+  governance/performance, AI-BI/GenAI, sharing/apps/DevOps), each item tagged LIVE/design/blocked
+  against `docs/TRACEABILITY_MATRIX.md`, not asserted from memory.
+- **Azure integration** — landing/streaming services (ADLS Gen2, Event Hubs, Litmus) vs. control
+  plane (workspace, Azure DevOps `.azuredevops/azure-pipelines.yml`, secret scope), explicit that
+  the ADO pipeline is designed but has never actually executed a run.
+- **AI/BI maturity** — reused the existing `.road`/`.phase` roadmap component as a 4-rung ladder
+  (semantic layer → retrieval → dashboards → generation), citing the 2026-07-31 live vector-search
+  query verification rather than just listing the feature.
+- **Agentic — live proof** — built entirely from *this session's* real HOLD→PROMOTE fix (see the
+  entry above): a before/after check comparison plus the dq_monitor_rca RCA quoted verbatim,
+  making the point that the agents reasoned about a real regression today, not scripted output.
+
+Two small consistency touch-ups to older slides so the deck doesn't contradict itself: the "Data
+quality" slide's footer previously said "10 green today (gaps tracked openly)" — stale after
+today's fix — updated to the current PROMOTE/14-14 result with a forward pointer to the new
+"Agentic — live proof" slide. New CSS added (`.caprow`, `.tag.bad`, `.proofgrid`/`.proof`,
+`.quote`) — all additive, no existing selectors changed. Verified all 4 new slides + the edited
+DQ slide via headless-Chrome screenshots (scratch copies with `go(0)` swapped to the target slide
+index — the deck is a one-slide-visible-at-a-time SPA, so a plain screenshot only ever shows the
+title slide). Not yet committed.
+
+## 2026-08-02 (still later) — v2 deck: `presentation/index_v2.html`, 23 → 31 slides
+User asked for a *new* version (old one preserved at `presentation/index.html` — the root-level
+`presentation.html` is the separate stale pre-rename original, untouched by either version) with:
+requirement-matrix detail on the agentic architecture, ROI moved to the end with POC/synthetic-data
+assumptions up front, per-decision detail from `docs/JUSTIFICATION_NOTES.md`, how RBAC is actually
+achieved (not just the policy), the "8 patterns" stat unpacked, and a slide per architecture/decision
+doc under `docs/`. Asked one clarifying question first — whether `docs/JD_ALIGNMENT.md`'s named
+former employers (BNY, JPMC, UBS, etc.) should appear on-screen — user chose to leave personal
+history out, so no slide was built from that file; it stays private interview-prep material.
+
+Eight new slides added to `presentation/index_v2.html` (23 → 31), each sourced from a specific repo
+file rather than written from memory:
+- **8 patterns** (after Replication) — unpacks the title slide's "8 patterns" stat: all 8 named
+  patterns from `config/replication_sources.yaml`'s header comment, cross-referenced against the
+  14 source rows to get real usage counts per pattern (`zerobus` = 0, designed but unassigned).
+- **Code & data flow** (after the mill diagram) — `docs/CODE_GRAPH.md`'s mermaid graph redrawn as a
+  self-contained monospace box diagram (no mermaid.js/CDN dependency, unlike `AGENT_ARCHITECTURE.html`)
+  — deliberately a file-path-level view distinct from the existing service-level "Cloud architecture"
+  slide, with an explicit real-vs-design-stage-code caption so it doesn't overstate what's deployed.
+- **PIT & Bridge** (after Gold) — the two DV2.0 use cases from `docs/DATA_VAULT_PIT_BRIDGE.md` with
+  their actual example SQL (as-of join, O2C cycle time query) rather than just naming the tables.
+- **RBAC mechanics** (after Governance) — how row filters/masks are *actually* wired: the
+  `is_member('admins')` escape hatch, and the real production incident from 2026-07-19 (`ALTER
+  TABLE ... SET ROW FILTER` rejected against a DLT-materialized table — governance had to move
+  into the pipeline's own `@dlt.table(row_filter=...)` declaration instead).
+- **Agentic — traceability** (after Agents) — ties the 6 deployed agents to requirement R9.1 in
+  `docs/TRACEABILITY_MATRIX.md` and names the 4 still-design-only agent specs (`pipeline_healer.md`,
+  `ingestion_registrar.md`, `lineage_doc_agent.md`, `dq_rca_agent.md`) so the gap is explicit, not
+  hidden.
+- **Decisions I/II/III** (Ingestion / Modeling / Platform, before Risks) — all 11 decisions from
+  `docs/JUSTIFICATION_NOTES.md`, each with its "why" and both rejected alternatives, as three
+  4-column tables grouped thematically rather than numerically (was 3+4+4, not the source doc's
+  1-11 order) so each slide has a coherent theme.
+
+Plus the two structural changes: the **Value/ROI slide moved from mid-deck to immediately before
+Q&A** (after Risks), and gained an assumptions panel at the top — explicit that the $1.2M model is
+built against `scripts/generate_synthetic_data.py` output, not acme's real volumes, and every dollar
+figure is a bottom-up rate model, not an observed outcome. First version of that panel pushed the
+roadmap below the 1000px screenshot viewport (harmless — `.slide` has `overflow-y:auto` — but not
+ideal for a live presentation); tightened the panel's padding/copy and re-verified it fits without
+scrolling at 1600×1000.
+
+Scoping calls made without asking (flagged here, not blocking): skipped dedicated slides for
+`docs/GAP_ANALYSIS.md` (superseded findings from before the DV2.0 pivot — presenting them now would
+read as current, misleadingly) and `docs/SESSION_NOTES.md`/`docs/DEMO_RUNBOOK.md` (process/dev-log
+docs, not architecture content). `docs/ARCHITECTURE.md`, `DATA_MODEL.md`, `REPLICATION_PATTERNS.md`,
+and `TRACEABILITY_MATRIX.md` didn't get new dedicated slides since the existing v1 slides (and the
+new ones above) already derive from them.
+
+All 9 new-or-changed slides verified via headless-Chrome screenshots (same scratch-copy-with-`go(N)`
+technique as the v1 session). Not yet committed — both `index.html` (v1, untouched) and
+`index_v2.html` (v2) currently sit as uncommitted new/modified files.

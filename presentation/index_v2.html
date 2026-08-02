@@ -260,6 +260,35 @@ td:first-child{color:var(--bright)}
   same registration via <code>deploy.py --register-source</code>.</p>
 </section>
 
+<!-- 4a EIGHT PATTERNS -->
+<section class="slide" data-title="8 patterns">
+  <div class="eyebrow">Ingestion estate · the "8 patterns" stat, unpacked</div>
+  <h2>Eight <span class="molten">named</span> patterns cover all fourteen sources</h2>
+  <p class="lead">Every row in <code>config/replication_sources.yaml</code> declares one of these — the pattern
+  name is the only thing that changes to swap a connector, per <code>docs/REPLICATION_PATTERNS.md</code>.</p>
+  <table>
+    <tr><th>pattern</th><th>mechanism</th><th>sources using it</th><th>status</th></tr>
+    <tr><td>goldengate</td><td>OGG Extract → ADLS <code>avro_op</code> → Auto Loader → AUTO CDC</td>
+      <td class="mono">7 · SAP ×4, JDE ×2, EBS ×1</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>lakeflow_query</td><td>Lakeflow Connect query-based connector, cursor column, no gateway</td>
+      <td class="mono">1 · EBS AR (native alt to goldengate)</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>lakeflow_d365</td><td>Lakeflow Connect managed Dynamics 365 connector</td>
+      <td class="mono">1 · D365 salesorders</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>lakeflow_sqlserver</td><td>Lakeflow Connect SQL Server CDC / Change Tracking gateway</td>
+      <td class="mono">1 · QAD so_mstr</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>autoloader_file</td><td>API / file export landing → Auto Loader (cloudFiles)</td>
+      <td class="mono">1 · Salesforce opportunity</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>litmus_eventhub</td><td>Litmus Edge UNS → Event Hubs (Kafka API) → Structured Streaming</td>
+      <td class="mono">2 · OT furnace, MES rollmill</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>litmus_adls</td><td>Litmus Edge UNS → ADLS parquet → Auto Loader</td>
+      <td class="mono">1 · OT caster history</td><td><span class="tag ok">active</span></td></tr>
+    <tr><td>zerobus</td><td>Lakeflow Connect direct-write API, &lt;5s latency, drops the Event Hubs hop</td>
+      <td class="mono">0 · designed, not yet assigned</td><td><span class="tag">design</span></td></tr>
+  </table>
+  <p class="mono" style="margin-top:14px">Swapping a source between patterns is a one-line YAML edit — e.g. EBS AR moved
+  from goldengate (R1) to lakeflow_query (R1b) when the connector went GA, with zero template code changes.</p>
+</section>
+
 <!-- 5 ARCHITECTURE (signature mill diagram) -->
 <section class="slide" data-title="Architecture">
   <div class="eyebrow">Medallion architecture</div><h2>Data rolls through the mill — click a stand</h2>
@@ -304,6 +333,39 @@ td:first-child{color:var(--bright)}
   <div id="layerinfo" class="panel hotline"><h3>Bronze — schema-on-write mirror, schema-on-read escape hatch</h3>
     <p>Source 3NF structures preserved; every table carries <code>_source_system, _ingest_ts, _batch_id, _op_type, _seq, _raw</code>.
     DLT expectations quarantine bad rows into <code>audit.rejected_records</code> with the failed rule and DAMA dimension.</p></div>
+</section>
+
+<!-- 5z CODE & DATA-FLOW GRAPH -->
+<section class="slide" data-title="Code & data flow">
+  <div class="eyebrow">Repo map · docs/CODE_GRAPH.md</div>
+  <h2>Same system, <span class="molten">file-level</span> this time — every box is a real path in the repo</h2>
+  <pre>Sources (SAP/EBS · SQL Server/QAD · Salesforce · OT via Litmus)
+        │
+        ▼   <span class="c">config/replication_sources.yaml — one YAML row per source, drives everything below</span>
+  ingestion/templates/bronze_ingest_template.py ──► <span class="k">acme_bronze</span>
+        │
+        ▼   pipelines/silver_dlt.py
+  <span class="k">acme_silver</span>   3NF · insert-only · hk = sha256(source_system|pk)
+        │
+        ▼   pipelines/gold_dlt.py
+  <span class="k">acme_gold</span>   star + agg  ──┬─► pit_customer            <span class="c">DV2.0 point-in-time</span>
+                       └─► bridge_order_fulfillment  <span class="c">DV2.0 bridge</span>
+        │
+        ├─► ml/feature_store.py ─────────────► Lakebase / online features
+        ├─► ai/vector_search_rag.py ─────────► Vector Search / RAG
+        └─► data_products/publish_marketplace.sql ─► Marketplace · marketplace-ui/
+
+  dq/dama_dq_framework.py ──gates──► Silver &amp; Gold ──breach──► agents/dq_rca_agent.md
+  Lakeflow job failure ─────────────────────────────────────► agents/pipeline_healer.md
+  scripts/validate.py ──14-check CI gate──► every layer above
+  databricks.yml + resources/pipelines.yml (DAB) ──deploys──► silver_dlt.py &amp; gold_dlt.py
+  sql/*.sql ──traces a row end to end──► Bronze · Silver · Gold</pre>
+  <p class="mono" style="margin-top:14px">Real vs. design in this graph: <code>silver_dlt.py</code> / <code>gold_dlt.py</code>,
+  <code>validate.py</code>, the DAB deploy path, and <code>sql/*.sql</code> are deployed and run against live data today.
+  <code>ingestion/templates/</code>, <code>ml/feature_store.py</code>, <code>ai/vector_search_rag.py</code>,
+  <code>data_products/publish_marketplace.sql</code>, and the two <code>agents/*.md</code> specs shown here are
+  design-stage code in-repo, not yet deployed — the six agents that <b>are</b> deployed (a different, Python set) are
+  covered in "Agent stack" / "Agents" ahead.</p>
 </section>
 
 <!-- 5a CLOUD ARCHITECTURE -->
@@ -458,6 +520,45 @@ new version  ⇒  new row (effective_ts)
   <p style="margin-top:18px" class="mono">melt_to_margin: furnace_heat_5min (OT) ⨝ fact_sales_orders — chemistry & energy joined to margin.</p>
 </section>
 
+<!-- 7a PIT & BRIDGE -->
+<section class="slide" data-title="PIT & Bridge">
+  <div class="eyebrow">DV2.0 payoff · docs/DATA_VAULT_PIT_BRIDGE.md</div>
+  <h2>Two query-assist tables turn <span class="molten">"cheap to store"</span> into cheap to query too</h2>
+  <div class="cols">
+    <div class="panel hotline"><h3>pit_customer — point-in-time</h3>
+      <p style="font-size:13.5px">Grain: one row per <code>(snapshot_date, customer_hk)</code>. Daily spine from first
+      customer version to today — equality join, no BETWEEN range scan.</p>
+      <pre><span class="c">-- as-of join: 2 equality joins, zero range scans</span>
+SELECT l.label_date, c.customer_name, c.country
+FROM   labels l
+JOIN   pit_customer p
+       ON p.customer_hk = l.customer_hk
+      AND p.snapshot_date = l.label_date
+JOIN   silver.customer c
+       ON c.hk = p.customer_hk AND c.effective_ts = p.as_of_ts;</pre>
+      <ul style="margin-top:8px;font-size:13px">
+        <li>Leakage-free ML training — features never see labels' future</li>
+        <li>Reproducible month-end reporting — re-run January in July, get January's truth</li>
+        <li>Audit evidence — which region row-filter applied on a given date</li></ul></div>
+    <div class="panel hotline"><h3>bridge_order_fulfillment — lifecycle bridge</h3>
+      <p style="font-size:13.5px">Grain: one row per current order, pre-joined to shipment + invoice hash
+      keys (NULL until each stage exists) — one join instead of walking the lifecycle.</p>
+      <pre><span class="c">-- order-to-cash cycle time + backlog, one table, one GROUP BY</span>
+SELECT source_system,
+  avg(datediff(invoice_date, order_date)) AS o2c_days,
+  count_if(NOT is_shipped)                AS backlog
+FROM   bridge_order_fulfillment
+GROUP  BY source_system;</pre>
+      <ul style="margin-top:8px;font-size:13px">
+        <li>Order-to-cash cycle time, no 3-table join for analysts or Genie</li>
+        <li>Backlog dashboards from a WHERE clause on two booleans</li>
+        <li>NL-friendly — one join path, no hallucination risk</li></ul></div>
+  </div>
+  <p class="mono" style="margin-top:14px">Both are batch materialized views in <code>gold_dlt.py</code>, recomputed per
+  run — derived, safe to <code>CREATE OR REPLACE</code>; truth stays in Silver history. <code>validate.py</code> checks 13
+  (PIT freshness) and 14 (bridge FK integrity) gate both in CI.</p>
+</section>
+
 <!-- 8 CONFIG -->
 <section class="slide" data-title="Config-driven">
   <div class="eyebrow">Config over code</div><h2>Mappings are data, so change is governed</h2>
@@ -523,6 +624,41 @@ engineers / execs → all rows</pre>
       <tr><td>data_steward</td><td>unmasked PII, DQ tooling</td></tr>
       <tr><td>ot_engineer</td><td>bronze.ot</td></tr>
       <tr><td>exec_readonly</td><td>products + dashboards</td></tr></table></div>
+  </div>
+</section>
+
+<!-- 10z RBAC MECHANICS -->
+<section class="slide" data-title="RBAC mechanics">
+  <div class="eyebrow">Governance · how it's actually wired, not just the policy</div>
+  <h2>Row filters &amp; masks live in the <span class="molten">pipeline definition</span>, not a bolt-on GRANT</h2>
+  <div class="cols">
+    <div class="panel"><h3>The function</h3>
+      <pre><span class="k">CREATE FUNCTION</span> acme_gold.sec.region_filter(source_system STRING)
+<span class="k">RETURN</span> is_member('admins')
+   <span class="k">OR</span> (is_member('sales_analyst_eu')    AND source_system='SAP')
+   <span class="k">OR</span> (is_member('sales_analyst_am')    AND source_system='JDE')
+   <span class="k">OR</span> (is_member('sales_analyst_emea')  AND source_system='QAD');
+
+<span class="k">CREATE FUNCTION</span> acme_gold.sec.mask_customer_name(name STRING)
+<span class="k">RETURN CASE WHEN</span> is_member('data_steward') OR is_member('admins')
+       <span class="k">THEN</span> name <span class="k">ELSE</span> concat(left(name,2),'*****') <span class="k">END</span>;</pre>
+      <p style="margin-top:8px;font-size:13px"><code>is_member('admins')</code> is a deliberate, temporary escape
+      hatch — it kept the owner's own visibility while the real account groups didn't exist yet, not a
+      permanent backdoor.</p></div>
+    <div class="panel coolline"><h3>The hard-won lesson</h3>
+      <p style="font-size:13.5px">First attempt: <code>ALTER TABLE ... SET ROW FILTER</code> against a
+      DLT-materialized table → <b>rejected</b> ("expects a table but is a view"). DLT publishes materialized
+      views under the hood; row filters/masks can't be bolted on after the fact.</p>
+      <p style="font-size:13.5px;margin-top:8px"><b>Fix:</b> declare governance <i>inside</i> the pipeline
+      definition itself —</p>
+      <pre>@dlt.table(row_filter=<span class="c">"ROW FILTER acme_gold.sec.region_filter ON (source_system)"</span>)
+<span class="k">def</span> fact_sales_orders(): ...
+
+<span class="c">-- dim_customer.customer_name gets a MASK in the same publish schema DDL</span></pre>
+      <p style="margin-top:8px;font-size:13px">Verified live in <code>information_schema</code>; validate.py checks
+      8–9 both PASS. GRANTs to the actual groups are staged in
+      <code>security/unity_catalog_policies.sql</code> — blocked on account-admin group creation
+      (<code>PRINCIPAL_DOES_NOT_EXIST</code>), not a design gap.</p></div>
   </div>
 </section>
 
@@ -612,6 +748,37 @@ engineers / execs → all rows</pre>
       <li>New high-churn accounts flagged → HTML report to leads</li></ul></div>
   </div>
   <p class="mono" style="margin-top:12px">Guardrails on all six: read-only on prod data · act via PRs &amp; versioned config inserts · bounded retries · full decision audit · human owns the merge button.</p>
+</section>
+
+<!-- 10c AGENTIC TRACEABILITY -->
+<section class="slide" data-title="Agentic — traceability">
+  <div class="eyebrow">Agentic AI architecture · requirement R9.1, docs/TRACEABILITY_MATRIX.md</div>
+  <h2>Six agents <span class="molten">live</span>, four more <span class="molten">specified</span> — named, not hidden</h2>
+  <div class="cols">
+    <div class="panel hotline"><h3>Deployed &amp; validated in LLM mode</h3>
+      <table><tr><th>agent</th><th>job / task</th></tr>
+        <tr><td>dq_monitor_rca</td><td class="mono">acme_agents_scheduled</td></tr>
+        <tr><td>operational_intel</td><td class="mono">acme_agents_scheduled</td></tr>
+        <tr><td>schema_evolution</td><td class="mono">acme_agents_on_demand</td></tr>
+        <tr><td>vector_content</td><td class="mono">acme_agents_on_demand</td></tr>
+        <tr><td>deployment_gate</td><td class="mono">acme_agents_on_demand</td></tr>
+        <tr><td>product_creator</td><td class="mono">acme_agents_on_demand</td></tr></table></div>
+    <div class="panel"><h3>Specified, design-only (<code>agents/*.md</code>)</h3>
+      <ul><li><b>dq_rca_agent.md</b> — the RCA spec; deployed <code>dq_monitor_rca.py</code> implements a live version</li>
+      <li><b>pipeline_healer.md</b> — schema drift → mapping PR; infra failure → smart retry</li>
+      <li><b>ingestion_registrar.md</b> — new-source onboarding automation</li>
+      <li><b>lineage_doc_agent.md</b> — auto-generates lineage documentation from cfg tables</li></ul>
+      <p class="mono" style="margin-top:10px">Per TRACEABILITY_MATRIX R9.1: "6 live; 4 spec'd agents design-only."</p></div>
+  </div>
+  <div class="strip" style="margin-top:4px">
+    <span><b>THE CONTRACT</b> (<code>agent_core.py</code>, shared by all six) — deterministic phase always runs and
+    writes the artifact, model or no model; reasoning phase is strictly additive, only fires if an Anthropic key resolves</span>
+  </div>
+  <div class="strip">
+    <span><b>GUARDRAILS</b> — one tool, read-only (<code>run_sql</code>, hard-guarded to SELECT/WITH/SHOW/DESCRIBE) ·
+    all writes happen in deterministic code, after reasoning · full audit trail (<code>audit.agent_runs</code> +
+    <code>audit.agent_reports</code>) · 12-turn tool budget with a forced finalization turn · human owns the merge button</span>
+  </div>
 </section>
 
 <!-- 11 PRODUCTS -->
@@ -755,9 +922,91 @@ PLCs/SCADA ─Litmus Edge─► Event Hubs (Kafka) or ADLS parquet ─► Struct
   source is registered. Zero non-null orphans, so the check stays green — the agent named the blind spot anyway.</p>
 </section>
 
-<!-- 12 VALUE -->
+<!-- 12a DECISION LOG I -->
+<section class="slide" data-title="Decisions I · Ingestion">
+  <div class="eyebrow">Decision log · docs/JUSTIFICATION_NOTES.md · 1 of 3</div>
+  <h2>Every ingestion choice has <span class="molten">two rejected alternatives</span> on record</h2>
+  <table>
+    <tr><th>#</th><th>decision</th><th>why</th><th>alternatives rejected</th></tr>
+    <tr><td>1</td><td>GoldenGate → ADLS → Auto Loader (Oracle / EBS)</td>
+      <td>Reuses existing OGG licenses/skills; ADLS landing decouples capture from compute; <code>avro_op</code> carries op_type+CSN for exact replay</td>
+      <td>Lakeflow Connect Oracle — adopt at GA, YAML pattern swap only · OGG→Kafka→streaming — only if multiple consumers need the CDC stream</td></tr>
+    <tr><td>2</td><td>SQL Server via Lakeflow Connect, replacing Fabric Mirroring</td>
+      <td>Single governance plane (Unity Catalog), managed CDC, no OneLake hop, serverless processing</td>
+      <td>Keep Mirroring + external location/shortcut — cheapest, but split governance, two copies of truth · Debezium+Event Hubs — max control/latency, highest run cost &amp; on-call burden</td></tr>
+    <tr><td>3</td><td>OT via Litmus → Event Hubs (default), ADLS-parquet fallback</td>
+      <td>Litmus already normalizes to UNS at the edge; Event Hubs gives sub-minute freshness; parquet path stays for high-volume historians</td>
+      <td>Azure IoT Operations — duplicates Litmus's job · Direct historian JDBC pulls — batch-only, loses tags/UNS context</td></tr>
+  </table>
+</section>
+
+<!-- 12b DECISION LOG II -->
+<section class="slide" data-title="Decisions II · Modeling">
+  <div class="eyebrow">Decision log · docs/JUSTIFICATION_NOTES.md · 2 of 3</div>
+  <h2>The modeling choices trade <span class="molten">object count</span> for <span class="molten">query simplicity</span></h2>
+  <table>
+    <tr><th>#</th><th>decision</th><th>why</th><th>alternatives rejected</th></tr>
+    <tr><td>4</td><td>Insert-only Silver, SHA-256 hash keys</td>
+      <td>Deterministic keys across 3 ERPs (system|pk); full history for free; merge-free = fast streaming writes</td>
+      <td>SCD2 with MERGE — familiar, but update-heavy, slower streams, key drift risk · Identity surrogate keys — compact joins, but non-deterministic across reloads/environments</td></tr>
+    <tr><td>5</td><td>DV2.0 <i>methodology</i>, not DV2.0 objects (3NF Silver + hash keys)</td>
+      <td>Hash keys play the hub-key role, insert-only versions play satellites, PIT/bridge materialize in Gold — without hub/link/sat table explosion for a single-domain pilot</td>
+      <td>Full raw vault (hubs/links/sats) — max auditability, defensible at enterprise scale-out, but 3–4× the tables/pipelines · One Big Table / plain Kimball star — fastest to first dashboard, loses deterministic keys and history-by-default</td></tr>
+    <tr><td>10</td><td>PIT as a materialized daily spine (<code>pit_customer</code>)</td>
+      <td>Equality joins (snapshot_date, hk) replace BETWEEN range scans; one blessed as-of path kills ML label leakage; reproducible month-end reports</td>
+      <td>Query-time AS OF / range joins — zero storage, but every consumer rewrites (and mis-writes) temporal logic · SCD2 dim with valid_from/valid_to — familiar to BI, but needs UPDATE, breaking insert-only Silver</td></tr>
+    <tr><td>11</td><td>Bridge as pre-joined lifecycle keys (<code>bridge_order_fulfillment</code>)</td>
+      <td>Order→shipment→invoice in ONE join for O2C cycle time, backlog flags, and Genie; NULLs mark incomplete stages honestly</td>
+      <td>Multi-hop joins in the BI/semantic layer — no extra storage, but every tool re-encodes join paths · Denormalize into a wide fact — fastest reads, but grain explosion and full reload on late-arriving stages</td></tr>
+  </table>
+</section>
+
+<!-- 12c DECISION LOG III -->
+<section class="slide" data-title="Decisions III · Platform">
+  <div class="eyebrow">Decision log · docs/JUSTIFICATION_NOTES.md · 3 of 3</div>
+  <h2>Platform choices favor <span class="molten">config and governance</span> over hand-built logic</h2>
+  <table>
+    <tr><th>#</th><th>decision</th><th>why</th><th>alternatives rejected</th></tr>
+    <tr><td>6</td><td>Config tables for source→target mapping, every layer</td>
+      <td>Changes = versioned inserts (lineage built-in); agents and humans share one contract; no code edits to onboard sources</td>
+      <td>dbt-style code-as-mapping — great for analysts, weaker for non-SQL OT pipelines · Hardcoded notebooks — fastest day 1, unscalable day 30</td></tr>
+    <tr><td>7</td><td>DQ as DAMA 6 dimensions, quarantine + thresholds that fail jobs</td>
+      <td>Business-recognizable scoring; row-level rejects with reasons; breach triggers the RCA agent</td>
+      <td>DLT expectations only — great inline, but no cross-table/dimension scoring · Great Expectations — rich, but another runtime; revisit at multi-domain scale</td></tr>
+    <tr><td>8</td><td>Region access via UC row filters keyed on source_system</td>
+      <td>EUROPE→SAP, AMERICAS→JDE, EMEA→QAD maps 1:1 to source_system; one function, applied to every Gold table</td>
+      <td>Separate regional catalogs — strong isolation, but triples objects · BI-tool security — bypassable via SQL, audit gap</td></tr>
+    <tr><td>9</td><td>Marketplace = Delta Sharing/Marketplace + thin custom portal</td>
+      <td>Native listing handles entitlements; portal adds branded discovery + AI search without owning access control</td>
+      <td>Portal-only with direct grants — re-implements entitlements · Third-party catalog (Collibra/Atlan) — strong governance suite, heavy for a pilot</td></tr>
+  </table>
+</section>
+
+<!-- 13 RISKS -->
+<section class="slide" data-title="Risks">
+  <div class="eyebrow">Risks & mitigation</div><h2>Where it can break, and what's already in place</h2>
+  <table>
+    <tr><th>risk</th><th>mitigation</th></tr>
+    <tr><td>Lakeflow Connect connector maturity/availability</td><td>Pattern abstraction: YAML swap back to GG/ADF path; no downstream change</td></tr>
+    <tr><td>OT volume spikes (campaign starts)</td><td>Watermarks + autoscaling streams; parquet batch path as pressure valve</td></tr>
+    <tr><td>ERP source schema drift</td><td>Healer agent proposes versioned mapping; <code>_raw</code> column preserves payload</td></tr>
+    <tr><td>Cost creep</td><td>Serverless auto-stop, budget policies, system.billing alerts, validate.py in CI</td></tr>
+    <tr><td>Hash collisions (theoretical)</td><td>SHA-256 over namespaced input; collision probability negligible at any realistic scale; uniqueness DQ check watches anyway</td></tr>
+    <tr><td>Agent overreach</td><td>Agents are read-only on prod data; act via PRs & config inserts; human review gate</td></tr>
+  </table>
+</section>
+
+<!-- 12 VALUE (moved to close the pitch, right before Q&A) -->
 <section class="slide" data-title="Value">
   <div class="eyebrow">Business value · ROI</div><h2>$1.2M annual value — <span class="molten">conservatively estimated</span>, payback &lt; 6 months</h2>
+  <div class="panel" style="border-top:3px solid var(--cool);padding:10px 20px;margin-bottom:14px">
+    <h3 style="margin-bottom:3px">Assumptions — read this before the numbers</h3>
+    <p style="font-size:12.5px;line-height:1.45">Proof of concept, validated against <b>generated synthetic data</b>
+    (<code>scripts/generate_synthetic_data.py</code> — ~25.9K records, 13,000 orders), not acme's actual production
+    volumes or costs. Every figure below is a <b>bottom-up model</b> — industry-typical rates applied to this build's
+    data structure, not an observed outcome. Read it as "the mechanism and how it would be quantified," not a
+    measured result; the real number needs one quarter against actual acme volumes.</p>
+  </div>
   <div class="valgrid">
     <div class="val"><b>$420K</b><h3>Reporting efficiency</h3><p>65% cut in report prep time — pre-aggregated Gold views eliminate manual data work for ~12 analyst FTEs.</p></div>
     <div class="val"><b>$480K</b><h3>Churn prevention (ML)</h3><p>~40 at-risk enterprise accounts/month flagged 72h early via PIT-correct features; 10% intervention success.</p></div>
@@ -777,7 +1026,7 @@ PLCs/SCADA ─Litmus Edge─► Event Hubs (Kafka) or ADLS parquet ─► Struct
       <ul><li>Platform run cost ≈ <b>$105K/yr</b> (serverless compute + storage + 0.5 FTE)</li>
         <li>Net year-1 value: $1.2M − $105K ≈ <b>$1.1M · 11.4× ROI</b></li>
         <li>18-month roadmap cumulative: <b>$7.6M</b> value on ~$315K invest ≈ <b>24×</b></li>
-        <li>Every figure decomposes to a countable driver — defensible line by line</li></ul></div>
+        <li>Every figure decomposes to a countable driver — defensible line by line, on the assumptions above</li></ul></div>
   </div>
   <div class="road">
     <div class="phase"><div class="dot">1</div><h3>Pilot</h3><span>0–3 mo · this build · $1.2M/yr</span>
@@ -789,20 +1038,6 @@ PLCs/SCADA ─Litmus Edge─► Event Hubs (Kafka) or ADLS parquet ─► Struct
     <div class="phase future"><div class="dot">4</div><h3>Intelligence</h3><span>12–18 mo · +$3.5M/yr</span>
       <ul><li>NL SQL for all users</li><li>Autonomous DQ remediation</li></ul></div>
   </div>
-</section>
-
-<!-- 13 RISKS -->
-<section class="slide" data-title="Risks">
-  <div class="eyebrow">Risks & mitigation</div><h2>Where it can break, and what's already in place</h2>
-  <table>
-    <tr><th>risk</th><th>mitigation</th></tr>
-    <tr><td>Lakeflow Connect connector maturity/availability</td><td>Pattern abstraction: YAML swap back to GG/ADF path; no downstream change</td></tr>
-    <tr><td>OT volume spikes (campaign starts)</td><td>Watermarks + autoscaling streams; parquet batch path as pressure valve</td></tr>
-    <tr><td>ERP source schema drift</td><td>Healer agent proposes versioned mapping; <code>_raw</code> column preserves payload</td></tr>
-    <tr><td>Cost creep</td><td>Serverless auto-stop, budget policies, system.billing alerts, validate.py in CI</td></tr>
-    <tr><td>Hash collisions (theoretical)</td><td>SHA-256 over namespaced input; collision probability negligible at any realistic scale; uniqueness DQ check watches anyway</td></tr>
-    <tr><td>Agent overreach</td><td>Agents are read-only on prod data; act via PRs & config inserts; human review gate</td></tr>
-  </table>
 </section>
 
 <!-- 14 CLOSE -->
