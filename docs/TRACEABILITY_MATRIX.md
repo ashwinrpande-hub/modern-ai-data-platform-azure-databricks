@@ -3,10 +3,21 @@
 Source: "requirements azure databricks data vault" spec (Nucor tech challenge).
 Status legend — ✅ **Deployed & validated** (running in workspace adb-7405618665227003,
 verified this build) · 🟡 **Partial** (core deployed, named remainder open) ·
-📘 **Design-only** (code/docs in repo, not deployed) · ❌ **Gap** (not built).
+📘 **Design-only** (code/docs in repo, not deployed) · ❌ **Gap** (not built) ·
+⏸️ **Deferred (POC scope)** (consciously out of scope for this exercise — blocked on
+account-admin action outside repo owner's permissions, or would only be built for a
+production rollout, not a proof-of-concept).
 
-Verification anchors: `scripts/validate.py` = 14/14 green (2026-07-19);
+Verification anchors: `scripts/validate.py` = 14/14 green, re-verified live by `deployment_gate`
+with a PROMOTE recommendation (2026-08-02, after rerunning `silver_pipeline`/`gold_pipeline` and
+the DQ agent to clear a 12-day staleness regression — see `docs/SESSION_NOTES.md`);
 `audit.agent_runs` / `agent_reports` = agent evidence; `sql/03` = zero-orphan lineage.
+Known non-blocking blind spot found in this re-verification: 3,000 QAD fact rows have
+`customer_hk = NULL` (no QAD customer-master source registered) — the FK check only counts
+non-null orphans so it stays green; pre-existing, not a regression. Also unchanged and
+by design for this POC: `orders_arriving_30d`/`bronze_ingest_fresh_24h` DQ checks fail because
+the synthetic data generator caps business dates at 2026-05-16 and bronze is a one-time seed,
+not live ingestion (see gap #1 below) — this does not affect `validate.py`'s own 14 checks.
 
 ## 1 — Replication / ingestion patterns
 
@@ -99,13 +110,20 @@ Verification anchors: `scripts/validate.py` = 14/14 green (2026-07-19);
 
 **28 requirements: 17 ✅ · 12 🟡 · 4 📘 · 2 ❌** (some IDs span categories).
 
-| # | Gap | Smallest closing action |
-|---|-----|------------------------|
-| 1 | Bronze ingestion pipelines not deployed (R1.1–R1.4) | Deploy `ingestion/templates/bronze_ingest_template.py` as a DLT pipeline for ONE pattern (autoloader_file over `data/` uploads) to prove the template |
-| 2 | `rejected_records`/`batch_log` never written by pipelines (R3.9) | Wire `dq/quarantine_writer.py` logic into `silver_dlt.py` expectations, or extend the DQ agent to snapshot DLT expectation metrics per run |
-| 3 | Delta Share / Marketplace listing (R5.3) | Metastore admin grants CREATE SHARE, then run `data_products/publish_marketplace.sql` |
-| 4 | Account groups for regional RBAC (R3.10) | Account admin creates `sales_analyst_*`/`data_engineer`/`data_steward`; rerun grants in `security/unity_catalog_policies.sql` |
-| 5 | RAG generation layer (R4.3) | Index is live and queryable (proof above) — remaining work is `ai/rag_agent.py`: retrieval-augmented prompt + a Model Serving endpoint |
-| 6 | Marketplace UI not deployed (R6) | Azure App Service / Static Web App deploy of `marketplace-ui/`; point backend at `cfg.product_registry` + trust view |
-| 7 | Trust dashboard not live (R5.2) | Create SQL warehouse → import `dashboards/dq_trust_dashboard.sql` as AI/BI dashboard |
-| 8 | Read-only interview access (R8.1) | Workspace admin invites reviewer as workspace user with SELECT-only grants on the 4 catalogs |
+**POC scope note (2026-08-02):** this build is a proof-of-concept for an interview/demo
+exercise, not a production handover. The core exercise — medallion + DV2.0, governance,
+agents, AI-ready layer — is ✅/🟡 above and running. The items below are consciously deferred
+rather than active engineering work: most are blocked on account-admin actions outside the
+repo owner's permissions, or are scoped for a real production rollout rather than this
+exercise. Nothing here blocks the demo.
+
+| # | Item | Why deferred (POC scope) | Path to production |
+|---|------|---------------------------|---------------------|
+| 1 | Bronze ingestion pipelines not deployed (R1.1–R1.4) | Synthetic seed stands in for live ingestion — sufficient to prove the medallion/DV2.0/governance/agent stack end to end | Deploy `ingestion/templates/bronze_ingest_template.py` as a DLT pipeline for ONE pattern (autoloader_file over `data/` uploads) |
+| 2 | `rejected_records`/`batch_log` never written by pipelines (R3.9) | Tables + design already exist (`dq/quarantine_writer.py`); wiring is incremental, not needed to demonstrate the DQ pattern (`audit.dq_results` already populated by the agent) | Wire `dq/quarantine_writer.py` into `silver_dlt.py` expectations |
+| 3 | Delta Share / Marketplace listing (R5.3) | ⏸️ Blocked on metastore-admin grant (CREATE SHARE) — outside repo owner's permissions | Metastore admin grants CREATE SHARE, then run `data_products/publish_marketplace.sql` |
+| 4 | Account groups for regional RBAC (R3.10) | ⏸️ Blocked on account-admin group creation — the row-filter/mask policies themselves are live and validated (checks 8–9 ✅) | Account admin creates `sales_analyst_*`/`data_engineer`/`data_steward`; rerun grants in `security/unity_catalog_policies.sql` |
+| 5 | RAG generation layer (R4.3) | Retrieval half is live and live-query-verified (semantic match confirmed); generation is a thin wrapper not needed to prove the retrieval pattern | Build `ai/rag_agent.py` (retrieval-augmented prompt) + a Model Serving endpoint on top of the live index |
+| 6 | Marketplace UI not deployed (R6) | Explicit stretch goal in the requirement doc; independent front-end, not core to the data platform exercise | Azure App Service / Static Web App deploy of `marketplace-ui/`; point backend at `cfg.product_registry` + trust view |
+| 7 | Trust dashboard not live (R5.2) | Needs a standing SQL warehouse (ongoing cost for a POC); the view backing it, `meta.v_product_trust_scores`, is already live | Create SQL warehouse → import `dashboards/dq_trust_dashboard.sql` as AI/BI dashboard |
+| 8 | Read-only interview access (R8.1) | ⏸️ One-time manual admin step, not an engineering task | Workspace admin invites reviewer as workspace user with SELECT-only grants on the 4 catalogs |

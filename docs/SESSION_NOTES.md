@@ -142,3 +142,44 @@ After merging the sibling repo's design estate, deployed the deployable parts:
   known-gaps prompt updated to "no open gaps — every failure is a candidate regression".
 - RESULT: full validation suite 14/14 GREEN for the first time.
 - docs/DEMO_RUNBOOK.md added — 5-station talking-point sequence + honest-answer cards.
+
+## 2026-07-31 — Docs catch-up: requirements traceability, live data model, agent architecture reference
+(Not logged same-day; reconstructed 2026-08-02 from commit history.) Added
+docs/TRACEABILITY_MATRIX.md (28 requirements scored against live evidence, prioritized gap
+table), docs/DATA_MODEL.md + generated HTML catalog/model docs + Excel export tooling, and
+docs/AGENT_ARCHITECTURE.html (agent guardrail contract, DAB deployment reference, captured
+output from a live agent run). That live run caught a real regression: deployment_gate issued
+HOLD and dq_monitor_rca independently confirmed it — scheduled jobs (DQ agent, gold_pipeline)
+had stopped producing anything since 2026-07-19, so PIT-snapshot and DQ-freshness checks were
+12+ days stale by 2026-07-31. Left unresolved at end of session.
+
+## 2026-08-02 — Cleared the staleness regression; reframed remaining backlog as POC-scope
+User directive: this build is a POC, so run the jobs needed to clear the real regression and
+stop tracking the rest as open engineering work. `databricks bundle deploy` (workspace already
+matched repo) → `silver_pipeline` → `gold_pipeline` (both green, `pit_customer` now stamped
+2026-08-02) → `agents_scheduled_job` (dq_monitor_rca + operational_intel, LLM mode) →
+`agents_on_demand_job --only deployment_gate`. Gate now reports 14/14 PASS, **PROMOTE**.
+
+RCA on the two still-failing *DQ* checks (distinct from validate.py's 14 — these are the DAMA
+checks inside dq_monitor_rca) confirmed two independent, non-fixable-by-rerun root causes: (1)
+`orders_arriving_30d` — synthetic generator (`scripts/generate_synthetic_data.py::_date()`) caps
+business dates at `2025-01-01 + rand(0,500d)` = max 2026-05-16, deterministic (`random.seed(42)`),
+so this check fails permanently as "now" advances past it — by design, previously accepted
+2026-07-18; (2) `bronze_ingest_fresh_24h` — bronze is a one-time seed load, not live ingestion
+(matrix gap #1), so `_ingest_ts` will always eventually exceed 24h. Rerunning pipelines cannot
+fix either; both are POC-scope limitations, not this session's regression (which was specifically
+the *meta*-checks — did DQ run recently, is the PIT snapshot from today — now cleared).
+
+New finding from this run (non-blocking): deployment_gate flagged gold FK check as
+"green-but-blind" — all 3,000 QAD fact rows have `customer_hk = NULL` because no QAD
+customer-master source is registered (`source_registry` has `qad_so_mstr` for orders only);
+the FK check only counts non-null orphans so it stays green. Pre-existing since QAD onboarding
+(2026-07-18), not introduced this session.
+
+docs/TRACEABILITY_MATRIX.md "Score & open gaps" table reframed: added a POC-scope legend entry
+(⏸️) and rewrote the table from "Gap / smallest closing action" to "Item / why deferred (POC
+scope) / path to production" — items blocked on account-admin actions (Delta Share, RBAC groups,
+read-only access) or scoped as production/stretch work (bronze ingestion template, quarantine
+writer wiring, RAG generation layer, marketplace UI, trust dashboard) are now framed as
+consciously out of scope for this exercise rather than unfinished work. Nothing in that table
+blocks the demo.
