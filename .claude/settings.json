@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv --version)",
+      "Bash(c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/.venv/Scripts/python.exe -c ' *)",
+      "Bash(\"c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/.venv/Scripts/python.exe\" 04_build_excel.py)",
+      "Bash(mkdir -p \"c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/data/exports/excel\" *)",
+      "Bash(\"c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/.venv/Scripts/python.exe\" 05_build_deliverables.py)",
+      "Bash(\"c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/.venv/Scripts/python.exe\" 06_generate.py)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:\\\\Users\\\\ashwi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\\\696bee20-21b4-4dac-be6b-ed229428fa27\\\\scratchpad\\\\shot_lineage.png\" --window-size=1600,1100 --virtual-time-budget=4000 \"file:///C:/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/696bee20-21b4-4dac-be6b-ed229428fa27/scratchpad/DATA_CATALOG.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"shot_catalog.png\" --window-size=1500,1200 --virtual-time-budget=4000 \"file:///C:/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/696bee20-21b4-4dac-be6b-ed229428fa27/scratchpad/test_catalog_tab.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"shot_click.png\" --window-size=1600,1100 --virtual-time-budget=4000 \"file:///C:/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/696bee20-21b4-4dac-be6b-ed229428fa27/scratchpad/test_click.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:\\\\Users\\\\ashwi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\\\696bee20-21b4-4dac-be6b-ed229428fa27\\\\scratchpad\\\\shot_catalog.png\" --window-size=1500,1200 --virtual-time-budget=4000 \"file:///C:/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/696bee20-21b4-4dac-be6b-ed229428fa27/scratchpad/test_catalog_tab.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:\\\\Users\\\\ashwi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\\\696bee20-21b4-4dac-be6b-ed229428fa27\\\\scratchpad\\\\shot_click.png\" --window-size=1600,1100 --virtual-time-budget=4000 \"file:///C:/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/696bee20-21b4-4dac-be6b-ed229428fa27/scratchpad/test_click.html\")",
+      "Bash(env)",
+      "Bash(.venv/Scripts/python.exe scripts/build_excel_exports.py)",
+      "Bash(.venv/Scripts/python.exe scripts/generate_data_docs.py)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:\\\\Users\\\\ashwi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\\\696bee20-21b4-4dac-be6b-ed229428fa27\\\\scratchpad\\\\final_lineage.png\" --window-size=1600,1150 --virtual-time-budget=4000 \"file:///c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/docs/DATA_CATALOG.html\")",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(.venv/Scripts/python.exe --version)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:\\\\Users\\\\ashwi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\\\696bee20-21b4-4dac-be6b-ed229428fa27\\\\scratchpad\\\\model_doc.png\" --window-size=1500,1300 --virtual-time-budget=4000 \"file:///c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/docs/DATA_MODEL.html\")",
+      "Bash(git commit -m ' *)",
+      "Bash(export DATABRICKS_CLI_PATH=\"/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.3-win32-x64/bin/databricks.exe\")",
+      "Bash(/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.3-win32-x64/bin/databricks.exe bundle *)",
+      "Bash(/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.3-win32-x64/bin/databricks.exe jobs *)",
+      "Bash(python3 -c \"import datetime; print\\(datetime.datetime.utcfromtimestamp\\(1784437619\\)\\)\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.3-win32-x64/bin/databricks.exe secrets *)",
+      "Bash(/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.3-win32-x64/bin/databricks.exe current-user *)",
+      "Bash(python3 -c ' *)",
+      "Bash('/c/Program Files/Google/Chrome/Application/chrome.exe' --headless --disable-gpu --screenshot=/c/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/f3e9589c-b483-42bb-911b-c0f98beadef8/scratchpad/agent_arch_p0.png --window-size=1440,1400 --virtual-time-budget=4000 file:///c:/Handson/Git/modern-ai-data-platform-azure-databricks-dv2/docs/AGENT_ARCHITECTURE.html)",
+      "Bash(rm -f /c/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/f3e9589c-b483-42bb-911b-c0f98beadef8/scratchpad/run_*.json /c/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/f3e9589c-b483-42bb-911b-c0f98beadef8/scratchpad/output_*.json /c/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/f3e9589c-b483-42bb-911b-c0f98beadef8/scratchpad/*.err /c/Users/ashwi/AppData/Local/Temp/claude/c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2/f3e9589c-b483-42bb-911b-c0f98beadef8/scratchpad/agent_arch_p0.png *)",
+      "Bash(export DATABRICKS_CLI_PATH=\"/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.4-win32-x64/bin/databricks.exe\")",
+      "Bash(/c/Users/ashwi/.vscode/extensions/databricks.databricks-2.12.4-win32-x64/bin/databricks.exe bundle *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ashwi\\AppData\\Local\\Temp\\claude\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\696bee20-21b4-4dac-be6b-ed229428fa27\\scratchpad\\excel_out",
+      "C:\\Users\\ashwi\\AppData\\Local\\Temp\\claude\\c--Handson-Git-modern-ai-data-platform-azure-databricks-dv2\\f3e9589c-b483-42bb-911b-c0f98beadef8\\scratchpad"
+    ]
+  }
+}
