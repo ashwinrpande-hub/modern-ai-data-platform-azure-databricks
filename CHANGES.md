@@ -47,3 +47,65 @@ python scripts/deploy.py --env dev          # now seeds mappings + registry
 databricks bundle deploy -t dev             # pipelines/jobs/lakeflow_jobs.yaml
 python scripts/validate.py --env dev
 ```
+
+---
+
+# 2026-08-13 update — agent self-sufficiency + governance audit + data dictionary
+
+Two threads: (1) research Ralph-loop-style agent self-sufficiency and audit this repo against
+Databricks' own governance/AI-security materials; (2) implement the 4 previously spec-only
+agents and close the biggest concrete gap the audit found (empty column comments). Full detail
+lives in the docs listed below — this is the file-level summary.
+
+## Files
+
+| File | New/Upd | Justification |
+|---|---|---|
+| `docs/ralph_loop.md` | NEW | Ralph loop (self-sufficient agent loop) pattern research, mapped onto this repo's actual agent architecture, plus an Azure Databricks deployment checklist. |
+| `docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md` | NEW | Full repo survey across data governance, data quality, ingestion, and AI-facing data dictionary — what's real vs. aspirational, with file:line citations; found 2 previously-undocumented bugs (a dashboard/table schema mismatch, a vector-content table naming inconsistency). |
+| `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md` | NEW | Chapter-by-chapter comparison against Databricks' "Comprehensive Guide to Data and AI Governance" ebook — full PDF extracted and read directly, not paraphrased from the gated landing page. |
+| `docs/DASF_ALIGNMENT.md` | NEW | Risk-by-risk mapping of the agent architecture against the actual Databricks AI Security Framework (DASF v1.1) whitepaper, Components 9 & 10 (Model Serving — the ones that apply to a hosted-LLM consumer rather than a trained-model server). |
+| `agents/pipeline_healer.py` | NEW | Implements the previously spec-only `pipeline_healer.md` — scans recent DLT pipeline failures via the Databricks SDK, classifies by heuristic (schema drift / bad records / infra / code), drafts remediation into its report. No PR/Slack integration (none provisioned in this workspace). |
+| `agents/dq_rca_agent.py` | NEW | Implements `dq_rca_agent.md` — deepens `dq_monitor_rca`'s output with first-failure-detection + `batch_log` correlation; runs after `dq_monitor_rca` in the job DAG. |
+| `agents/ingestion_registrar.py` | NEW | Implements `ingestion_registrar.md` — validates every row in `config/replication_sources.yaml` (pattern, PK, expectations, region, naming) and flags what's unregistered. |
+| `agents/lineage_doc_agent.py` | NEW | Implements `lineage_doc_agent.md` — builds lineage edges from live `cfg.layer_mappings` plus UC's `system.access.table_lineage` where available, instead of docs/CODE_GRAPH.md's hand-typed edge list. Writes to `agent_reports` only, not the git-tracked docs folder (a job-container file write wouldn't reach the repo). |
+| `agents/README.md` | UPD | Spec/implementation table now reflects reality instead of contradicting the deployed code. |
+| `resources/agents.yml` | UPD | Wires the 4 new agents into `agents_scheduled_job`/`agents_on_demand_job`; adds `pyyaml` to the on-demand job's environment for `ingestion_registrar`. |
+| `config/config_tables.sql` | UPD | Adds `business_definition STRING` to `cfg.layer_mappings` — the config-table source of truth for UC column comments. |
+| `config/seed_layer_mappings.sql` | UPD | 40 real business definitions added, one per mapping row, sourced with multi-system nuance (JDE's Julian date, SAP's doc-currency caveat, etc.). Rewritten in plain ASCII after finding a databricks-connect data-corruption bug (see Gotcha below). |
+| `scripts/apply_column_comments.py` | NEW | Applies `business_definition` values as real UC `ALTER TABLE ... ALTER COLUMN ... COMMENT` statements; concatenates distinct definitions when multiple sources contribute to the same column. |
+| `pipelines/gold_dlt.py` | UPD | `dim_customer`: added a real `customer_key_mdm` deterministic cross-source entity-resolution key (normalized name + country); fixed a table comment that claimed "MDM-survived" when the code only ever deduped SCD versions within one source, never actually resolved entities across SAP/JDE/QAD. Added per-column `COMMENT` clauses to the schema string. |
+
+## Applied live against the workspace (not just files)
+- `acme_bronze.cfg.layer_mappings`: `business_definition` column added via `ALTER TABLE`, then
+  backfilled on all 40 existing rows via a natural-key `MERGE` — deliberately not a raw
+  re-`INSERT` (the live table already had 40 rows from the original deploy; a plain insert
+  would have duplicated them to 80).
+- 24 real UC column comments applied across `acme_silver.sales.{customer,invoice,
+  sales_order_header,shipment}` — independently verified via `information_schema.columns`,
+  not just the script's own success log.
+- `databricks bundle validate` confirmed clean against the live workspace (includes the new
+  agent job wiring).
+
+## Gotcha found this session
+databricks-connect (serverless, this workspace) silently corrupts special characters inside
+SQL `VALUES`-clause string literals passed via `spark.sql(f'...')`: escaped apostrophes (`''`)
+were dropped entirely instead of collapsing to `'`, and em-dashes came back as `�` mojibake.
+Caught by spot-checking an applied value byte-for-byte before trusting it; root cause not
+isolated (Spark Connect transport vs. a `VALUES`-parsing quirk — didn't chase it further).
+Logged in memory (`databricks-tooling-quirks`) so it doesn't cost debugging time again;
+`config/seed_layer_mappings.sql` is deliberately plain-ASCII because of it.
+
+## Deliberately NOT run
+`gold_pipeline` has not been redeployed/run — `dim_customer`'s schema change
+(`customer_key_mdm` + column comments) is committed in code but not live. Run
+`databricks bundle deploy -t dev && databricks bundle run gold_pipeline -t dev` to materialize
+it, then re-verify via `information_schema.columns` the same way the Silver comments were
+verified above.
+
+## Not yet committed as of this entry
+`config/config_tables.sql`, `config/seed_layer_mappings.sql`, `pipelines/gold_dlt.py`
+(modified, unstaged) and `docs/DASF_ALIGNMENT.md`, `scripts/apply_column_comments.py`
+(untracked) — everything else in this section (the 3 audit docs, 4 new agents, README/
+agents.yml wiring) is committed as `1e2fe2c`, `ff9fd24`, `50bb9a3` on `dv2`, 2 commits ahead
+of `origin/dv2` and not yet pushed.
