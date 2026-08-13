@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS acme_bronze.cfg.layer_mappings (
   tgt_table STRING, tgt_column STRING,
   transform_expr STRING,                            -- SQL expression, NULL = passthrough
   dq_rule STRING, version INT, valid_from TIMESTAMP, valid_to TIMESTAMP,
-  changed_by STRING
+  changed_by STRING,
+  business_definition STRING                        -- human/AI-facing meaning of tgt_column;
+                                                      -- applied as a UC column comment by
+                                                      -- scripts/apply_column_comments.py
 );
 
 -- Rejected records (record-level) + batch audit

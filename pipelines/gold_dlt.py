@@ -3,25 +3,48 @@ import dlt
 from pyspark.sql import functions as F
 
 @dlt.table(name="dim_customer",
-           comment="MDM-survived customer dim; PK = customer_hk",
+           comment="Customer dim; PK = customer_hk (one row per source-system record, latest "
+                   "SCD version). customer_key_mdm is a deterministic cross-source "
+                   "entity-resolution key (normalized name + country) — the join point for "
+                   "the same real-world customer appearing under different source_system IDs. "
+                   "On this repo's independently-generated synthetic data, SAP/JDE/QAD "
+                   "customers don't model overlapping real entities, so customer_key_mdm "
+                   "rarely collapses rows today; the mechanism is real and is where a "
+                   "production fuzzy-match step (Zingg/Splink) would plug in for near-"
+                   "duplicates this exact-match misses.",
            table_properties={"delta.enableChangeDataFeed": "true"},
            # Governance is declared here, not via ALTER: DLT-materialized tables reject
            # ALTER TABLE SET ROW FILTER / SET MASK (they are views to the ALTER path).
            # Functions live in acme_gold.sec (security/unity_catalog_policies.sql).
-           schema="""customer_hk STRING,
-                     src_customer_id STRING,
-                     customer_name STRING MASK acme_gold.sec.mask_customer_name,
-                     country STRING,
-                     source_system STRING""",
+           schema="""customer_hk STRING COMMENT 'Silver hash key: sha2(source_system|src_customer_id). Stable per-source FK grain used by fact_sales_orders — never changes when the MDM match logic changes.',
+                     customer_key_mdm STRING COMMENT 'Deterministic cross-source entity-resolution key: sha2(normalized_name|country). Equal across source systems only when name and country match exactly after normalization (case, punctuation, common corporate suffixes stripped).',
+                     src_customer_id STRING COMMENT 'Customer ID as recorded in the source ERP (SAP KUNNR / JDE ABAN8 / QAD so_cust).',
+                     customer_name STRING COMMENT 'Customer legal/short name from the source ERP, pre-match (not yet resolved across sources).' MASK acme_gold.sec.mask_customer_name,
+                     country STRING COMMENT 'ISO-2 country code of the customer address, as recorded by the source ERP.',
+                     source_system STRING COMMENT 'Which ERP this record came from: SAP, JDE, or QAD.'""",
            row_filter="ROW FILTER acme_gold.sec.region_filter ON (source_system)")
 def dim_customer():
-    c = dlt.read("acme_silver.sales.customer")
-    # survivorship: prefer SAP > JDE > QAD on name conflicts (latest version per hk)
     from pyspark.sql.window import Window
+    c = dlt.read("acme_silver.sales.customer")
+    # collapse Silver's Type-2 versions to the current row per source-system record
     w = Window.partitionBy("hk").orderBy(F.col("effective_ts").desc())
-    return (c.withColumn("rn", F.row_number().over(w)).filter("rn=1")
-             .select(F.col("hk").alias("customer_hk"), "src_customer_id",
-                     "customer_name", "country", "source_system"))
+    latest = c.withColumn("rn", F.row_number().over(w)).filter("rn=1")
+
+    # Entity resolution: exact match on a normalized (name, country) key. This is the
+    # deterministic tier — real duplicates that differ by more than casing/punctuation/a
+    # corporate suffix (typos, abbreviations, transliteration) won't collapse here; that's
+    # the gap a probabilistic matcher (Zingg/Splink) fills in production.
+    norm_name = F.upper(F.trim(F.col("customer_name")))
+    norm_name = F.regexp_replace(norm_name, r"[.,]", "")
+    norm_name = F.regexp_replace(norm_name, r"\s+(INC|LLC|LTD|CORP|CO|GMBH|AG|SA)\.?$", "")
+    norm_name = F.trim(F.regexp_replace(norm_name, r"\s+", " "))
+    norm_country = F.upper(F.trim(F.col("country")))
+
+    return (latest
+            .withColumn("customer_key_mdm",
+                        F.sha2(F.concat_ws("|", norm_name, norm_country), 256))
+            .select(F.col("hk").alias("customer_hk"), "customer_key_mdm", "src_customer_id",
+                    "customer_name", "country", "source_system"))
 
 @dlt.table(name="fact_sales_orders",
            comment="Grain: one row per order per source; FKs are hash keys",
