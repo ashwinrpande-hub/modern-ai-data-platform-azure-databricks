@@ -1,0 +1,32 @@
+resources:
+  jobs:
+    dq_quarantine_job:
+      name: acme_dq_quarantine
+      description: >
+        Populates acme_bronze.audit.batch_log and .rejected_records from the silver_pipeline /
+        gold_pipeline event logs (dq/quarantine_writer.py) -- the two audit tables that existed
+        as schema-only until this was first run manually, 2026-08-14. Intended ordering once
+        live: pipelines run -> this runs -> DQ agents read a fuller audit trail. Cron is defined
+        but paused -- run manually (or unpause) once you're ready for it to track every update
+        instead of a point-in-time backfill.
+      schedule:
+        quartz_cron_expression: "0 30 6 * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+      parameters:
+        - name: gold_pipeline_id
+          default: "${resources.pipelines.gold_pipeline.id}"
+        - name: silver_pipeline_id
+          default: "${resources.pipelines.silver_pipeline.id}"
+      environments:
+        - environment_key: dq_env
+          spec:
+            environment_version: "3"
+      tasks:
+        - task_key: quarantine_writer
+          spark_python_task:
+            python_file: ../dq/quarantine_writer.py
+            parameters:
+              - "{{job.parameters.gold_pipeline_id}}"
+              - "{{job.parameters.silver_pipeline_id}}"
+          environment_key: dq_env

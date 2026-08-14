@@ -8,10 +8,16 @@ What it does — from each pipeline's event log (event_log() TVF, no direct stor
 DAMA dimension is inferred from the expectation name prefix used in replication_sources.yaml
 (valid_* = VALIDITY, complete_/*_pk = COMPLETENESS, ts/timely = TIMELINESS, etc.).
 """
-from pyspark.sql import SparkSession, functions as F
+from pyspark.sql import functions as F
 import sys
 
-spark = SparkSession.builder.getOrCreate()
+try:
+    from pyspark.sql import SparkSession
+    spark = SparkSession.builder.getOrCreate()
+except Exception:
+    from databricks.connect import DatabricksSession
+    spark = DatabricksSession.builder.serverless(True).getOrCreate()
+
 PIPELINE_IDS = sys.argv[1:] or [r[0] for r in spark.sql(
     "SELECT pipeline_id FROM acme_bronze.cfg.pipeline_registry WHERE active").collect()]
 
@@ -25,6 +31,14 @@ def dama_dim(col):  # SQL CASE from expectation-name conventions
         case += f"WHEN lower({col}) LIKE '%{token}%' THEN '{dim}' "
     return case + "ELSE 'VALIDITY' END"
 
+# Layer isn't a property event_log() gives you directly -- derive it from the flow's own
+# catalog prefix (flow_name is fully qualified, e.g. acme_gold.sales.dim_customer) instead of
+# hardcoding one layer, which would mislabel every flow that isn't actually Bronze.
+LAYER_EXPR = ("CASE WHEN origin.flow_name LIKE 'acme_gold%' THEN 'gold' "
+              "WHEN origin.flow_name LIKE 'acme_silver%' THEN 'silver' "
+              "WHEN origin.flow_name LIKE 'acme_bronze%' THEN 'bronze' "
+              "ELSE 'unknown' END")
+
 for pid in PIPELINE_IDS:
     ev = spark.sql(f"SELECT * FROM event_log('{pid}')")
 
@@ -33,7 +47,7 @@ for pid in PIPELINE_IDS:
        .selectExpr(
            "origin.update_id            AS batch_id",
            "origin.flow_name            AS source_name",
-           "'bronze'                    AS layer",
+           f"{LAYER_EXPR}               AS layer",
            "cast(details:flow_progress.metrics.num_output_rows AS BIGINT)  AS rows_written",
            "cast(details:flow_progress.data_quality.dropped_records AS BIGINT) AS rows_rejected",
            "timestamp                   AS finished_at",
@@ -46,19 +60,24 @@ for pid in PIPELINE_IDS:
        .write.mode("append").saveAsTable("acme_bronze.audit.batch_log"))
 
     # ---- 2. rejected_records from expectation drops (rule-level; row payloads stay in
-    #         the failing flow's quarantine view when expect_all_or_drop is used) ----
+    #         the failing flow's quarantine view when expect_all_or_drop is used).
+    #    Column list matches the live table (config/config_tables.sql): run_id, rejected_at,
+    #    source_table, dq_dimension, reason, raw -- this originally wrote a different, wider
+    #    column set (reject_id/batch_id/source_name/target_table/layer/failed_rule/
+    #    record_payload) that doesn't exist on the deployed table and failed with
+    #    DELTA_METADATA_MISMATCH the first time this ran, 2026-08-14.
     exp = ev.filter("event_type = 'flow_progress'").selectExpr(
         "origin.update_id AS batch_id", "origin.flow_name AS source_name",
         "explode_outer(from_json(details:flow_progress.data_quality.expectations, "
         "'array<struct<name:string,dataset:string,passed_records:bigint,failed_records:bigint>>')) AS e"
     ).filter("e.failed_records > 0")
     (exp.selectExpr(
-            "uuid() AS reject_id", "batch_id", "source_name",
-            "e.dataset AS target_table", "'bronze' AS layer",
-            "e.name AS failed_rule",
+            "batch_id AS run_id",
+            "current_timestamp() AS rejected_at",
+            "e.dataset AS source_table",
             f"{dama_dim('e.name')} AS dq_dimension",
-            "to_json(named_struct('failed_records', e.failed_records)) AS record_payload",
-            "current_timestamp() AS rejected_at")
+            "e.name AS reason",
+            "to_json(named_struct('failed_records', e.failed_records)) AS raw")
         .write.mode("append").saveAsTable("acme_bronze.audit.rejected_records"))
 
 print(f"quarantine_writer: processed {len(PIPELINE_IDS)} pipeline event logs")
