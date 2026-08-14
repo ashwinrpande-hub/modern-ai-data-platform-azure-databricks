@@ -100,7 +100,7 @@ not live ingestion (see gap #1 below) — this does not affect `validate.py`'s o
 
 | ID | Requirement | Evidence | Status |
 |----|-------------|----------|--------|
-| R9.1 | Agentic workflows / self-healing pipelines | `agents/` 6 agents + `agent_core.py`, 3 jobs deployed, all validated `mode=llm`; healer/registrar/lineage-doc specs in `agents/*.md` | 🟡 6 live; 4 spec'd agents design-only |
+| R9.1 | Agentic workflows / self-healing pipelines | `agents/` **10** agents + `agent_core.py`, 2 agent jobs + 1 ML job deployed, all 10 confirmed live via `databricks jobs get-run-output` on 2026-08-14 (not just `bundle validate`); each report now independently fact-checked against its own evidence log before saving (`docs/AGENT_RELIABILITY_GUARDRAILS.md`) | ✅ |
 | R9.2 | .md per section; session summaries; token-optimized docs | `docs/*.md` (12 files) + `docs/index.html` tabbed site; `docs/SESSION_NOTES.md` dated log | ✅ |
 | R9.3 | Automation + validation scripts | `scripts/validate.py` (CI gate), `scripts/generate_synthetic_data.py`, `scripts/deploy.py` (design), agents | ✅ |
 | R9.4 | Code graph | `docs/CODE_GRAPH.md` (mermaid, rendered in docs site) | ✅ |
@@ -108,7 +108,7 @@ not live ingestion (see gap #1 below) — this does not affect `validate.py`'s o
 
 ## Score & open gaps (prioritized)
 
-**28 requirements: 17 ✅ · 12 🟡 · 4 📘 · 2 ❌** (some IDs span categories).
+**28 requirements: 18 ✅ · 11 🟡 · 4 📘 · 2 ❌** (some IDs span categories; R9.1 moved 🟡→✅ 2026-08-14 when the 4 previously spec-only agents were confirmed live).
 
 **POC scope note (2026-08-02):** this build is a proof-of-concept for an interview/demo
 exercise, not a production handover. The core exercise — medallion + DV2.0, governance,

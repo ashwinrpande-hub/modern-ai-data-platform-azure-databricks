@@ -263,3 +263,132 @@ new ones above) already derive from them.
 All 9 new-or-changed slides verified via headless-Chrome screenshots (same scratch-copy-with-`go(N)`
 technique as the v1 session). Not yet committed — both `index.html` (v1, untouched) and
 `index_v2.html` (v2) currently sit as uncommitted new/modified files.
+
+## 2026-08-13 — Agent self-sufficiency research, governance/DASF audit, data dictionary, 4 spec-only agents implemented
+File-level summary already in `CHANGES.md`'s "2026-08-13 update" section — this entry is the
+narrative/discussion trail CLAUDE.md rule 4 asks for, not a duplicate of that file list.
+
+Researched Ralph loops (Geoffrey Huntley, mid-2025 agentic-coding pattern — fresh context per
+iteration, state in files/git not conversation memory, one stable goal prompt + a verification
+gate) and mapped it onto this repo's actual agent design: single-shot today, not looping;
+`docs/ralph_loop.md` has the full deployment checklist for closing that gap later.
+
+Audited the repo across governance/DQ/ingestion/AI-data-dictionary
+(`docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`) and against Databricks' own "Comprehensive Guide to
+Data and AI Governance" ebook, full 39-page PDF extracted and read directly rather than
+paraphrased from the gated landing page (`docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`). Found
+two previously-undocumented bugs: `dashboards/dq_trust_dashboard.sql` querying columns
+(`dimension`/`score`/`met_threshold`) that don't exist in the live `dq_results` schema (fixed
+2026-08-14, see below), and a table-naming mismatch between `vector_content.py`'s
+`customer_narratives` and `ai/vector_search_rag.py`'s `customer_profile_text`. The ebook
+comparison's priority list drove the rest of this day's and the next day's work: column comments
+(done same day), DASF citation (done same day), account-group provisioning (still blocked, not
+an engineering task).
+
+Implemented the 4 previously spec-only agents (`pipeline_healer.py`, `dq_rca_agent.py`,
+`ingestion_registrar.py`, `lineage_doc_agent.py`) on the same `agent_core.py` guardrail contract
+as the original 6 — the PR/Slack/webhook design in their `.md` specs was never buildable here
+(no GitHub token, no Slack webhook provisioned), so every recommendation lands in
+`acme_bronze.audit.agent_reports` for a human to act on instead, same as every other agent.
+`lineage_doc_agent` deliberately does NOT write to the git-tracked `docs/` folder — a file
+written from inside a Databricks job container is ephemeral compute state, not a commit, so it
+would never reach the repo; caught this before shipping it, not after.
+
+Added `cfg.layer_mappings.business_definition` (one human/AI-facing sentence per `tgt_column`,
+stacked across source systems where meanings differ) and applied it live: `ALTER TABLE` +
+natural-key `MERGE` (not a raw re-`INSERT` — the live table already had 40 rows; a plain insert
+would have duplicated them), then `scripts/apply_column_comments.py` applied 24 real Unity
+Catalog column comments, independently verified via `information_schema.columns` rather than
+trusting the script's own success log. This directly closes the audit's "column-level comments
+are empty everywhere" finding for Silver.
+
+**Gotcha found and worked around**: databricks-connect (serverless, this workspace) silently
+corrupts special characters inside SQL `VALUES`-clause string literals passed via `spark.sql(f'...')`
+— escaped apostrophes (`''`) were dropped entirely instead of collapsing to `'`, em-dashes came
+back as mojibake. Root cause not isolated (Spark Connect transport vs. a `VALUES`-parsing quirk).
+Fix: `config/seed_layer_mappings.sql` rewritten plain-ASCII. Logged in memory
+(`databricks-tooling-quirks`) so a future session doesn't re-lose time to it.
+
+Also added `pipelines/gold_dlt.py::dim_customer.customer_key_mdm` — a deterministic cross-source
+entity-resolution key (normalized name + country, sha2) — and fixed a table comment that had been
+overclaiming "MDM-survived" when the code only ever deduped SCD versions within one source, never
+actually resolved entities across SAP/JDE/QAD. Committed but **not run** — `gold_pipeline` wasn't
+redeployed this session, so this schema change stayed code-only through 2026-08-14 morning (see
+below for when it actually went live).
+
+## 2026-08-14 — Live agent verification, reliability guardrails closed against Anthropic's own standards, presentation v3, dashboard fix
+Picked up from 2026-08-13's uncommitted state: committed and pushed everything in 4 logical
+commits (dashboard fix scope not yet known at that point, data-dictionary + entity-resolution,
+DASF doc + `CHANGES.md`, presentation v3), then deployed the bundle for real
+(`databricks bundle deploy -t dev`) — confirmed via a live `information_schema.columns` check
+that `customer_key_mdm` reached the workspace as a *file* but not as a materialized column
+(deploy syncs code, it doesn't run a pipeline update); `gold_pipeline` itself is still not run as
+of this entry.
+
+**Ran every agent live and checked the actual results**, not just `bundle validate`: all 5
+scheduled-job tasks and all 5 on-demand-job tasks executed successfully — except
+`ingestion_registrar`, which reported job-level SUCCESS while doing zero validation. Root cause:
+`open()` on the synced YAML hit `[Errno 5] Input/output error` against
+`/Workspace/.../files/config/replication_sources.yaml`, a serverless-only flakiness none of the
+other agents hit because they all read through `spark.sql()`, not a raw filesystem call. Fixed by
+falling back to the Databricks SDK's Workspace Files API (`WorkspaceClient().workspace.download()`)
+when `open()` fails; re-ran, all 14 sources validated clean.
+
+Built `presentation/index_v3.html` (34 slides, up from 31 in v2, both older versions untouched) —
+a new Technical Summary slide, a dedicated Unity Catalog structure slide (live 4-catalog/
+23-schema tree pulled via `SHOW SCHEMAS`/`SHOW TABLES` that same session, not a design doc), and
+an AI Security slide scoring the agent fleet against DASF. Refreshed every agent-related slide
+from the stale "6 live / 4 spec'd" framing to 10-live, and swapped the RBAC mechanics slide's
+illustrative code snippet for the actual live function body pulled from
+`information_schema.routines` — which surfaced a real finding along the way: this session's
+principal is a workspace admin (`is_member('admins')` true) but resolves `false` on every
+`is_account_group_member(...)` check, since no account groups exist yet. That's the precise
+mechanism behind the RBAC blocker, not just "GRANTs fail."
+
+Asked what stops the agents from hallucinating, and whether that was documented anywhere — it
+wasn't (checked the `agents/*.md` specs and `docs/AGENT_ARCHITECTURE.html` directly; both cover
+write-safety, neither uses the word). Wrote `docs/AGENT_RELIABILITY_GUARDRAILS.md`, fetching
+Anthropic's current published standards live (Reduce Hallucinations, Trustworthy Agents in
+Practice, Building Effective AI Agents, Effective Harnesses for Long-Running Agents — not from
+training-data memory) and comparing them against what this repo actually does. Found 4 closable
+gaps and closed all 4 the same session, all through the shared `agent_core.py` contract so no
+per-agent file needed editing for the first three:
+- **Evaluator-optimizer pass**: `run_reasoning()` now runs a second, independent Claude call
+  (`verify_report`) that checks the draft report against the `run_sql` evidence log before it's
+  saved.
+- **Inline citations**: the evidence log itself (not just a reference to `agent_runs`) is now
+  appended to every LLM-mode report.
+- **Eval scorecard**: `scripts/eval_agent_reports.py`, deterministic, scores per-agent
+  verified/flagged rates from `agent_runs.decision_log` over a 30-day window.
+- **Plan Mode**: `product_creator` (the one agent that writes directly) got an opt-in `dry_run`
+  job parameter, default `false` so existing demo behavior is unchanged.
+
+The best evidence in that doc came from the guardrail catching a real bug in itself: the first
+live run of `dq_monitor_rca` under the new verification pass got genuinely flagged — the
+evidence log recorded which queries ran but not their *returned values*, so several numbers in
+the report weren't strictly re-confirmable from the log alone. Fixed in the same pass
+(`safe_sql()` now logs a value snippet per query) and reconfirmed live. Separately confirmed
+`product_creator --dry_run=true` proposes without creating by checking the catalog directly
+(no view existed) rather than trusting the printed log line.
+
+Fixed `dashboards/dq_trust_dashboard.sql`'s column-name bug found in yesterday's audit
+(`dimension`/`score`/`met_threshold` → `dq_dimension`/derived-from-`passed`/`source_table`/
+`reason`) and verified all 5 widget queries execute against the live workspace — 2 return real
+rows, 3 return 0 rows (expected: `batch_log`/`rejected_records` are only populated by live
+ingestion, which doesn't exist yet, not a bug).
+
+**Read every tracked `.md` file in the repo for the first time this session** (prompted by being
+asked what gets read at project load, and to make sure changes were actually being traced) —
+confirmed the concrete cost of the lazy-loading rule this file used to have: `docs/CODE_GRAPH.md`
+and `docs/TRACEABILITY_MATRIX.md` both still said "six agents" after a tenth was added and
+deployed, and this file (`SESSION_NOTES.md`) had gone silent for both 2026-08-13 and this day
+despite major work, because `CHANGES.md` was carrying that load instead and rule 4 was being
+treated as an end-of-session task rather than a running one. Rewrote `CLAUDE.md`: rule 1 now
+reads every `.md` file at session start instead of lazily; rule 4 says log as you go; new rule 7
+says check and update docs in the same session a change makes them stale. Fixed the two "six
+agents" references directly. Other staleness found but deliberately not silently rewritten this
+session — flagged instead, since some of it (`docs/DATA_MODEL.md`, machine-generated, marked "do
+not hand-edit") needs regeneration via its own pipeline, not hand-patching, and some of it
+(`docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`)
+are point-in-time snapshots whose value is partly *being* a snapshot — annotating what's since
+changed belongs there, not a silent rewrite that erases the record of what was found when.

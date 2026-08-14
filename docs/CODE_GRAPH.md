@@ -40,13 +40,17 @@ deployed or validated against the workspace — still tracked as open gaps, same
 Bronze tables seeded directly from `scripts/generate_synthetic_data.py` output (no ingestion pipeline
 yet — see `docs/ARCHITECTURE.md`'s Deployment section) and `config/seed_layer_mappings.sql`-seeded
 config tables; `sql/*.sql` traces a row through all three layers end to end against that real data;
-and `agents/*.py` — six platform agents (DQ monitor+RCA, schema evolution, product creator,
+and `agents/*.py` — **ten** platform agents (DQ monitor+RCA, DQ root-cause deep-correlation,
+pipeline healer, lineage/docs, schema evolution, ingestion registrar, product creator,
 vector/content, deployment gate, operational intel) deployed as two serverless jobs via
 `resources/agents.yml`, sharing `agents/agent_core.py` (read-only-SQL tool guard, decision logging to
-`audit.agent_runs`, reports to `audit.agent_reports`). Agents run deterministic checks always and add
+`audit.agent_runs`, reports to `audit.agent_reports`, and — since 2026-08-14 — a second,
+independent Claude call that fact-checks each report against its own evidence log before saving;
+see `docs/AGENT_RELIABILITY_GUARDRAILS.md`). Agents run deterministic checks always and add
 Claude reasoning (claude-opus-4-8) when the Databricks secret `agents/anthropic_api_key` (or env
 `ANTHROPIC_API_KEY`) is present; without it they run in deterministic mode. The DQ agent populates
 `audit.dq_results` (closing validate.py check 10); the product creator ships
-`acme_products.sales.v_sales_orders_unified`; the content agent builds
-`acme_gold.sales.customer_narratives`.
+`acme_products.sales.v_sales_orders_unified` (and now supports a `dry_run` param that proposes
+without creating); the content agent builds `acme_gold.sales.customer_narratives`. All 10 were
+confirmed live via `databricks jobs get-run-output` on 2026-08-14, not just `bundle validate`.
 
