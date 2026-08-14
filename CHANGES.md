@@ -164,3 +164,37 @@ doc/slide that still said otherwise.
 itself — all three stay frozen historical snapshots, per the versioning convention established
 this session; `index_v3.html`'s known "six agents" leftover bug is fixed only in the new
 `index_v4.html`, not retroactively in v3.
+
+# 2026-08-14 update (continued) — quarantine_writer wired into a real job, entity-resolution demo query, AI agents overview doc
+
+Three threads: (1) `dq/quarantine_writer.py` went from an unreferenced file to a working,
+bug-fixed, live-populated writer wired into a real (paused) job; (2) `sql/02_trace_order_lineage.sql`
+got a 4th demonstration step for `customer_key_mdm`; (3) a new comprehensive agents-overview doc,
+in both markdown and standalone HTML.
+
+## Files
+
+| File | New/Upd | Justification |
+|---|---|---|
+| `dq/quarantine_writer.py` | UPD | Two real bugs found only by running it live: hardcoded `'bronze' AS layer` for every row (now a `LAYER_EXPR` CASE-WHEN on the flow name's catalog prefix); `rejected_records` write used a column set that didn't match the live table, crashing with `DELTA_METADATA_MISMATCH` (remapped to the real schema — `run_id/source_table/reason/raw`). Also added a local-dev `SparkSession` fallback matching the rest of the repo's convention. |
+| `resources/dq.yml` | NEW | Job `acme_dq_quarantine` (live id `780794521049191`), task `quarantine_writer`, dynamic `${resources.pipelines.*.id}` parameters, cron defined but `pause_status: PAUSED`. Needed an explicit `environments` block for `bundle validate` to accept a zero-extra-dependency `spark_python_task`. |
+| `sql/02_trace_order_lineage.sql` | UPD | New STEP 7 (3 sub-queries) demonstrating `dim_customer.customer_key_mdm` end to end — this order's customer's match key, every `customer_hk` sharing it, and the platform-wide collision check. Verified live: 7a/7b return 1 row each, 7c returns 0 (honest caveat included in the file: proves the key computes and is unique per row, not that entity resolution collapses duplicates, since this dataset has none to collapse). |
+| `docs/AI_AGENTS_OVERVIEW.md`, `docs/AI_AGENTS_OVERVIEW.html` | NEW | Comprehensive agent doc: architecture/shared contract, deployment (real job DAGs), per-agent breakdown, Nucor-values alignment (sourced live from nucor.com, not recalled — "The Nucor Way," 10 principles, only 6 mapped to real evidence), DASF/governance alignment, this session's gap-fix retrospective, and a named list of structural gaps (account groups unprovisionable, no output/PII screening, cron still paused, not a Ralph loop). |
+| `scripts/generate_standalone_doc.py` | NEW | Renders one `docs/*.md` as a standalone single-page HTML doc, reusing `generate_docs_site.py`'s `md_to_html()` rather than duplicating it — one markdown source, two regenerable HTML outputs. |
+| `scripts/generate_docs_site.py`, `docs/index.html` | UPD | Added "AI Agents Overview" to `TABS`; regenerated (16 tabs, was 15). |
+| `docs/SESSION_NOTES.md` | UPD | Backfilled entries for all of the above plus the interview-prep move below — these had landed without same-day entries, a rule-4 gap caught only in retrospect. |
+
+## Applied live against the workspace (not just files)
+- `dq/quarantine_writer.py` run twice: first crashed with `DELTA_METADATA_MISMATCH` after
+  writing 180 mislabeled rows, cleaned up via `DELETE FROM acme_bronze.audit.batch_log` before
+  re-running clean (bad audit data judged worse than no audit data). Re-run: `batch_log` got 151
+  correctly-layered rows (84 gold/56 silver/11 unknown), `rejected_records` got 5 — both real,
+  both previously empty.
+- `sql/02_trace_order_lineage.sql` STEP 7 run against the live warehouse, all three sub-queries
+  returned exactly the row counts the file's own comments claim.
+
+## Deliberately not tracked in this repo
+The two gitignored interview-prep HTML files were moved out of the repository entirely, to
+`C:\Handson\Git\Training\Nucor-Interview-Prep\`, on explicit request — gitignored isn't the same
+guarantee as "not present in the folder" if the whole repo directory ever gets shared. No commit
+involved; `.gitignore`'s `interview-prep/` line stays as a harmless safety net.

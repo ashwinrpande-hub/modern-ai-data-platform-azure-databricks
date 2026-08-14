@@ -25,6 +25,7 @@ OUT = os.path.join(DOCS, "index.html")
 # (tab label, path relative to repo root)
 TABS = [
     ("Architecture", "docs/ARCHITECTURE.md"),
+    ("AI Agents Overview", "docs/AI_AGENTS_OVERVIEW.md"),
     ("Code Graph", "docs/CODE_GRAPH.md"),
     ("Data Vault PIT Bridge", "docs/DATA_VAULT_PIT_BRIDGE.md"),
     ("Justification Notes", "docs/JUSTIFICATION_NOTES.md"),

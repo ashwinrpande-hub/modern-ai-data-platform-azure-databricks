@@ -3,8 +3,9 @@
 Rules for any Claude Code session in this repo:
 1. **Read every tracked `.md` file at the start of the session** — `agents/*.md`, `docs/*.md`,
    and the top-level `*.md` files (`README.md`, `CHANGES.md`, `README_APPLY.md`,
-   `marketplace-ui/README.md`). As of 2026-08-14 that's ~26 files / ~29K words (skip `Old/` —
-   a superseded design kept for reference only; see `docs/GAP_ANALYSIS.md` D5 on removing it).
+   `marketplace-ui/README.md`). As of 2026-08-14 (end of day) that's ~27 files / ~34K words
+   (skip `Old/` — a superseded design kept for reference only; see `docs/GAP_ANALYSIS.md` D5 on
+   removing it).
    This replaces the previous "read only what the task needs" rule: lazy loading is exactly
    what let docs drift stale across this repo (see rule 7's examples). Only the harness's
    automatic load of this file is free; reading the rest is a real, deliberate cost the repo

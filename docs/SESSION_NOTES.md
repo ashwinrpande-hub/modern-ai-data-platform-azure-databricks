@@ -438,3 +438,71 @@ docs (`GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, this file) got annotated, not rewri
 `presentation/index_v3.html` itself was left untouched (including its bug) since the
 established convention this session is that shipped versions are frozen snapshots — the fix
 landed in a new `presentation/index_v4.html` instead, same pattern as v2→v3.
+
+## 2026-08-14 (continued further) — 4th lineage query, quarantine_writer wired into a real (paused) job, interview-prep moved out of the repo
+Gap in this file itself, caught only in retrospect: the next three pieces of work landed without
+a same-day entry, contrary to rule 4. Logging them now, dated to when they actually happened
+rather than silently backfilling as if they'd always been here.
+
+Added STEP 7 to `sql/02_trace_order_lineage.sql` — three sub-queries demonstrating
+`dim_customer.customer_key_mdm` end to end (this customer's match key, every `customer_hk`
+sharing it, and the platform-wide collision check). Verified live: 7a/7b return 1 row each, 7c
+returns 0 rows — matches the file's own comments, including the honest caveat that 0 collisions
+proves the key computes and is unique per row, not that entity resolution actually resolves
+duplicates, since this build's synthetic data has no overlapping real entities to collapse.
+
+User then asked why `acme_bronze.audit.rejected_records`/`batch_log` were empty. Root cause:
+`dq/quarantine_writer.py` existed, was synced to the workspace by every bundle deploy, but was
+never referenced by any job resource — a writer nobody ever called. Ran it live to populate the
+tables for real, which surfaced two genuine bugs the code review alone hadn't caught: (1) it
+hardcoded `'bronze' AS layer` for every row, mislabeling Gold/Silver flows; fixed with a
+`LAYER_EXPR` CASE-WHEN derived from the flow name's catalog prefix. (2) its `rejected_records`
+write used a column set (`reject_id/batch_id/target_table/failed_rule/record_payload`) that
+doesn't match the live table's real schema per `config/config_tables.sql`
+(`run_id/source_table/reason/raw`) — crashed with `DELTA_METADATA_MISMATCH` on the first run.
+Deleted the 180 mislabeled rows the failed run had already written (`DELETE FROM
+acme_bronze.audit.batch_log`) rather than leave incorrect audit data sitting alongside correct
+data — reasoning explicitly: bad audit data is worse than no audit data. Fixed both bugs,
+re-ran clean: `batch_log` got 151 correctly-layered rows (84 gold/56 silver/11 unknown),
+`rejected_records` got 5, both real. User then asked for this to be a proper job, not just a
+manual run: added `resources/dq.yml` (job `acme_dq_quarantine`, live id `780794521049191`),
+cron defined but `pause_status: PAUSED` — same "wire it in real but don't turn on the tap"
+pattern as the agent jobs. Needed an explicit `environments` block (`environment_version: "3"`)
+for `bundle validate` to accept a `spark_python_task` with zero extra pip deps — not obvious
+from the docs, worth remembering if this trips again.
+
+Separately, moved the two gitignored interview-prep HTML files
+(`nucor-senior-data-engineer-qa*.html`) out of the repo entirely, to
+`C:\Handson\Git\Training\Nucor-Interview-Prep\`, per explicit user request: gitignored is not
+the same guarantee as "not in the folder," and the user wants zero chance of either file being
+visible if this repo folder itself gets shared with the interview team. `.gitignore`'s
+`interview-prep/` line was left in place as a harmless safety net even though the directory is
+now empty/removed.
+
+## 2026-08-14 (continued further still) — docs/AI_AGENTS_OVERVIEW.md + standalone HTML: full agent architecture, per-agent breakdown, Nucor-values alignment, DASF guidelines, gap-fix retrospective, structural TODOs
+User asked for one comprehensive document covering all 10 agents, how they're deployed, what
+each does, how they help Nucor's principals, Databricks/DASF guidelines, how this session's
+reliability gaps got fixed, and what still needs structural work — as both `.md` and `.html`.
+
+Wrote `docs/AI_AGENTS_OVERVIEW.md`, eight sections, everything either file:line-cited or tied to
+a live verification already recorded elsewhere in this file — no new claims invented for the
+occasion. Section 5 (Nucor-values alignment) needed real sourcing, not guessing: launched a
+background agent to fetch Nucor's actual published values directly from nucor.com rather than
+relying on training-data recall (which would have surfaced the older, unrelated
+decentralization/pay-for-performance framing instead of what Nucor currently publishes). It
+returned the real list — ten named principles under "The Nucor Way": Safety, Integrity, Trust,
+Innovation, Open Communication, Teamwork, Inclusion, Can-Do Attitude, Courage, Ownership,
+sourced from nucor.com/company/ and nucor.com/careers/. Mapped only six of the ten to concrete
+design decisions with evidence (Trust, Integrity, Open Communication, Can-Do Attitude, Courage,
+Ownership) and explicitly said so for the other three (Safety, Teamwork, Inclusion) rather than
+force a connection a data platform can't actually back up — consistent with this document's own
+stated principle, in its structural-gaps section, of naming what's missing rather than hiding it.
+
+Avoided hand-maintaining a second copy of the markdown-to-HTML logic: added the new doc to
+`scripts/generate_docs_site.py`'s `TABS` list (now 16 tabs, was 15) and regenerated
+`docs/index.html`, then wrote a new small `scripts/generate_standalone_doc.py` that imports and
+reuses the same `md_to_html()` function to render `docs/AI_AGENTS_OVERVIEW.html` as a dedicated,
+shareable single-page doc — one markdown source of truth, two regenerable outputs, not two
+hand-maintained ones. Verified both renders via headless Chrome screenshots (full-height capture
+of the standalone doc, DOM-dump check that the new tab button and panel exist in the tabbed
+site) before reporting done.
