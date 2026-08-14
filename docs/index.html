@@ -42,11 +42,12 @@ pre{background:#15181C;border:1px solid var(--line);border-radius:6px;padding:14
   font:12.5px/1.55 "IBM Plex Mono";color:#B7C6D3;overflow-x:auto;margin:12px 0}
 pre code{background:none;border:none;padding:0;color:inherit}
 pre.mermaid{background:#15181C;text-align:center}
-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;display:block;overflow-x:auto}
 th{font:600 11px "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:8px 10px;border-bottom:1px solid #232A33;vertical-align:top}
 td:first-child{color:var(--bright)}
+.genmeta{font:500 11px "IBM Plex Mono";color:var(--dim);margin-top:10px}
 @media print{
   body{background:#fff;color:#222}
   .tabs{display:none}
@@ -57,20 +58,12 @@ td:first-child{color:var(--bright)}
 </head>
 <body>
 <header><div class="wrap">
-  <div class="eyebrow">acme · Sales Lakehouse on Azure Databricks · Project Documentation</div>
+  <div class="eyebrow">acme &middot; Sales Lakehouse on Azure Databricks &middot; Project Documentation</div>
   <h1>Documentation</h1>
+  <p class="genmeta">Generated 2026-08-14 by scripts/generate_docs_site.py from the docs/*.md files below &mdash; do not hand-edit this file, edit the source .md and re-run the generator.</p>
 </div></header>
 <div class="wrap">
-  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" onclick="tab(this,'p0')">Architecture</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p1')">Code Graph</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p2')">Data Vault PIT Bridge</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p3')">Justification Notes</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p4')">Session Notes</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p5')">Demo Runbook</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p6')">Gap Analysis</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p7')">Jd Alignment</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p8')">Replication Patterns</button>
-    <button role="tab" aria-selected="false" onclick="tab(this,'p9')">Traceability Matrix</button></div>
+<div class="tabs" role="tablist"><button role="tab" aria-selected="true" onclick="tab(this,'p0')">Architecture</button><button role="tab" aria-selected="false" onclick="tab(this,'p1')">Code Graph</button><button role="tab" aria-selected="false" onclick="tab(this,'p2')">Data Vault PIT Bridge</button><button role="tab" aria-selected="false" onclick="tab(this,'p3')">Justification Notes</button><button role="tab" aria-selected="false" onclick="tab(this,'p4')">Replication Patterns</button><button role="tab" aria-selected="false" onclick="tab(this,'p5')">Traceability Matrix</button><button role="tab" aria-selected="false" onclick="tab(this,'p6')">Agent Reliability Guardrails</button><button role="tab" aria-selected="false" onclick="tab(this,'p7')">DASF Alignment</button><button role="tab" aria-selected="false" onclick="tab(this,'p8')">Governance DQ Ingestion AI Audit</button><button role="tab" aria-selected="false" onclick="tab(this,'p9')">Databricks Governance Ebook Comparison</button><button role="tab" aria-selected="false" onclick="tab(this,'p10')">Ralph Loop</button><button role="tab" aria-selected="false" onclick="tab(this,'p11')">Demo Runbook</button><button role="tab" aria-selected="false" onclick="tab(this,'p12')">Gap Analysis</button><button role="tab" aria-selected="false" onclick="tab(this,'p13')">Session Notes</button><button role="tab" aria-selected="false" onclick="tab(this,'p14')">Jd Alignment</button></div>
 <div id="p0" class="tabpanel show" role="tabpanel">
 <p class="srcfile">source: docs/ARCHITECTURE.md</p>
 <h1>Architecture — acme Sales Lakehouse on Azure Databricks</h1>
@@ -144,29 +137,29 @@ validate.py checks 13–14 assert PIT freshness and bridge referential integrity
   subgraph Sources
     SAP[SAP / Oracle EBS]; SQL[SQL Server / QAD]; SFDC[Salesforce]; OT[PLCs via Litmus Edge]
   end
-  SAP --&gt;|GoldenGate avro_op| L[ADLS landing]
-  SFDC --&gt;|API export| L
-  OT --&gt;|UNS topics| EH[Event Hubs Kafka]
-  OT --&gt;|parquet| L
-  SQL --&gt;|Lakeflow Connect CDC| B
-  L --&gt;|Auto Loader| T1[ingestion/templates/bronze_ingest_template.py]
-  EH --&gt; T2[ingestion/litmus_ot/litmus_eventhub_dlt.py]
-  T1 --&gt; B[(acme_bronze)]
-  T2 --&gt; B
-  CFG[[config/replication_sources.yaml]] -.drives.-&gt; T1 &amp; T2 &amp; DEP[scripts/deploy.py]
-  B --&gt; S1[pipelines/silver_dlt.py] --&gt; S[(acme_silver 3NF insert-only, hk=sha256)]
-  S --&gt; G1[pipelines/gold_dlt.py] --&gt; G[(acme_gold star + agg)]
-  G1 --&gt; PIT[pit_customer DV2.0 point-in-time] &amp; BR[bridge_order_fulfillment DV2.0 bridge]
-  PIT --&gt; FS
-  BR --&gt; BI[AI/BI + Genie one-join lifecycle]
-  G --&gt; FS[ml/feature_store.py] &amp; VS[ai/vector_search_rag.py] &amp; P[data_products/publish_marketplace.sql]
-  P --&gt; MKT[Databricks Marketplace] &amp; UI[marketplace-ui/]
-  DQ[dq/dama_dq_framework.py] -.gates.-&gt; S &amp; G
-  DQ --&gt;|breach| RCA[agents/dq_rca_agent.md]
-  JOBFAIL[Lakeflow failure] --&gt; HEAL[agents/pipeline_healer.md]
-  VAL[scripts/validate.py] -.CI gate.-&gt; ALL[(all layers)]
-  DAB[[databricks.yml + resources/pipelines.yml]] -.deploys.-&gt; S1 &amp; G1
-  Q[sql/*.sql] -.traces.-&gt; B &amp; S &amp; G
+  SAP -->|GoldenGate avro_op| L[ADLS landing]
+  SFDC -->|API export| L
+  OT -->|UNS topics| EH[Event Hubs Kafka]
+  OT -->|parquet| L
+  SQL -->|Lakeflow Connect CDC| B
+  L -->|Auto Loader| T1[ingestion/templates/bronze_ingest_template.py]
+  EH --> T2[ingestion/litmus_ot/litmus_eventhub_dlt.py]
+  T1 --> B[(acme_bronze)]
+  T2 --> B
+  CFG[[config/replication_sources.yaml]] -.drives.-> T1 & T2 & DEP[scripts/deploy.py]
+  B --> S1[pipelines/silver_dlt.py] --> S[(acme_silver 3NF insert-only, hk=sha256)]
+  S --> G1[pipelines/gold_dlt.py] --> G[(acme_gold star + agg)]
+  G1 --> PIT[pit_customer DV2.0 point-in-time] & BR[bridge_order_fulfillment DV2.0 bridge]
+  PIT --> FS
+  BR --> BI[AI/BI + Genie one-join lifecycle]
+  G --> FS[ml/feature_store.py] & VS[ai/vector_search_rag.py] & P[data_products/publish_marketplace.sql]
+  P --> MKT[Databricks Marketplace] & UI[marketplace-ui/]
+  DQ[dq/dama_dq_framework.py] -.gates.-> S & G
+  DQ -->|breach| RCA[agents/dq_rca_agent.md]
+  JOBFAIL[Lakeflow failure] --> HEAL[agents/pipeline_healer.md]
+  VAL[scripts/validate.py] -.CI gate.-> ALL[(all layers)]
+  DAB[[databricks.yml + resources/pipelines.yml]] -.deploys.-> S1 & G1
+  Q[sql/*.sql] -.traces.-> B & S & G
 </pre>
 <p>The design-estate files referenced above (<code>ingestion/templates/bronze_ingest_template.py</code>,
 <code>ingestion/litmus_ot/litmus_eventhub_dlt.py</code>, <code>scripts/deploy.py</code>, <code>dq/dama_dq_framework.py</code>,
@@ -179,15 +172,19 @@ deployed or validated against the workspace — still tracked as open gaps, same
 Bronze tables seeded directly from <code>scripts/generate_synthetic_data.py</code> output (no ingestion pipeline
 yet — see <code>docs/ARCHITECTURE.md</code>'s Deployment section) and <code>config/seed_layer_mappings.sql</code>-seeded
 config tables; <code>sql/*.sql</code> traces a row through all three layers end to end against that real data;
-and <code>agents/*.py</code> — six platform agents (DQ monitor+RCA, schema evolution, product creator,
+and <code>agents/*.py</code> — <strong>ten</strong> platform agents (DQ monitor+RCA, DQ root-cause deep-correlation,
+pipeline healer, lineage/docs, schema evolution, ingestion registrar, product creator,
 vector/content, deployment gate, operational intel) deployed as two serverless jobs via
 <code>resources/agents.yml</code>, sharing <code>agents/agent_core.py</code> (read-only-SQL tool guard, decision logging to
-<code>audit.agent_runs</code>, reports to <code>audit.agent_reports</code>). Agents run deterministic checks always and add
+<code>audit.agent_runs</code>, reports to <code>audit.agent_reports</code>, and — since 2026-08-14 — a second,
+independent Claude call that fact-checks each report against its own evidence log before saving;
+see <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>). Agents run deterministic checks always and add
 Claude reasoning (claude-opus-4-8) when the Databricks secret <code>agents/anthropic_api_key</code> (or env
 <code>ANTHROPIC_API_KEY</code>) is present; without it they run in deterministic mode. The DQ agent populates
 <code>audit.dq_results</code> (closing validate.py check 10); the product creator ships
-<code>acme_products.sales.v_sales_orders_unified</code>; the content agent builds
-<code>acme_gold.sales.customer_narratives</code>.</p>
+<code>acme_products.sales.v_sales_orders_unified</code> (and now supports a <code>dry_run</code> param that proposes
+without creating); the content agent builds <code>acme_gold.sales.customer_narratives</code>. All 10 were
+confirmed live via <code>databricks jobs get-run-output</code> on 2026-08-14, not just <code>bundle validate</code>.</p>
 </div>
 <div id="p2" class="tabpanel" role="tabpanel">
 <p class="srcfile">source: docs/DATA_VAULT_PIT_BRIDGE.md</p>
@@ -373,471 +370,6 @@ GROUP  BY source_system;
 </ol>
 </div>
 <div id="p4" class="tabpanel" role="tabpanel">
-<p class="srcfile">source: docs/SESSION_NOTES.md</p>
-<h1>Session notes (append-only, dated) — required by CLAUDE.md rule 4</h1>
-<h2>2026-07-05 — Gap analysis + 2026 feature refresh</h2>
-<p>Compared repo vs requirement; produced docs/GAP_ANALYSIS.md. Fixed credibility gaps
-(config-driven Silver made real, batch_log/quarantine writers, source_registry inserts),
-added missing requirement artifacts (DQ trust dashboard, EBS/D365/MES sources, jobs,
-Lakebase online features, RAG agent, metric view), refreshed patterns for GA features
-(Oracle query-based connector, Zerobus, AUTO CDC). Open decisions in GAP_ANALYSIS §D.</p>
-<h2>2026-07-11 — Data Vault 2.0 methodology + PIT/bridge in Gold</h2>
-<p>Requirement now names DV2.0 explicitly. Adopted DV2.0 methodology over existing hash-key design
-(decision revised in JUSTIFICATION_NOTES #5; new #10 PIT, #11 bridge — 2 alternatives each).
-New: docs/DATA_VAULT_PIT_BRIDGE.md (use cases), gold pit_customer + bridge_order_fulfillment,
-silver shipment/invoice (config-driven; SAP LIPS/VBRP seed mappings + YAML sources + synthetic
-lips/vbrp), validate.py checks 13–14 (PIT freshness, bridge FK), ARCHITECTURE.md rewritten,
-presentation Gold layer text updated. User-confirmed scope: customer PIT + order-lifecycle
-bridge; JDE/QAD lifecycle onboarding deferred to mapping rows (no code).</p>
-<h2>2026-07-18 — First real deploy: DAB resources, bronze seeding, bug fixes, lineage queries</h2>
-<p>Went from "code exists" to "pipelines actually run against real data" for the first time. Added
-<code>databricks.yml</code> + <code>resources/pipelines.yml</code> (DAB) to deploy <code>silver_dlt.py</code>/<code>gold_dlt.py</code> as
-Lakeflow Declarative Pipelines. Workspace had none of the <code>acme_*</code> UC catalogs provisioned and no
-bronze ingestion pipeline exists in-repo (gap, see docs/CODE_GRAPH.md) — provisioned catalogs/schemas/
-cfg+audit tables directly and loaded <code>scripts/generate_synthetic_data.py</code> output into Bronze as a
-stand-in, since building the full templated ingestion layer was out of scope for getting the two
-existing pipelines running.</p>
-<p>Found and fixed 5 pre-existing bugs surfaced by actually running this for the first time:
-<code>config/seed_layer_mappings.sql</code>'s <code>MERGE ... USING (VALUES...) s(cols)</code> (column aliases not allowed
-on this Spark version → temp view instead), <code>uuid()</code> inside an inline <code>VALUES</code> table (non-deterministic,
-not foldable → moved to outer SELECT), <code>pipelines/{silver,gold}_dlt.py</code> had a UTF-8 BOM the Lakeflow
-parser rejects, <code>silver_dlt.py</code>'s <code>fx_rates</code> table read from its own publish target
-(<code>acme_silver.sales.fx_rates</code>) causing a DLT graph cycle — reference table moved to <code>acme_silver.ref</code>,
-and the three <code>_current</code> tables were <code>@dlt.view</code> (pipeline-local, never reach Unity Catalog) but
-<code>gold_dlt.py</code> reads them cross-pipeline by fully-qualified name — changed to <code>@dlt.table</code>.</p>
-<p><code>scripts/validate.py</code> needs a SQL warehouse (none provisioned); ran the same 14 checks via a
-serverless Spark Connect session instead — 10/14 pass. Failures are real, pre-existing gaps: no UC
-row filter/column mask exists anywhere in the repo (checks 8–9), no DQ framework exists to populate
-<code>audit.dq_results</code> (check 10), and <code>validate.py</code>'s expected active-source count (6) is stale against
-<code>replication_sources.yaml</code>'s current 14 (check 3) — never updated when EBS/D365/MES were added
-2026-07-05.</p>
-<p>Added <code>sql/01_explore_tables.sql</code>, <code>sql/02_trace_order_lineage.sql</code>,
-<code>sql/03_full_lineage_reconciliation.sql</code> — Bronze→Silver→Gold lineage queries, all verified against
-the live data (all 13,000 synthetic orders across SAP/JDE/QAD reconcile with zero orphans). Restyled
-<code>presentation/index.html</code>: swapped the orange/amber "molten glow" UI chrome for a restrained
-industrial-corporate palette (charcoal/steel-gray/green), in the tone of steel-sector sites like
-nucor.com (public site loads styling via external JS/CSS, so exact brand hex values weren't
-extractable — this is a stylistic approximation, not a literal brand match); kept the literal
-molten-steel SVG gradient warm since that's a realistic detail, and gave the Bronze/Silver/Gold
-medallion circles their literal metal colors instead of the old arbitrary orange/amber/blue mapping.</p>
-<p>Later same day: presentation expanded 14 → 17 slides, structure borrowed from the Vertiv V5 deck
-(same author's prior Snowflake platform presentation): title slide gained a platform-at-a-glance stat
-band using this build's verified numbers (4 catalogs · 14 sources/8 patterns · 32 tables · 40 mapping
-rows · 25.9K records · 13K orders zero-orphan · 14 CI checks · 99.0% avg DQ score); two new data-
-architecture slides (per-layer table/row-count model, field-level source→Bronze→Silver→Gold lineage
-matrix drawn from cfg.layer_mappings transforms); one new agentic-AI architecture slide (6 agents —
-DQ RCA, schema evolution, product creator, vector/content, deployment, operational intel — each mapped
-to the platform layer it owns, with triggers/orchestrator/tools strips and guardrails line); value
-slide upgraded with the Vertiv deck's ROI framing ($1.2M/yr with 4-driver breakdown, before/after
-table, $105K run cost, 11.4×/24× ROI, per-phase roadmap values). DQ slide got a live-result line
-(14 checks, 10 green, gaps named). All 5 changed slides verified via headless-Chrome screenshots.
-Then two more diagram slides (deck now 19): "Cloud architecture" — six-swimlane Azure/Databricks
-service-flow map (sources → ADLS/Event Hubs/Lakeflow Connect/Auto Loader/Zerobus → Bronze → the two
-DLT pipelines + UC → Delta Sharing/Genie/Vector Search/Lakebase → consumers) with a DevOps-spine strip;
-and "Agent stack" — five-band agentic services diagram (triggers → Claude Agent SDK orchestrator →
-MCP/API tools → six agents → platform surfaces acted on, write paths marked PR-only). Both verified
-via headless-Chrome screenshots.</p>
-<p>Final stretch: the six agents were BUILT AND DEPLOYED for real (agents/ + resources/agents.yml —
-two serverless jobs: acme_agents_scheduled with daily-06:00-UTC cron PAUSED, acme_agents_on_demand
-with a product_request job parameter). Design: deterministic work always runs (DAMA checks,
-drift scan, corpus build, gate, digest); Claude reasoning (claude-opus-4-8, adaptive thinking,
-manual tool loop with ONE read-only-SQL tool, everything logged to audit.agent_runs) activates when
-env ANTHROPIC_API_KEY or Databricks secret agents/anthropic_api_key exists — currently NEITHER is
-configured, so all validated runs were deterministic mode. To enable LLM mode: create secret scope
-"agents", put anthropic_api_key in it. Both jobs ran SUCCESS on serverless (env spec
-environment_version 3 + pip anthropic). One deploy bug fixed: <strong>file</strong> is undefined in serverless
-spark_python_task (script exec'd in IPython kernel) — path bootstrap falls back to sys.argv[0].
-Validated outputs: audit.dq_results now populated (10 checks, 9 pass; orders_arriving_30d fails
-by design — synthetic data max order_date ~2026-05); schema drift found for real (unmapped MATNR,
-SHLITM/SHKCOO/SHDOCO/SHDCTO, so_domain/so_part — the JDE key columns are consumed via a
-concat transform_expr with src_column NULL, so the scanner over-reports them: known limitation);
-acme_products.sales.v_sales_orders_unified created (13,000 rows); customer_narratives 1,001 rows;
-gate reads 9/14 — two NEW failures are side effects, not regressions (config-table count grew to 7
-because agents added agent_runs/agent_reports and validate.py expects exactly 5; PIT freshness
-fails because UTC date rolled past the last gold_pipeline run — rerun gold_pipeline to clear).</p>
-<h2>2026-07-19 — Agents completed: LLM mode enabled and validated end-to-end</h2>
-<p>Secret scope "agents" created; user stored anthropic_api_key via interactive put-secret (key never
-in transcript). Three agent_core fixes from the first LLM runs: (1) secret retrieval now tries
-databricks.sdk.runtime.dbutils first (WorkspaceClient().dbutils proved flaky on serverless — one
-task got the key, its sibling didn't) with failure reasons logged; (2) tool budget raised 8→12 and
-a finalization turn added (tool_choice none, "write the report from gathered evidence") — first RCA
-came back truncated mid-investigation; (3) schema_evolution scanner now counts columns referenced
-inside transform_expr as consumed (JDE composite-key columns no longer false-positive).</p>
-<p>All six agents validated in mode=llm (see audit.agent_runs / agent_reports):
-- dq_monitor_rca: full evidence-backed RCA on orders_arriving_30d — correctly diagnosed
-  source-side staleness (fresh _ingest_ts, frozen business dates, single-batch snapshot reload,
-  identical cutoff across 3 ERPs) and proposed the bronze business-date freshness check that
-  would have caught it earlier.
-- operational_intel: digest with self-directed drill-downs (top backlog accounts per customer).
-- schema_evolution: sampled drifted columns, found MATNR/SHLITM/so_part share identical
-  harmonized product codes, proposed 3 mapping INSERTs to a common product_id, and correctly
-  recommended skipping so_domain (constant technical field).
-- product_creator: NL request → acme_products.sales.order_to_cash (13,000 rows), passed the
-  validation gate.
-- vector_content: QA caught a REAL artifact — all 501 JDE customers show backlog == orders
-  because shipment lifecycle sources are SAP-only in the pilot (LIPS mappings only); flagged as
-  ETL gap, plus GmbH-suffix-vs-country synthetic-data mismatch.
-- deployment_gate: classified all 5 failures with evidence and issued HOLD on the one genuine
-  regression (pit_customer 1 day stale) — cleared by rerunning gold_pipeline (PIT now current).
-Remaining known gaps unchanged: row filters/masks not built; validate.py counts stale (checks 2–3).</p>
-<h2>2026-07-19 (later) — Design estate deployed: security, products, ML features, semantics — 14/14</h2>
-<p>After merging the sibling repo's design estate, deployed the deployable parts:
-- SECURITY (checks 8–9 closed): acme_gold.sec schema + region_filter/mask_customer_name
-  functions (is_member('admins') escape added so the owner keeps visibility — the account
-  groups don't exist yet). Learning: DLT-materialized tables REJECT ALTER TABLE SET ROW
-  FILTER/MASK ("expects a table but is a view") — governance must be declared in the pipeline
-  definition: gold_dlt.py now sets row_filter= on fact_sales_orders + dim_customer and a
-  schema DDL with MASK on dim_customer.customer_name. Verified in information_schema.
-  GRANTs to sales_analyst_*/data_engineer fail (PRINCIPAL_DOES_NOT_EXIST — account groups
-  not provisioned); staged in security/unity_catalog_policies.sql until an account admin
-  creates them. PII tags applied.
-- PRODUCTS: v_sales_orders (canonical), v_customer_360 (narrative + fulfillment metrics),
-  ops.v_melt_to_margin (36 rows), meta.v_product_trust_scores (from dq_results), all
-  commented + tagged; registry entries added. CREATE SHARE denied (needs metastore-level
-  privilege) — documented.
-- SEMANTICS: acme_gold.sales.mv_sales_metrics metric view (WITH METRICS LANGUAGE YAML)
-  created successfully — query with MEASURE().
-- ML: ml/build_features.py + resources/ml.yml job acme_ml_features — PIT-correct
-  (order_date &lt; as_of_date strictly) customer features: 1,001 rows, churn_risk computed
-  (594 high-risk — consistent with the frozen order flow). audit.batch_log created.
-- AI: ai/provision_vector_search.py (sdk-based, 3-phase idempotent) — source table
-  customer_profile_text (1,001 rows, CDF), endpoint acme-vs PROVISIONING; rerun for index.
-  NOTE: the endpoint bills while it exists.
-- validate.py baselines refreshed (config tables &gt;=9, sources = 14); deployment_gate
-  known-gaps prompt updated to "no open gaps — every failure is a candidate regression".
-- RESULT: full validation suite 14/14 GREEN for the first time.
-- docs/DEMO_RUNBOOK.md added — 5-station talking-point sequence + honest-answer cards.</p>
-</div>
-<div id="p5" class="tabpanel" role="tabpanel">
-<p class="srcfile">source: docs/DEMO_RUNBOOK.md</p>
-<h1>Demo Runbook — sequence of talking points</h1>
-<p>Five stations, ~2–3 minutes each. Pre-demo checklist at the bottom. Every claim in the
-deck maps to something you can open live at one of these stations.</p>
-<h2>Station 1 — The deck (presentation/index.html)</h2>
-<p>Open in a browser, arrow keys to navigate. Slide flow: title (stat band: 4 catalogs ·
-14 sources · 32 tables · 25.9K records · 14/14 CI checks) → context → cloud architecture
-→ data model (real row counts) → field-level lineage → silver hash keys → gold/DV2.0 →
-config-driven → DQ → governance → agent stack → agents → products → ROI → risks.
-<strong>Talking point:</strong> "Every number on the title slide is verified against the live workspace."</p>
-<h2>Station 2 — The repo (GitHub, branch dv2)</h2>
-<p>Show: <code>pipelines/</code> (2 DLT files — the whole medallion), <code>agents/</code> (6 agents + core),
-<code>resources/</code> (Asset Bundle = the deployment), <code>sql/</code> (lineage proofs), <code>security/</code>,
-<code>docs/index.html</code> (tabbed doc site).
-<strong>Talking point:</strong> "Deployment is <code>databricks bundle deploy</code> — no hand-built notebooks;
-CI gate is <code>scripts/validate.py</code>, currently 14/14."</p>
-<h2>Station 3 — Databricks workspace (adb-7405618665227003.3.azuredatabricks.net)</h2>
-<ul>
-<li>Catalog Explorer: acme_bronze → silver → gold → products; open
-  <code>acme_gold.sales.dim_customer</code> → note ROW FILTER + column MASK badges.</li>
-<li>Pipelines UI: silver_pipeline / gold_pipeline, both green.</li>
-<li>Jobs UI: acme_agents_scheduled (paused cron), acme_agents_on_demand, acme_ml_features.
-<strong>Talking point:</strong> "Governance is enforced in the pipeline definition — filters and masks
-survive every refresh; account-group grants are staged in security/unity_catalog_policies.sql."</li>
-</ul>
-<h2>Station 4 — Live queries (SQL editor or databricks-connect)</h2>
-<pre><code class="language-sql">-- one order traced Bronze -&gt; Silver -&gt; Gold (swap the id to any order)
--- run the steps in sql/02_trace_order_lineage.sql
-
--- governance is real:
-SELECT * FROM system.information_schema.row_filters  WHERE table_name = 'fact_sales_orders';
-SELECT * FROM system.information_schema.column_masks WHERE table_name = 'dim_customer';
-
--- products + trust:
-SELECT * FROM acme_products.meta.v_product_trust_scores;
-SELECT * FROM acme_products.sales.v_customer_360 LIMIT 5;
-
--- semantic layer (metric view):
-SELECT order_date, MEASURE(revenue_usd), MEASURE(avg_order_value)
-FROM acme_gold.sales.mv_sales_metrics GROUP BY order_date ORDER BY order_date DESC LIMIT 10;
-
--- ML features (PIT-correct):
-SELECT * FROM acme_gold.ml.customer_features WHERE churn_risk_score &gt;= 0.5 LIMIT 10;
-</code></pre>
-<h2>Station 5 — Agent evidence (the differentiator)</h2>
-<pre><code class="language-sql">SELECT agent, mode, status, finished_at FROM acme_bronze.audit.agent_runs ORDER BY finished_at DESC;
-SELECT agent, title, body FROM acme_bronze.audit.agent_reports ORDER BY created_at DESC LIMIT 3;
-</code></pre>
-<p>Read aloud from the DQ RCA report: the agent verified the failure itself, traced it to
-source-side staleness (fresh <code>_ingest_ts</code>, frozen business dates, one snapshot batch),
-and proposed the bronze-layer check that would have caught it two months earlier.
-<strong>Talking point:</strong> "The agent's only tool is read-only SQL; every query it ran is in the
-decision log; writes happen in deterministic code. That's the guardrail model."
-Then: <code>acme_products.sales.order_to_cash</code> — a view an agent created from a natural-language
-request, through a validation gate.</p>
-<h2>Pre-demo checklist (run 30 min before)</h2>
-<ol>
-<li><code>databricks bundle run gold_pipeline -t dev</code> (fresh PIT snapshot — check 13)</li>
-<li><code>databricks bundle run agents_scheduled_job -t dev</code> (fresh DQ rows + digest; needs the
-   <code>agents/anthropic_api_key</code> secret for LLM mode)</li>
-<li><code>python scripts/validate.py</code>-equivalent via connect — confirm 14/14</li>
-<li>Open all five stations in browser tabs; presentation on second screen</li>
-</ol>
-<h2>Honest-answer cards (if pressed)</h2>
-<ul>
-<li>Delta Share: <code>CREATE SHARE</code> needs metastore-level privilege this workspace user lacks —
-  designed in <code>data_products/publish_marketplace.sql</code>, blocked on admin action.</li>
-<li>Vector Search: endpoint <code>acme-vs</code> provisioned; index created by rerunning
-  <code>ai/provision_vector_search.py</code> once the endpoint is ONLINE.</li>
-<li>Account groups (sales_analyst_*): filter/mask functions reference them today; the GRANTs
-  activate when an account admin creates the groups.</li>
-<li>Bronze ingestion: synthetic seed stands in for the templated Auto Loader/Lakeflow Connect
-  estate described in <code>docs/REPLICATION_PATTERNS.md</code> — design complete, not deployed.</li>
-</ul>
-</div>
-<div id="p6" class="tabpanel" role="tabpanel">
-<p class="srcfile">source: docs/GAP_ANALYSIS.md</p>
-<h1>Gap Analysis — repo vs. requirement (July 2026)</h1>
-<p>Legend: 🔴 broken/missing (claimed but not real) · 🟠 required but absent · 🟡 improvement / new-feature opportunity · ✅ solid</p>
-<h2>A. Claimed-in-docs but NOT in code (highest interview risk — fix first)</h2>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Gap</th>
-<th>Evidence</th>
-<th>Fix (in this package)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A1</td>
-<td>🔴 <strong>Silver is NOT config-driven.</strong> <code>silver_dlt.py</code> docstring says mappings come from <code>cfg.layer_mappings</code>; all mappings are hardcoded. <code>layer_mappings</code> is never seeded, never read.</td>
-<td><code>pipelines/silver_dlt.py</code> vs <code>config/config_tables.sql</code></td>
-<td>Updated <code>silver_dlt.py</code> (reads <code>cfg.layer_mappings</code>, hardcoded specs kept only as seed/fallback) + <code>config/seed_layer_mappings.sql</code></td>
-</tr>
-<tr>
-<td>A2</td>
-<td>🔴 <strong><code>batch_log</code> never written.</strong> Requirement: "automated checks and logging for the rejected records <strong>and batches</strong>". Table exists; zero writers.</td>
-<td>grep: no writer for <code>audit.batch_log</code></td>
-<td><code>dq/quarantine_writer.py</code> writes batch_log from the DLT event log every run</td>
-</tr>
-<tr>
-<td>A3</td>
-<td>🔴 <strong>DLT-dropped rows never reach <code>rejected_records</code>.</strong> <code>expect_all_or_drop</code> silently drops; the promised <code>dq/quarantine_writer.py</code> doesn't exist (referenced in <code>bronze_ingest_template.py</code>). Only the batch DQ job quarantines.</td>
-<td><code>ingestion/templates/bronze_ingest_template.py</code> comment</td>
-<td>New <code>dq/quarantine_writer.py</code>: parses pipeline event log expectations → rejected_records with DAMA dimension tag</td>
-</tr>
-<tr>
-<td>A4</td>
-<td>🔴 <strong><code>validate.py</code> check #3 can never pass.</strong> "Sources registered ≥6" reads <code>cfg.source_registry</code>, but <code>deploy.py --register-source</code> never inserts into it.</td>
-<td><code>scripts/deploy.py</code></td>
-<td>Updated <code>deploy.py</code> inserts registry row per source</td>
-</tr>
-<tr>
-<td>A5</td>
-<td>🔴 <strong>Referenced files missing</strong>: <code>ingestion/litmus_ot/uns_topic_map.yaml</code> (REPLICATION_PATTERNS R3), <code>gg_bronze_dlt.py</code> (R1 — actually covered by the shared template), <code>fx_rates</code> table (read by Silver, never created), <code>docs/SESSION_NOTES.md</code> (CLAUDE.md rule 4).</td>
-<td>docs vs tree</td>
-<td>Added <code>uns_topic_map.yaml</code>; <code>fx_rates</code> created+seeded in <code>seed_layer_mappings.sql</code>; R1 doc corrected to name the real template; SESSION_NOTES.md stub</td>
-</tr>
-</tbody>
-</table>
-<h2>B. Requirement present, repo silent (🟠 required)</h2>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Requirement text</th>
-<th>Gap</th>
-<th>Fix</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>B1</td>
-<td>"dashboard showing that metrics" (DAMA 6 DQ dimensions) + trust in data products</td>
-<td>No dashboard artifact at all. <code>dq_results</code> exists but nothing consumes it.</td>
-<td><code>dashboards/dq_trust_dashboard.sql</code> — Lakeview-ready dataset queries: score by dimension over time, product trust scorecard, reject drill-down, freshness SLO</td>
-</tr>
-<tr>
-<td>B2</td>
-<td>"oracle EBS <strong>and D365</strong> data along with <strong>MES</strong>" in region/sensitivity policies</td>
-<td>No EBS, D365, or MES source rows; security SQL only covers SAP/JDE/QAD</td>
-<td>3 new rows in <code>replication_sources.yaml</code> (EBS via OGG, D365 via Lakeflow Connect managed connector, MES via Litmus); <code>unity_catalog_policies.sql</code> region filter extended (EBS→AMERICAS, D365→GLOBAL-masked, MES→ot_engineer)</td>
-</tr>
-<tr>
-<td>B3</td>
-<td>Workflow orchestration (JD: "workflow orchestration tools"; deploy.py step 7 "jobs (DQ, features, vectors)")</td>
-<td>No job definitions exist anywhere</td>
-<td><code>pipelines/jobs/lakeflow_jobs.yaml</code> — Declarative Automation Bundle resources: dq job (with failure→healer webhook), quarantine writer, feature refresh, vector sync</td>
-</tr>
-<tr>
-<td>B4</td>
-<td>ML Feature Store "low-latency serving"</td>
-<td>Only a comment; no online path</td>
-<td><code>ml/feature_store.py</code> updated: publishes a <strong>Lakebase</strong>-synced online feature table (Lakebase is GA on Azure since Mar 2026)</td>
-</tr>
-<tr>
-<td>B5</td>
-<td>"RAG patterns" / Agent Bricks</td>
-<td><code>vector_search_rag.py</code> ends in a comment where the agent should be</td>
-<td><code>ai/rag_agent.py</code> — retriever tool + agent + Model Serving endpoint via Mosaic AI Agent Framework</td>
-</tr>
-<tr>
-<td>B6</td>
-<td>Synthetic data "from multiple source systems"</td>
-<td>Generator covers SAP VBAK, JDE F4201, OT only. No KNA1/F0101 (Silver customer reads them!), no QAD, SFDC, D365; <code>STEEL</code> product list defined but unused</td>
-<td><code>generate_synthetic_data.py</code> extended: kna1, f0101, qad so_mstr, sfdc opportunity, d365 salesorders — with product codes so a <code>dim_product</code> becomes possible</td>
-</tr>
-<tr>
-<td>B7</td>
-<td>Gold star schema depth ("dimensional modeling")</td>
-<td>Only <code>dim_customer</code> + 2 facts; no <code>dim_date</code>, no <code>dim_product</code>; <code>fact_heat_quality</code> comment promises a tonnage join it doesn't do</td>
-<td>Deliberately <strong>not</strong> auto-fixed (would need your grain decisions) — flagged as open question below</td>
-</tr>
-</tbody>
-</table>
-<h2>C. Latest-feature upgrades (🟡 — what changed since the repo was written)</h2>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Feature (status, July 2026)</th>
-<th>Where it lands</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>C1</td>
-<td><strong>Oracle query-based connector — GA May 2026.</strong> Databricks-native Oracle/EBS ingestion via cursor column, no gateway, no OGG.</td>
-<td>New pattern <code>lakeflow_query</code> in YAML + REPLICATION_PATTERNS R1b. Positioning: OGG stays for true CDC/deletes; query-based for cursor-friendly tables (EBS <code>LAST_UPDATE_DATE</code>). This directly answers "how to do it Databricks-native."</td>
-</tr>
-<tr>
-<td>C2</td>
-<td><strong>Zerobus (Lakeflow Connect direct-write API)</strong> — high-throughput (~100MB/s), &lt;5s latency event ingestion without managing Event Hubs consumers.</td>
-<td>Documented as Path C for Litmus OT in R3; Litmus can push straight to the lakehouse. Event Hubs path kept as default (Litmus ships a native EH connector today).</td>
-</tr>
-<tr>
-<td>C3</td>
-<td><strong>AUTO CDC replaces <code>apply_changes</code></strong> in Lakeflow Spark Declarative Pipelines; <code>dlt</code> module direction is <code>pyspark.pipelines</code>.</td>
-<td>Bronze template updated to <code>create_auto_cdc_flow</code> with graceful fallback; comment notes the module rename so the repo doesn't look pre-2025.</td>
-</tr>
-<tr>
-<td>C4</td>
-<td><strong>Unity Catalog Metric Views / Business Semantics — GA</strong>, integrated with AI/BI Dashboards + Genie.</td>
-<td><code>semantics/sales_metric_view.sql</code> — revenue/orders/AOV defined once; Genie space and dashboards both bind to it. Replaces "Genie hits agg table" with the 2026-correct answer.</td>
-</tr>
-<tr>
-<td>C5</td>
-<td><strong>Lakebase GA on Azure (Mar 2026)</strong> — autoscaling, HA, scale-to-zero.</td>
-<td>B4 above; also noted as the backing store for the marketplace UI if it needs app state.</td>
-</tr>
-<tr>
-<td>C6</td>
-<td><strong>Data Quality Monitoring / Anomaly Detection (Public Preview) + table health indicators.</strong></td>
-<td>Noted in dashboard SQL header: complements (not replaces) the DAMA framework — anomaly detection = unknown-unknowns, DAMA rules = contractual thresholds. Good interview talking point.</td>
-</tr>
-<tr>
-<td>C7</td>
-<td><strong>Declarative Automation Bundles</strong> (Asset Bundles renamed).</td>
-<td><code>lakeflow_jobs.yaml</code> written in bundle resource shape; deploy.py notes <code>databricks bundle deploy</code> as the target-state deployer vs raw REST.</td>
-</tr>
-<tr>
-<td>C8</td>
-<td>Real-time mode (<code>update_flow</code>, ms-latency, Public Preview)</td>
-<td>Documented option in R3 for OT alerting use cases; not defaulted (preview).</td>
-</tr>
-</tbody>
-</table>
-<h2>D. Open questions (per CLAUDE.md rule 3 — no assumptions made)</h2>
-<ol>
-<li><strong>Gold dims</strong>: should <code>dim_product</code> key off SAP MATNR / JDE item / QAD part unified by hash key, and what survivorship order? (B7)</li>
-<li><strong>fact_heat_quality ↔ shipped tonnage</strong>: which table carries daily tonnage — JDE F4211 lines or MES? Join grain (site+date?) needs your call.</li>
-<li><strong>D365 scope</strong>: which entities (salesorders only, or accounts/quotes)? Managed connector vs Synapse Link landing?</li>
-<li><strong>OGG retirement horizon</strong>: if EBS tables all have reliable <code>LAST_UPDATE_DATE</code>, query-based connector could retire OGG entirely — licensing decision, not technical.</li>
-<li><code>Old/</code> folder still ships stale content (599-line old README, jsx) — delete before sharing repo access at the interview?</li>
-</ol>
-</div>
-<div id="p7" class="tabpanel" role="tabpanel">
-<p class="srcfile">source: docs/JD_ALIGNMENT.md</p>
-<h1>JD Alignment — Senior Data Engineer (Agentic Lakehouse)</h1>
-<p>Maps each requirement to (a) proof in this repo, (b) real project history. Use for resume
-tailoring and interview talking points. Source-of-truth for both: this file only — do not
-duplicate into ARCHITECTURE.md or REPLICATION_PATTERNS.md.</p>
-<table>
-<thead>
-<tr>
-<th>JD requirement</th>
-<th>Repo evidence</th>
-<th>Real-world evidence</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>6+ yrs modern data platforms/pipelines</td>
-<td>Full Bronze→Silver→Gold→Products lakehouse, config-driven</td>
-<td>19+ yrs; BNY (Customer MDM/governance), JPMC, UBS, Bank of America, Westfield, Autoliv, Bayer</td>
-</tr>
-<tr>
-<td>AI/ML-driven workflows</td>
-<td><code>agents/</code> (dq_rca_agent, pipeline_healer, lineage_doc_agent, ingestion_registrar); <code>ml/feature_store.py</code>; <code>ai/vector_search_rag.py</code></td>
-<td>New — this repo is the primary proof point; position as hands-on agentic build, not just theory</td>
-</tr>
-<tr>
-<td>Strong SQL &amp; Python</td>
-<td><code>config/config_tables.sql</code>, <code>dq/dama_dq_framework.py</code>, <code>pipelines/*_dlt.py</code>, <code>scripts/*.py</code></td>
-<td>Snowflake/T-SQL/PySpark across all prior engagements</td>
-</tr>
-<tr>
-<td>Databricks, Delta Lake, Spark hands-on</td>
-<td>Entire repo: DLT pipelines, Delta tables, Liquid Clustering, Unity Catalog</td>
-<td>Azure Databricks at Westfield Insurance (P&amp;C) and Autoliv (manufacturing)</td>
-</tr>
-<tr>
-<td>ETL/ELT in Azure</td>
-<td>ADLS Gen2 landing, Lakeflow Connect, Azure DevOps CI/CD</td>
-<td>Azure Databricks/ADF pipelines at Westfield, Autoliv</td>
-</tr>
-<tr>
-<td>Workflow orchestration tools</td>
-<td>Lakeflow Jobs orchestration; <code>.azuredevops/azure-pipelines.yml</code></td>
-<td>ADF/Databricks Workflows at prior engagements</td>
-</tr>
-<tr>
-<td>Agentic automation concepts</td>
-<td><code>agents/*.md</code> specs: self-healing pipelines, DQ root-cause-analysis agent, lineage-doc agent, ingestion registrar agent — all config-driven, no hardcoded logic</td>
-<td>Differentiator — most candidates will only have orchestration, not self-healing/agentic design</td>
-</tr>
-<tr>
-<td>DW/DL/Lakehouse design</td>
-<td>Medallion (3NF Bronze/Silver, star Gold), hash-key joins, config-table lineage</td>
-<td>Data Vault 2.0 on Snowflake at Autoliv; Snowflake medallion at Vertiv-style platform build</td>
-</tr>
-<tr>
-<td>CI/CD (Azure DevOps preferred)</td>
-<td><code>.azuredevops/azure-pipelines.yml</code>, <code>scripts/validate.py</code> as CI gate</td>
-<td>Azure DevOps pipelines in prior Azure engagements</td>
-</tr>
-<tr>
-<td>Agile</td>
-<td>—</td>
-<td>Standard across all consulting engagements (BNY, Westfield, Autoliv)</td>
-</tr>
-<tr>
-<td>MDM / Reference Data collaboration</td>
-<td><code>security/unity_catalog_policies.sql</code> (region-based RBAC), hash-key dimension model as reference-data backbone</td>
-<td>Direct: Customer MDM + data governance frameworks at BNY</td>
-</tr>
-<tr>
-<td>Observability/monitoring/alerting</td>
-<td><code>dq/</code> quarantine + rejected-record logging; batch_log/dq_results tables; SQL freshness alerts</td>
-<td>Standard governance practice from BNY/Westfield engagements</td>
-</tr>
-</tbody>
-</table>
-<h2>How to use this in interview prep</h2>
-<ul>
-<li>Lead with BNY MDM + governance as the "why data quality/lineage/config-driven design matters to me" story.</li>
-<li>Use this repo as the concrete Databricks-native answer to "have you worked with agentic pipelines?" — walk through <code>agents/pipeline_healer.md</code> and <code>agents/dq_rca_agent.md</code> specifically, since that's the requirement most candidates will fake or hand-wave.</li>
-<li>Bridge Data Vault 2.0 (Autoliv/Snowflake) → hash-key Silver design here: same deterministic-key idea, applied without full hub/link/sat overhead (see <code>JUSTIFICATION_NOTES.md</code> #4–5 for the reasoning to repeat verbatim in an interview).</li>
-<li>If asked about production Databricks depth specifically (vs. Snowflake): be upfront that Westfield/Autoliv is your hands-on Databricks base, and this repo demonstrates the newer Databricks 2025/2026 surface (Lakeflow Connect, Agent Bricks, Genie, Lakebase) applied to that same real-world pattern set.</li>
-</ul>
-<h2>Gaps to name honestly (don't oversell)</h2>
-<ul>
-<li>No production Databricks Marketplace publish in real engagements — <code>data_products/publish_marketplace.sql</code> here is a design/demo, say so if asked directly.</li>
-<li>Agentic pipeline healing is a <strong>build</strong>, not yet <strong>production-run-at-scale</strong> — frame as "designed and implemented in a representative environment," not "running in prod for N years."</li>
-</ul>
-</div>
-<div id="p8" class="tabpanel" role="tabpanel">
 <p class="srcfile">source: docs/REPLICATION_PATTERNS.md</p>
 <h1>Reusable Replication Patterns → Bronze</h1>
 <p>Goal: <strong>any technical person</strong> lands a new source in Bronze by (1) adding one row to
@@ -923,15 +455,26 @@ batch-only, loses edge normalization and UNS context.</p>
    pipeline via REST, and records lineage in <code>acme_bronze.audit.source_registry</code>.</li>
 </ol>
 </div>
-<div id="p9" class="tabpanel" role="tabpanel">
+<div id="p5" class="tabpanel" role="tabpanel">
 <p class="srcfile">source: docs/TRACEABILITY_MATRIX.md</p>
 <h1>Requirements Traceability Matrix</h1>
 <p>Source: "requirements azure databricks data vault" spec (Nucor tech challenge).
 Status legend — ✅ <strong>Deployed &amp; validated</strong> (running in workspace adb-7405618665227003,
 verified this build) · 🟡 <strong>Partial</strong> (core deployed, named remainder open) ·
-📘 <strong>Design-only</strong> (code/docs in repo, not deployed) · ❌ <strong>Gap</strong> (not built).</p>
-<p>Verification anchors: <code>scripts/validate.py</code> = 14/14 green (2026-07-19);
-<code>audit.agent_runs</code> / <code>agent_reports</code> = agent evidence; <code>sql/03</code> = zero-orphan lineage.</p>
+📘 <strong>Design-only</strong> (code/docs in repo, not deployed) · ❌ <strong>Gap</strong> (not built) ·
+⏸️ <strong>Deferred (POC scope)</strong> (consciously out of scope for this exercise — blocked on
+account-admin action outside repo owner's permissions, or would only be built for a
+production rollout, not a proof-of-concept).</p>
+<p>Verification anchors: <code>scripts/validate.py</code> = 14/14 green, re-verified live by <code>deployment_gate</code>
+with a PROMOTE recommendation (2026-08-02, after rerunning <code>silver_pipeline</code>/<code>gold_pipeline</code> and
+the DQ agent to clear a 12-day staleness regression — see <code>docs/SESSION_NOTES.md</code>);
+<code>audit.agent_runs</code> / <code>agent_reports</code> = agent evidence; <code>sql/03</code> = zero-orphan lineage.
+Known non-blocking blind spot found in this re-verification: 3,000 QAD fact rows have
+<code>customer_hk = NULL</code> (no QAD customer-master source registered) — the FK check only counts
+non-null orphans so it stays green; pre-existing, not a regression. Also unchanged and
+by design for this POC: <code>orders_arriving_30d</code>/<code>bronze_ingest_fresh_24h</code> DQ checks fail because
+the synthetic data generator caps business dates at 2026-05-16 and bronze is a one-time seed,
+not live ingestion (see gap #1 below) — this does not affect <code>validate.py</code>'s own 14 checks.</p>
 <h2>1 — Replication / ingestion patterns</h2>
 <table>
 <thead>
@@ -1111,8 +654,8 @@ verified this build) · 🟡 <strong>Partial</strong> (core deployed, named rema
 <tr>
 <td>R4.3</td>
 <td>AI-ready: embeddings, semantic search, RAG</td>
-<td><code>customer_narratives</code> + <code>ai.customer_profile_text</code> (CDF, deployed); <code>ai/provision_vector_search.py</code> (endpoint <code>acme-vs</code> provisioning); <code>ai/vector_search_rag.py</code>, <code>ai/rag_agent.py</code> (design)</td>
-<td>🟡</td>
+<td><code>customer_narratives</code> + <code>ai.customer_profile_text</code> (CDF); <code>ai/provision_vector_search.py</code> — endpoint <code>acme-vs</code> ONLINE, delta-sync index <code>customer_profile_idx</code> ready, 1,001 rows embedded (<code>databricks-gte-large-en</code>), live query verified (churn/backlog search returns correct matches by meaning, not keyword); RAG generation layer (<code>ai/vector_search_rag.py</code>, <code>ai/rag_agent.py</code>, Model Serving) still design-only</td>
+<td>🟡 retrieval deployed; generation (RAG) design-only</td>
 </tr>
 <tr>
 <td>R4.4</td>
@@ -1272,8 +815,8 @@ verified this build) · 🟡 <strong>Partial</strong> (core deployed, named rema
 <tr>
 <td>R9.1</td>
 <td>Agentic workflows / self-healing pipelines</td>
-<td><code>agents/</code> 6 agents + <code>agent_core.py</code>, 3 jobs deployed, all validated <code>mode=llm</code>; healer/registrar/lineage-doc specs in <code>agents/*.md</code></td>
-<td>🟡 6 live; 4 spec'd agents design-only</td>
+<td><code>agents/</code> <strong>10</strong> agents + <code>agent_core.py</code>, 2 agent jobs + 1 ML job deployed, all 10 confirmed live via <code>databricks jobs get-run-output</code> on 2026-08-14 (not just <code>bundle validate</code>); each report now independently fact-checked against its own evidence log before saving (<code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>)</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>R9.2</td>
@@ -1302,58 +845,1805 @@ verified this build) · 🟡 <strong>Partial</strong> (core deployed, named rema
 </tbody>
 </table>
 <h2>Score &amp; open gaps (prioritized)</h2>
-<p><strong>28 requirements: 17 ✅ · 12 🟡 · 4 📘 · 2 ❌</strong> (some IDs span categories).</p>
+<p><strong>28 requirements: 18 ✅ · 11 🟡 · 4 📘 · 2 ❌</strong> (some IDs span categories; R9.1 moved 🟡→✅ 2026-08-14 when the 4 previously spec-only agents were confirmed live).</p>
+<p><strong>POC scope note (2026-08-02):</strong> this build is a proof-of-concept for an interview/demo
+exercise, not a production handover. The core exercise — medallion + DV2.0, governance,
+agents, AI-ready layer — is ✅/🟡 above and running. The items below are consciously deferred
+rather than active engineering work: most are blocked on account-admin actions outside the
+repo owner's permissions, or are scoped for a real production rollout rather than this
+exercise. Nothing here blocks the demo.</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
-<th>Gap</th>
-<th>Smallest closing action</th>
+<th>Item</th>
+<th>Why deferred (POC scope)</th>
+<th>Path to production</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
 <td>Bronze ingestion pipelines not deployed (R1.1–R1.4)</td>
-<td>Deploy <code>ingestion/templates/bronze_ingest_template.py</code> as a DLT pipeline for ONE pattern (autoloader_file over <code>data/</code> uploads) to prove the template</td>
+<td>Synthetic seed stands in for live ingestion — sufficient to prove the medallion/DV2.0/governance/agent stack end to end</td>
+<td>Deploy <code>ingestion/templates/bronze_ingest_template.py</code> as a DLT pipeline for ONE pattern (autoloader_file over <code>data/</code> uploads)</td>
 </tr>
 <tr>
 <td>2</td>
 <td><code>rejected_records</code>/<code>batch_log</code> never written by pipelines (R3.9)</td>
-<td>Wire <code>dq/quarantine_writer.py</code> logic into <code>silver_dlt.py</code> expectations, or extend the DQ agent to snapshot DLT expectation metrics per run</td>
+<td>Tables + design already exist (<code>dq/quarantine_writer.py</code>); wiring is incremental, not needed to demonstrate the DQ pattern (<code>audit.dq_results</code> already populated by the agent)</td>
+<td>Wire <code>dq/quarantine_writer.py</code> into <code>silver_dlt.py</code> expectations</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Delta Share / Marketplace listing (R5.3)</td>
+<td>⏸️ Blocked on metastore-admin grant (CREATE SHARE) — outside repo owner's permissions</td>
 <td>Metastore admin grants CREATE SHARE, then run <code>data_products/publish_marketplace.sql</code></td>
 </tr>
 <tr>
 <td>4</td>
 <td>Account groups for regional RBAC (R3.10)</td>
+<td>⏸️ Blocked on account-admin group creation — the row-filter/mask policies themselves are live and validated (checks 8–9 ✅)</td>
 <td>Account admin creates <code>sales_analyst_*</code>/<code>data_engineer</code>/<code>data_steward</code>; rerun grants in <code>security/unity_catalog_policies.sql</code></td>
 </tr>
 <tr>
 <td>5</td>
-<td>Vector index + RAG serving (R4.3)</td>
-<td>Rerun <code>ai/provision_vector_search.py</code> once <code>acme-vs</code> is ONLINE; then <code>ai/rag_agent.py</code> needs a serving endpoint</td>
+<td>RAG generation layer (R4.3)</td>
+<td>Retrieval half is live and live-query-verified (semantic match confirmed); generation is a thin wrapper not needed to prove the retrieval pattern</td>
+<td>Build <code>ai/rag_agent.py</code> (retrieval-augmented prompt) + a Model Serving endpoint on top of the live index</td>
 </tr>
 <tr>
 <td>6</td>
 <td>Marketplace UI not deployed (R6)</td>
+<td>Explicit stretch goal in the requirement doc; independent front-end, not core to the data platform exercise</td>
 <td>Azure App Service / Static Web App deploy of <code>marketplace-ui/</code>; point backend at <code>cfg.product_registry</code> + trust view</td>
 </tr>
 <tr>
 <td>7</td>
 <td>Trust dashboard not live (R5.2)</td>
+<td>Needs a standing SQL warehouse (ongoing cost for a POC); the view backing it, <code>meta.v_product_trust_scores</code>, is already live</td>
 <td>Create SQL warehouse → import <code>dashboards/dq_trust_dashboard.sql</code> as AI/BI dashboard</td>
 </tr>
 <tr>
 <td>8</td>
 <td>Read-only interview access (R8.1)</td>
+<td>⏸️ One-time manual admin step, not an engineering task</td>
 <td>Workspace admin invites reviewer as workspace user with SELECT-only grants on the 4 catalogs</td>
 </tr>
 </tbody>
 </table>
+</div>
+<div id="p6" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/AGENT_RELIABILITY_GUARDRAILS.md</p>
+<h1>Agent reliability guardrails: what stops hallucination, and how it compares to Anthropic's current standards</h1>
+<p><strong>Update:</strong> the four closable gaps found below (evaluator-optimizer pass, inline citations,
+an eval scorecard, and a Plan-Mode option for the one agent that writes) were implemented the
+same session this doc was written — see "Closed this session" at the bottom. The comparison
+table and gap list below are left as originally written, then annotated, so the record of
+what was found vs. what was fixed stays honest and traceable.</p>
+<p><strong>Direct answer to "is this documented in the md file?": no, not centrally.</strong> The 10 <code>agents/*.md</code>
+spec files (the original one-paragraph specs for <code>pipeline_healer</code>, <code>dq_rca_agent</code>,
+<code>ingestion_registrar</code>, <code>lineage_doc_agent</code>) say nothing about hallucination — they only cover
+triggers, tool access, and <em>write</em>-safety ("never merge", "read-only on prod data").
+<code>docs/AGENT_ARCHITECTURE.html</code> documents a "Guardrails" section, but it's framed entirely around
+write-safety (the read-only tool, deterministic-writes-only, tool budget) — it never uses the word
+"hallucination" and doesn't frame the design as an accuracy measure. The actual anti-hallucination
+instructions are real and working, but they live scattered across <code>agent_core.py</code> and individual
+system prompts in the <code>.py</code> files, not written down anywhere as a named policy. <strong>This doc is that
+missing writeup</strong>, plus the comparison you asked for.</p>
+<h2>Sources consulted (current, fetched live — not from training-data memory)</h2>
+<ul>
+<li><a href="https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-hallucinations">Reduce hallucinations</a> — Claude Docs</li>
+<li><a href="https://www.anthropic.com/research/trustworthy-agents">Trustworthy agents in practice</a> — Anthropic Research</li>
+<li><a href="https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents">Effective harnesses for long-running agents</a> — Anthropic Engineering</li>
+<li><a href="https://www.anthropic.com/research/building-effective-agents">Building Effective AI Agents</a> — Anthropic Research</li>
+</ul>
+<h2>Legend</h2>
+<p>✅ done and verified live · 🟡 partial / inconsistent · ❌ missing</p>
+<h2>Comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Standard (source)</th>
+<th>Status</th>
+<th>Evidence in this repo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>External knowledge restriction</strong> — ground every claim in provided data, not general knowledge (<em>Reduce hallucinations</em>)</td>
+<td>✅</td>
+<td><code>agent_core.py:98-100</code> — the <em>one</em> tool every agent shares, <code>run_sql</code>, is described as: <em>"Call this whenever a claim needs evidence — </em><em>never guess row counts or values</em><em>."</em> Applies uniformly to all 10 agents since they all import this same tool definition — not a per-agent copy-paste that could drift.</td>
+</tr>
+<tr>
+<td><strong>Allow the model to say "I don't know"</strong> (<em>Reduce hallucinations</em>)</td>
+<td>✅</td>
+<td><code>lineage_doc_agent.py:29</code> — system prompt: <em>"This is a factual restatement of the edges you were given — </em><em>do not invent tables or edges that weren't in the input</em><em>."</em> Proven live in today's actual run: when <code>system.access.table_lineage</code> wasn't queryable, the agent wrote <em>"I confirmed that Unity Catalog's native lineage isn't accessible to me (insufficient privileges)... so no silver/gold-side edges were available"</em> instead of fabricating them. <code>vector_content</code> and <code>operational_intel</code> did the same live today when their data sources were unreachable — see <code>docs/SESSION_NOTES.md</code> / today's run output.</td>
+</tr>
+<tr>
+<td><strong>No invented figures</strong> (<em>Reduce hallucinations</em> — "external knowledge restriction")</td>
+<td>🟡</td>
+<td><code>operational_intel.py:42</code> states it explicitly: <em>"no invented figures — every number must come from the metrics given or your own queries."</em> Not every agent's prompt repeats this in words, but the shared <code>run_sql</code> tool description (above) enforces the same rule structurally for all 10.</td>
+</tr>
+<tr>
+<td><strong>Verification loop / evidence before conclusion</strong> (<em>Reduce hallucinations</em> — chain-of-thought verification; <em>Building Effective Agents</em> — evaluator-optimizer)</td>
+<td>🟡 → <strong>✅ CLOSED</strong></td>
+<td><code>dq_monitor_rca.py:53-54</code>, <code>dq_rca_agent.py:31</code>: <em>"You are READ-ONLY: investigate with the run_sql tool... (1) verify the failure yourself, (2) find the earliest evidence."</em> was already real. Now backed by a genuine second pass — see "Closed this session".</td>
+</tr>
+<tr>
+<td><strong>Citations / auditable claims</strong> (<em>Reduce hallucinations</em> — "verify with citations")</td>
+<td>🟡 → <strong>✅ CLOSED</strong></td>
+<td>Was: evidence lived only in <code>agent_runs</code>, not surfaced in the report. Now: every LLM-mode report carries an "Evidence log" section inline — see "Closed this session".</td>
+</tr>
+<tr>
+<td><strong>Human control &amp; approval gates</strong>, tiered permissioning (<em>Trustworthy agents in practice</em>)</td>
+<td>✅ (simpler than the standard, but consistent)</td>
+<td>Hard rule across all 10 agents: <em>"agents propose fixes into their reports; never auto-merge... never write outside their own audit tables"</em> (<code>agents/README.md:18-19</code>). Anthropic's model is a <em>tiered</em> permission system (always-allow / needs-approval / block, per tool); this repo uses a <em>blanket</em> one (every agent's only tool is read-only SQL, full stop) — simpler, more conservative, no per-tool nuance needed because there's only one tool.</td>
+</tr>
+<tr>
+<td><strong>"Pause rather than assume" in ambiguous situations</strong> (<em>Trustworthy agents in practice</em>)</td>
+<td>🟡 → <strong>partially closed</strong></td>
+<td>The forced-finalization behavior in <code>agent_core.py:118-121,129-133</code> (flag uncertainty rather than guess) was already real. The missing "Plan Mode" piece — a proposal a human approves <em>before</em> anything happens — now exists for <code>product_creator</code>, the one agent that writes directly; see "Closed this session". <code>schema_evolution</code> was always plan-only (never executes).</td>
+</tr>
+<tr>
+<td><strong>Poka-yoke tool design</strong> — make mistakes mechanically impossible, not just discouraged (<em>Building Effective Agents</em>)</td>
+<td>✅</td>
+<td><code>agent_core.py:71-85</code> <code>safe_sql()</code> — rejects anything with a semicolon or not starting with <code>SELECT/WITH/SHOW/DESCRIBE</code> <em>before</em> it reaches Spark. <code>product_creator.py</code>'s <code>VIEW_RE</code> + <code>FORBIDDEN</code> regex do the same for LLM-generated SQL text before it's ever executed — allowlist shape-match + denylist verbs + catalog restriction, checked in code, not left to the model's discretion.</td>
+</tr>
+<tr>
+<td><strong>Bounded execution / prevent compounding errors</strong> (<em>Building Effective Agents</em> names this risk explicitly)</td>
+<td>✅</td>
+<td><code>MAX_STEPS = 12</code> hard tool-call ceiling per agent run, with a forced no-tool finalization turn if exhausted — a runaway investigation can't spiral indefinitely.</td>
+</tr>
+<tr>
+<td><strong>Simplicity first — don't add agentic complexity you don't need</strong> (<em>Building Effective Agents</em>)</td>
+<td>✅</td>
+<td>Deterministic-first design: every agent's factual checks run as plain SQL/Python <em>before</em> any LLM call, and would produce a complete (if less narrated) artifact even with zero LLM involvement. The LLM is additive narration over ground-truth facts, not the source of the facts — architecturally stronger than most of Anthropic's own examples, which generally assume the LLM's claims need separate verification because the LLM <em>is</em> the source of the facts. Here, for the 10 checks in <code>dq_monitor_rca</code> for instance, the LLM never touches the pass/fail numbers at all.</td>
+</tr>
+<tr>
+<td><strong>Transparency — show planning/reasoning, not just conclusions</strong> (<em>Building Effective Agents</em>)</td>
+<td>🟡</td>
+<td>Full audit log exists (<code>agent_runs</code>), but it's a <em>post-hoc</em> transcript, not a live, human-facing plan shown before the agent acts. Since every action is already read-only, the risk this addresses (silently taking a wrong <em>action</em>) doesn't really apply — but the transparency of <em>reasoning</em>, specifically, is only visible if someone goes and reads the log.</td>
+</tr>
+<tr>
+<td><strong>Evaluator-optimizer pattern</strong> — a second LLM checks the first's output (<em>Building Effective Agents</em>)</td>
+<td>❌ → <strong>✅ CLOSED</strong></td>
+<td>See "Closed this session" — <code>agent_core.verify_report()</code>.</td>
+</tr>
+<tr>
+<td><strong>Best-of-N / self-consistency check</strong> (<em>Reduce hallucinations</em>)</td>
+<td>❌ still open</td>
+<td>Each agent still runs exactly once per job trigger. <code>verify_report()</code> is a genuine second, independent pass, but it's an <em>evaluator</em> checking the first draft against evidence, not the same task run N times and diffed — a different mechanism, not a substitute. Not implemented: would add real cost/latency for a benefit largely already covered by the evaluator pass.</td>
+</tr>
+<tr>
+<td><strong>Direct-quote extraction before analysis</strong> (<em>Reduce hallucinations</em> — for long-document tasks)</td>
+<td>N/A</td>
+<td>Doesn't apply cleanly here — these agents reason over SQL query results, not long unstructured documents, so there's no analogous "long document" to quote-extract from. The inline evidence log (see "Closed this session") is the applicable equivalent.</td>
+</tr>
+<tr>
+<td><strong>Formal eval suite measuring output accuracy over time</strong> (<em>Trustworthy agents in practice</em>, <em>Building Effective Agents</em> — "extensive testing")</td>
+<td>❌ → <strong>✅ CLOSED</strong></td>
+<td>See "Closed this session" — <code>scripts/eval_agent_reports.py</code>.</td>
+</tr>
+<tr>
+<td><strong>Prompt-injection-specific defenses</strong> (<em>Trustworthy agents in practice</em>)</td>
+<td>🟡</td>
+<td>Not explicitly named as a threat model anywhere except <code>docs/DASF_ALIGNMENT.md</code> (DASF risks 9.1-9.9), which covers it structurally: the only untrusted input any agent sees is SQL result rows, and the only action is another read-only query or a regex-gated text proposal — so there's no path from "attacker controls a row of data" to "attacker executes a write." That's a real, effective mitigation, but it's incidental to the read-only design, not a purpose-built injection defense (no input scanning, no red-teaming done).</td>
+</tr>
+</tbody>
+</table>
+<h2>What's already done well (the honest positive case)</h2>
+<ol>
+<li><strong>The core hallucination guardrail is centralized, not scattered.</strong> Because every agent shares one <code>run_sql</code> tool definition (<code>agent_core.py</code>), the "never guess, get evidence" instruction is enforced once, for all 10 agents, rather than copy-pasted per-agent where it could drift or get forgotten on the next new agent.</li>
+<li><strong>It's proven live, today, three separate times</strong> (<code>lineage_doc_agent</code>, <code>vector_content</code>, <code>operational_intel</code> in the same run) — each hit a data source it couldn't reach and said so explicitly instead of fabricating a plausible-sounding answer. That's the single strongest piece of evidence: not "the prompt says X," but "the prompt said X and the model actually did X under real failure conditions."</li>
+<li><strong>The architecture goes further than most of Anthropic's own guidance assumes is necessary</strong>: the deterministic-first design means the <em>facts</em> (row counts, pass/fail, violation counts) never pass through the LLM at all — they're computed in plain SQL/Python first, and the LLM only narrates over them. Most hallucination-mitigation advice (quote-grounding, citation-verification) exists because the model usually <em>is</em> the source of the facts; here it structurally isn't, for the highest-stakes numbers.</li>
+<li><strong>Tool design follows the "poka-yoke" principle exactly</strong> — <code>safe_sql()</code> and <code>product_creator</code>'s SQL-shape allowlist make bad actions mechanically impossible rather than merely prompted-against.</li>
+</ol>
+<h2>What was genuinely missing when this doc was first written (now closed — see below)</h2>
+<ol>
+<li>~~No evaluator-optimizer / second-pass verification.~~ <strong>Closed.</strong></li>
+<li>~~No inline citations in the saved report.~~ <strong>Closed.</strong></li>
+<li>~~No eval suite for agent output quality.~~ <strong>Closed.</strong></li>
+<li>~~No "Plan Mode" equivalent for the write-adjacent agents.~~ <strong>Closed for <code>product_creator</code></strong> (the only one that ever executes a write); <code>schema_evolution</code> never executed anything to begin with, so it didn't need one.</li>
+<li>~~Not documented as a named policy anywhere.~~ <strong>Closed</strong> — cross-referenced from <code>agents/README.md</code> and <code>docs/AGENT_ARCHITECTURE.html</code>.</li>
+</ol>
+<h2>Closed this session</h2>
+<p><strong>1 &amp; 2 — evaluator pass + inline citations, <code>agents/agent_core.py</code>:</strong> <code>run_reasoning()</code> now
+calls a new <code>verify_report(client, text, log)</code> after the model produces its draft — a
+<em>second</em>, independent <code>client.messages.create()</code> call (no tools, terse system prompt) whose
+only job is to check every claim in the draft against the <code>run_sql</code> calls actually logged, and
+say so if something isn't backed by evidence. The final text <code>run_reasoning()</code> returns to every
+agent now has the draft, an inline <strong>Evidence log</strong> (the actual queries run, extracted from the
+tool-call log), and an <strong>Independent verification</strong> verdict, appended automatically — no changes
+needed in any of the 10 individual agent files, since they all call this one shared function.
+Applies to every agent uniformly, same as the original <code>run_sql</code> guardrail did.</p>
+<p><strong>3 — eval scorecard, <code>scripts/eval_agent_reports.py</code>:</strong> deterministic (no LLM — the eval
+itself can't hallucinate), queries <code>acme_bronze.audit.agent_runs.decision_log</code> for the
+<code>verification: ...</code> line every run now carries, and reports per-agent counts of clean /
+flagged / verification-errored / no-LLM-pass runs over a 30-day window, plus an overall
+"claims verified" rate. Not wired into a schedule — run on demand, same as <code>validate.py</code>.</p>
+<p><strong>4 — Plan Mode for <code>product_creator</code>, <code>agents/product_creator.py</code> + <code>resources/agents.yml</code>:</strong>
+new <code>dry_run</code> job parameter (default <code>"false"</code>, so the existing one-shot demo behavior is
+unchanged unless you opt in). With <code>dry_run=true</code>, the agent still does the full investigation
+and generates the SQL, but stops before <code>spark.sql(sql)</code> — the proposed view is written to
+<code>agent_reports</code> clearly marked <code>PROPOSED (dry run, awaiting review)</code>, and nothing is created
+until a human re-runs it with <code>dry_run=false</code>. <code>schema_evolution</code> needed no change — it was
+already propose-only, never executing anything.</p>
+<p><strong>5 — cross-references:</strong> <code>agents/README.md</code> and <code>docs/AGENT_ARCHITECTURE.html</code> both now link
+to this file.</p>
+<p><strong>Honest residual gap:</strong> Best-of-N / self-consistency (running the same agent twice and diffing)
+is still not implemented — see the table row above for why that was a deliberate skip, not an
+oversight.</p>
+<p><strong>Live proof the evaluator pass actually works, not just exists:</strong> the first real run of
+<code>dq_monitor_rca</code> after deploying this (<code>run 904966710921460</code>, 2026-08-14) got genuinely flagged
+— the verifier correctly noticed that <code>safe_sql()</code>'s evidence log recorded which queries ran and
+how many rows came back, but not the <em>returned values</em>, so several specific numbers in the
+report (exact timestamps, per-source row counts) weren't strictly re-confirmable from the log
+alone. That's the mechanism catching a real gap in its own supporting infrastructure, not a
+false positive — fixed immediately in the same session (<code>safe_sql()</code> now logs a value snippet
+per query, not just the query text), and confirmed via <code>scripts/eval_agent_reports.py</code>, which
+shows the flag on record. This is the single best piece of evidence in this whole document:
+not "the guardrail should work," but "the guardrail worked, on its first try, against code that
+had existed for weeks."</p>
+</div>
+<div id="p7" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/DASF_ALIGNMENT.md</p>
+<h1>Alignment with the Databricks AI Security Framework (DASF v1.1)</h1>
+<p>Status: mapping only — cites the actual DASF whitepaper (55 risks across 12 components,
+<code>databricks-ai-security-framework-dasf-whitepaper-v4-final.pdf</code>), not a paraphrase. Captured
+2026-08-13.</p>
+<p>This repo's agents (<code>agents/agent_core.py</code>) don't serve a trained model — they call a hosted
+third-party model (Claude) with a constrained tool surface. That maps almost entirely onto
+DASF <strong>Component 9 (Model Serving — Inference Requests)</strong> and <strong>Component 10 (Inference
+Responses)</strong>, the 15 risks under "Model deployment and serving." Components 1–8 (raw data
+through model build/management) mostly describe <em>training</em> a model, which doesn't apply
+here — see <a href="DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md">docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</a>
+for the ⚪ N/A framing on classical-ML governance already established. Component 12 (ML
+platform) risks are workspace-admin-level, covered under Chapter 3 of that same doc.</p>
+<p>Legend: ✅ Covered · 🟡 Partial · ❌ Gap · ⚪ N/A (doesn't apply to a hosted-model consumer)</p>
+<h2>Component 9: Model Serving — Inference Requests</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>9.1 Prompt injection</td>
+<td>🟡</td>
+<td>The model's only action surface is <code>run_sql</code>, hard-guarded to single read-only statements (<code>agent_core.py::safe_sql</code> — rejects anything not starting <code>SELECT/WITH/SHOW/DESCRIBE</code>, rejects multi-statement via <code>;</code>). A successful injection still can't cause a write. But nothing sanitizes untrusted <em>data</em> the model reads before it's fed back into the model's context (e.g. a crafted value in a source table read via <code>run_sql</code> could carry injected instructions) — no input-side filtering exists.</td>
+</tr>
+<tr>
+<td>9.2 Model inversion</td>
+<td>⚪</td>
+<td>Applies to extracting a proprietary trained model's parameters/training data. We don't host or train the model.</td>
+</tr>
+<tr>
+<td>9.3 Model breakout</td>
+<td>✅</td>
+<td>All writes happen in deterministic framework code after validation, never directly from the model (<code>agent_core.py</code> docstring, lines 3-9). <code>product_creator.py</code> additionally regex-gates its one write-adjacent output (a view DDL string) to <code>CREATE OR REPLACE VIEW acme_products.sales.*</code> reading <code>acme_gold</code> only.</td>
+</tr>
+<tr>
+<td>9.4 Looped input</td>
+<td>✅</td>
+<td><code>MAX_STEPS = 12</code> tool-call budget with a forced finalization turn (<code>tool_choice: {"type": "none"}</code>) when exhausted — bounds runaway tool-calling loops.</td>
+</tr>
+<tr>
+<td>9.5 Infer training data membership</td>
+<td>⚪</td>
+<td>Same as 9.2 — not applicable to a hosted-model consumer.</td>
+</tr>
+<tr>
+<td>9.6 Discover ML model ontology</td>
+<td>⚪</td>
+<td>Not applicable — we don't expose model internals.</td>
+</tr>
+<tr>
+<td>9.7 Denial of service (DoS)</td>
+<td>🟡</td>
+<td>The 12-step budget bounds cost per <em>agent run</em>, but there's no cross-run rate limit or dollar budget — a scheduled job misfiring repeatedly could still run up spend. Flagged as a gap in <a href="ralph_loop.md">docs/ralph_loop.md</a> section D (cost &amp; runaway controls) for any future looping design.</td>
+</tr>
+<tr>
+<td>9.8 LLM hallucinations</td>
+<td>🟡</td>
+<td>System prompts explicitly instruct the model to call <code>run_sql</code> for any claim needing evidence ("never guess row counts or values" — <code>dq_monitor_rca.py::RCA_SYSTEM</code>), and deterministic checks always compute ground truth <em>before</em> the model reasons over it. No output-side fact-checking against the deterministic results, though — the model could still misstate something in its prose that contradicts the numbers it was given.</td>
+</tr>
+<tr>
+<td>9.9 Input resource control</td>
+<td>✅</td>
+<td><code>safe_sql(..., max_rows=50)</code> caps result size per query; the 12-step budget caps total queries per run.</td>
+</tr>
+<tr>
+<td>9.10 Accidental exposure of unauthorized data to models</td>
+<td>❌</td>
+<td>The agent jobs run under a job/service identity with broad read access across <code>acme_bronze/silver/gold</code> needed to run the deterministic checks — not scoped per end-user, and the row filters/masks that would narrow this (<code>security/unity_catalog_policies.sql</code>) are non-functional today because the account groups they reference were never provisioned (see <a href="GOVERNANCE_DQ_INGESTION_AI_AUDIT.md">docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</a>). The model only sees what <code>run_sql</code> returns, but nothing today prevents that query from reaching data the <em>human</em> reading the report shouldn't see.</td>
+</tr>
+</tbody>
+</table>
+<h2>Component 10: Model Serving — Inference Responses</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.1 Lack of audit and monitoring of inference quality</td>
+<td>🟡</td>
+<td>Every tool call, its query, and the result summary is appended to a decision log persisted in <code>acme_bronze.audit.agent_runs</code>; final reports land in <code>agent_reports</code> — full audit trail of <em>what the model did</em>. But nothing evaluates output <em>quality</em> — no toxicity/PII-leakage screening on generated report text, no factuality scoring. Audit: yes. Quality monitoring: no.</td>
+</tr>
+<tr>
+<td>10.2 Output manipulation</td>
+<td>❌</td>
+<td>No validation on the free-text report content itself (beyond <code>product_creator</code>'s regex gate on the one structured SQL output it produces). A report's prose isn't checked for injected instructions surfacing from upstream data before a human reads it.</td>
+</tr>
+<tr>
+<td>10.3 Discover ML model ontology</td>
+<td>⚪</td>
+<td>N/A — hosted-model consumer.</td>
+</tr>
+<tr>
+<td>10.4 Discover ML model family</td>
+<td>⚪</td>
+<td>N/A — hosted-model consumer.</td>
+</tr>
+<tr>
+<td>10.5 Black-box attacks</td>
+<td>⚪</td>
+<td>N/A — hosted-model consumer.</td>
+</tr>
+</tbody>
+</table>
+<h2>What's needed to close the real gaps here</h2>
+<ol>
+<li><strong>9.10 (data exposure) is the one that matters most</strong> — and it isn't a new problem, it's the same account-group-provisioning gap blocking RBAC/masking everywhere else in this repo. One fix closes both.</li>
+<li><strong>10.1/10.2 (output quality/manipulation)</strong> — no code exists today to screen agent-generated report text before it lands in <code>agent_reports</code>. A lightweight addition: a second Claude pass (or a simple keyword/pattern check) scanning the report for PII patterns or instruction-like text lifted from source data, before <code>save_report()</code> persists it.</li>
+<li><strong>9.7 (cross-run DoS/cost)</strong> — already flagged in <code>docs/ralph_loop.md</code>; only matters if/when this repo moves toward looping agents rather than single-shot runs.</li>
+<li>Everything marked ⚪ requires no action — it's a framework/architecture mismatch (DASF assumes you're serving a model you trained), not a gap in this repo.</li>
+</ol>
+</div>
+<div id="p8" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</p>
+<h1>Governance / DQ / Ingestion / AI Data-Dictionary audit</h1>
+<p>Status: <strong>inventory only, nothing changed.</strong> Captured 2026-08-12 via a full repo survey
+(4 parallel searches: governance, data quality, ingestion, AI-facing data dictionary). Left
+unedited below on purpose — this is a point-in-time finding, not a living doc; what's since
+changed is called out here instead of silently rewritten into the original text.</p>
+<p><strong>Update — 2026-08-14, what's since closed:</strong>
+- The dashboard bug in §2 (<code>dq_trust_dashboard.sql</code> querying <code>dimension</code>/<code>score</code>/<code>met_threshold</code>)
+  is <strong>fixed</strong> — column names corrected, all 5 widget queries verified live.
+- §4's "column-level comments are empty everywhere" is <strong>no longer true for Silver</strong>: 24 real UC
+  column comments applied via <code>cfg.layer_mappings.business_definition</code> +
+  <code>scripts/apply_column_comments.py</code>, independently verified in <code>information_schema.columns</code>.
+  Bronze/Gold column comments are still empty — this closed the Silver slice of the gap, not
+  the whole thing.
+- §4's data dictionary is still scattered across the same 4 disconnected artifacts named below;
+  the fix added a 5th (real) source rather than reconciling the existing ones.
+- Not addressed by anything since: account groups still unprovisioned, RAG generation still
+  design-only, the <code>customer_narratives</code>/<code>customer_profile_text</code> naming inconsistency (§4) is
+  still present.</p>
+<p>Cross-cutting theme: in all four areas the design work is real and often good (row filters,
+DAMA framework, ingestion templates, metric-view semantics), but roughly half of it stops at
+"spec'd or coded" and never reaches "in the deployed bundle." Consistent with this being an
+honestly-scoped POC, not a hidden gap.</p>
+<hr />
+<h2>1. Data Governance</h2>
+<h3>Implemented (real config/code/resource exists)</h3>
+<ul>
+<li><strong>Row-level security</strong>: <code>security/unity_catalog_policies.sql:7-13</code> —
+  <code>acme_gold.sec.region_filter(source_system STRING)</code>, ABAC-style region rule using
+  <code>is_account_group_member()</code> (EUROPE→SAP, AMERICAS→JDE/EBS, EMEA→QAD, D365 open to all
+  analysts). Applied via <code>ALTER TABLE ... SET ROW FILTER</code>
+  (<code>security/unity_catalog_policies.sql:15-18</code>) and also declared directly in the DLT table
+  decorator in <code>pipelines/gold_dlt.py:16,29</code> (DLT-materialized tables reject <code>ALTER TABLE</code>).</li>
+<li><strong>Column masking</strong>: <code>mask_customer_name()</code> (<code>security/unity_catalog_policies.sql:21-25</code>),
+  unmasked only for <code>data_steward</code> group; wired into DLT schema DDL
+  (<code>pipelines/gold_dlt.py:13</code>).</li>
+<li><strong>PII tagging</strong>: <code>customer_name</code>→<code>pii=name</code>, <code>src_customer_id</code>→<code>pii=identifier</code>
+  (<code>security/unity_catalog_policies.sql:40-41</code>).</li>
+<li><strong>Grants (least privilege)</strong>: real SQL for <code>sales_analyst_emea/americas/europe</code>,
+  <code>data_engineer</code>, <code>ml_engineer</code>, <code>ot_engineer</code>, <code>mes_engineer</code>
+  (<code>security/unity_catalog_policies.sql:28-36</code>).</li>
+<li><strong>Automated governance verification</strong>: <code>scripts/validate.py</code> checks 8-9 query
+  <code>system.information_schema.row_filters</code>/<code>column_masks</code> to confirm the filter/mask are
+  actually active.</li>
+<li><strong>Audit logging</strong>: <code>agents/agent_core.py:38-46</code> creates and populates
+  <code>acme_bronze.audit.agent_runs</code>/<code>agent_reports</code> — genuinely written by deployed agents.</li>
+<li><strong>Data-product ownership/SLA metadata</strong>: <code>data_products/data_products.yaml</code> (<code>owner</code>, <code>sla</code>
+  per product); <code>COMMENT ON VIEW</code>/<code>SET TAGS</code> in <code>data_products/publish_marketplace.sql:9-15</code>
+  for discovery/governance.</li>
+<li><code>acme_products</code> catalog deliberately structured as a governed output-port layer distinct
+  from bronze/silver/gold (<code>docs/ARCHITECTURE.md:29</code>).</li>
+</ul>
+<h3>Documented but not implemented / aspirational only</h3>
+<ul>
+<li><strong>Account groups never provisioned</strong>: every group referenced by the row filter/GRANTs
+  (<code>sales_analyst_*</code>, <code>data_engineer</code>, <code>ml_engineer</code>, <code>data_steward</code>, <code>ot_engineer</code>,
+  <code>mes_engineer</code>, <code>exec_readonly</code>) does not exist in the workspace — GRANTs fail with
+  <code>PRINCIPAL_DOES_NOT_EXIST</code>. Blocked on account-admin group creation
+  (<code>docs/TRACEABILITY_MATRIX.md</code>, <code>docs/SESSION_NOTES.md</code>). Practical effect: the
+  <code>data_steward</code> masking exception and all region-based GRANTs are non-functional today even
+  though the SQL exists.</li>
+<li><strong>Delta Sharing / Marketplace listing</strong>: <code>CREATE SHARE</code>/<code>ALTER SHARE</code>
+  (<code>data_products/publish_marketplace.sql:18-19</code>) written but fails — "CREATE SHARE denied,
+  metastore privilege missing" (<code>docs/TRACEABILITY_MATRIX.md</code>).</li>
+<li><strong>Read-only interview/reviewer access grant</strong>: documented as a manual admin step, never
+  executed.</li>
+<li><strong>Steward ticketing / Slack escalation</strong>: only exists in the unimplemented
+  <code>agents/pipeline_healer.md</code> (<code>log to audit.agent_actions</code> — table doesn't exist anywhere;
+  real audit tables are <code>agent_runs</code>/<code>agent_reports</code>) and <code>agents/dq_rca_agent.md</code> specs.</li>
+<li><strong>Lineage-based audit agent</strong>: <code>agents/lineage_doc_agent.md</code> spec-only, never implemented;
+  no code anywhere queries <code>system.access.table_lineage</code>.</li>
+<li><strong><code>acme_products.meta.v_product_trust_scores</code></strong>: referenced as live everywhere (row counts
+  in <code>docs/DATA_MODEL.md</code>, read by <code>scripts/generate_data_docs.py</code>) but <strong>no <code>CREATE VIEW</code>
+  DDL exists in the repo</strong> — created ad hoc directly in the workspace, not IaC.</li>
+<li><strong>Legacy <code>Old/</code> design (superseded, not current)</strong>: a materially richer governance stack —
+  Purview scan rules/glossary/sensitivity labels, Entra ID RBAC mapping, a full
+  masking-policy table (email/financial masks), a <code>data_steward_chatbot.py</code> — described in
+  <code>Old/README.md</code> but none of it carried forward. <code>docs/GAP_ANALYSIS.md</code> already flags this
+  folder as stale content to delete before sharing repo access.</li>
+</ul>
+<h3>Not present at all</h3>
+<ul>
+<li>No systematic data-classification/sensitivity-labeling scheme (only 2 columns on 1 table
+  carry a <code>pii</code> tag).</li>
+<li>No masking beyond <code>mask_customer_name</code> (no email/phone/financial masks).</li>
+<li>No compliance-framework references (GDPR/CCPA/HIPAA/SOC2) outside the stale <code>Old/</code> folder.</li>
+<li>No business glossary / third-party catalog integration — deliberately rejected in
+  <code>docs/JUSTIFICATION_NOTES.md</code> as "heavy for a pilot."</li>
+<li>No job/pipeline-level <code>permissions:</code> blocks in <code>databricks.yml</code>/<code>resources/*.yml</code>.</li>
+<li>No query of native UC access-audit system tables (<code>system.access.*</code>) anywhere in code.</li>
+<li>No steward ticketing/workflow tool actually implemented.</li>
+</ul>
+<hr />
+<h2>2. Data Quality</h2>
+<h3>Two parallel DQ suites exist — only one is deployed</h3>
+<p><strong>A. <code>agents/dq_monitor_rca.py</code> — DEPLOYED, live</strong>, writes to <code>acme_bronze.audit.dq_results</code>.
+Runs as part of <code>agents_scheduled_job</code> (<code>resources/agents.yml</code>, cron <code>0 0 6 * * ?</code>, currently
+<strong>PAUSED</strong>). 10 hardcoded checks (<code>agents/dq_monitor_rca.py:18-47</code>):</p>
+<table>
+<thead>
+<tr>
+<th>check_name</th>
+<th>dimension</th>
+<th>table</th>
+<th>what it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>order_keys_not_null</td>
+<td>completeness</td>
+<td>sales_order_header</td>
+<td>src_order_id/source_system not null</td>
+</tr>
+<tr>
+<td>customer_name_not_null</td>
+<td>completeness</td>
+<td>dim_customer</td>
+<td>customer_name not null</td>
+</tr>
+<tr>
+<td>hash_key_64_hex</td>
+<td>validity</td>
+<td>sales_order_header</td>
+<td>hk matches <code>^[0-9a-f]{64}$</code></td>
+</tr>
+<tr>
+<td>currency_in_fx_reference</td>
+<td>validity</td>
+<td>v_sales_order_header_current</td>
+<td>currency resolves against fx_rates</td>
+</tr>
+<tr>
+<td>no_duplicate_current_orders</td>
+<td>uniqueness</td>
+<td>v_sales_order_header_current</td>
+<td>no dup (source_system, src_order_id)</td>
+</tr>
+<tr>
+<td>fact_customer_fk_resolves</td>
+<td>consistency</td>
+<td>fact_sales_orders</td>
+<td>customer_hk FK resolves (LEFT ANTI JOIN)</td>
+</tr>
+<tr>
+<td>silver_gold_row_parity</td>
+<td>consistency</td>
+<td>fact_sales_orders</td>
+<td>row-count parity Silver↔Gold</td>
+</tr>
+<tr>
+<td>usd_amount_reconciles</td>
+<td>accuracy</td>
+<td>fact_sales_orders</td>
+<td>sum(order_amount_usd) reconciles within 0.01</td>
+</tr>
+<tr>
+<td>bronze_ingest_fresh_24h</td>
+<td>timeliness</td>
+<td>acme_bronze.sap.vbak</td>
+<td>max(_ingest_ts) within 24h</td>
+</tr>
+<tr>
+<td>orders_arriving_30d</td>
+<td>timeliness</td>
+<td>fact_sales_orders</td>
+<td>max(order_date) within 30d</td>
+</tr>
+</tbody>
+</table>
+<p>Pass/fail is binary (zero violations), hardcoded in the check SQL — not read from a config
+table. Failing checks trigger a read-only Claude RCA pass (<code>agent_core.run_reasoning</code>) that
+writes a report to <code>acme_bronze.audit.agent_reports</code>.</p>
+<p><strong>B. <code>dq/dama_dq_framework.py</code> — NOT deployed</strong> (design-stage, confirmed by
+<code>docs/CODE_GRAPH.md</code>). 6 DAMA-tagged rules with per-rule thresholds (completeness 0.99,
+validity 0.999, uniqueness 0.999, timeliness 0.95, consistency 0.98, accuracy 0.99) —
+numerically match <code>data_products/data_products.yaml</code>'s <code>dq_dimensions_threshold</code>, but the
+executing code hardcodes the tuple rather than reading the YAML; its docstring claims rules
+"live in <code>acme_bronze.cfg.layer_mappings.dq_rule</code>" but the actual code doesn't query that
+column. Its owning job (<code>pipelines/jobs/lakeflow_jobs.yaml</code>) was never added to the deployed
+bundle — <code>databricks.yml</code> only globs <code>resources/*.yml</code>, so this suite has never run.</p>
+<p><strong>DLT-inline expectations (deployed)</strong>: <code>@dlt.expect_all_or_drop</code> on Silver tables
+(<code>pipelines/silver_dlt.py:49-51,60,65,70</code>), <code>@dlt.expect_all</code> (warn-only) on Gold fact/bridge
+tables (<code>pipelines/gold_dlt.py:30,67</code>). Hardcoded decorator args, not config-driven.</p>
+<p><strong>CI/deployment-gate suite</strong>: <code>scripts/validate.py</code> — 14 checks, DQ-relevant ones include
+Gold FK integrity, DQ-ran-in-24h freshness, rejects-logged-with-dimension, bridge FK
+integrity. <code>agents/deployment_gate.py</code> imports this exact <code>CHECKS</code> list and has Claude
+classify failures vs. known/tracked gaps to issue PROMOTE/HOLD.</p>
+<h3>Bug found (not previously documented) — FIXED 2026-08-14, see update note at top</h3>
+<p><code>dashboards/dq_trust_dashboard.sql</code> queries columns (<code>dimension</code>, <code>score</code>, <code>met_threshold</code>)
+that belong to the <strong>undeployed</strong> DAMA framework's schema. The actual live <code>dq_results</code> table
+(populated by <code>dq_monitor_rca.py</code>) has different columns (<code>dq_dimension</code>, <code>passed</code>,
+<code>row_count</code>) — this dashboard SQL would not run against the real table as written.</p>
+<h3>Quarantine / rejected-records</h3>
+<p>Schema exists (<code>config/config_tables.sql:25-34</code>: <code>rejected_records</code>, <code>batch_log</code>); a writer
+exists (<code>dq/quarantine_writer.py</code>, maps DLT expectation failures to DAMA dimensions via a
+naming-convention heuristic); but neither writer's owning job is in the deployed bundle —
+<strong>the tables are defined but not populated by any deployed pipeline.</strong></p>
+<h3>How rules are defined/configured</h3>
+<ul>
+<li>Config-driven (real DDL): <code>acme_bronze.cfg.source_registry</code>/<code>layer_mappings</code>; per-source
+  <code>expectations:</code> maps in <code>config/replication_sources.yaml</code>; per-product <code>sla</code>/
+  <code>dq_dimensions_threshold</code> in <code>data_products/data_products.yaml</code>.</li>
+<li>Hardcoded in code: the actually-executing check suite (<code>dq_monitor_rca.py</code>), the CI gate
+  (<code>validate.py</code>), DLT decorator expectations, and the DAMA thresholds tuple.</li>
+</ul>
+<h3>Known gaps/deferred items (already tracked, not new)</h3>
+<ul>
+<li><code>rejected_records</code>/<code>batch_log</code> exist but unwired — tracked in <code>docs/TRACEABILITY_MATRIX.md</code>
+  as POC-scope deferred.</li>
+<li><code>orders_arriving_30d</code>/<code>bronze_ingest_fresh_24h</code> fail permanently by design — synthetic
+  generator caps business dates at 2026-05-16 (<code>scripts/generate_synthetic_data.py::_date()</code>,
+  seed 42); bronze is a one-time seed, not live ingestion.</li>
+<li>QAD FK check is "green-but-blind": 3,000 QAD fact rows have <code>customer_hk = NULL</code> because no
+  QAD customer-master source is registered; the check only counts non-null orphans so it
+  stays green regardless.</li>
+<li>A real staleness regression (jobs silent for 12+ days, 2026-07-19→2026-07-31) was caught by
+  <code>deployment_gate</code>/<code>dq_monitor_rca</code> and fixed 2026-08-02 — this was a genuine catch, not a
+  design gap.</li>
+</ul>
+<hr />
+<h2>3. Data Ingestion</h2>
+<h3>Sources registered (<code>config/replication_sources.yaml</code> — "the ingestion estate")</h3>
+<p>14 source-object rows across 8 patterns:</p>
+<table>
+<thead>
+<tr>
+<th>System</th>
+<th>Sources</th>
+<th>Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SAP (Europe)</td>
+<td>vbak_sales_header, kna1_customer, lips_delivery_item, vbrp_billing_item</td>
+<td>goldengate</td>
+</tr>
+<tr>
+<td>JDE (Americas)</td>
+<td>f4201_sales_header, f0101_address_book</td>
+<td>goldengate</td>
+</tr>
+<tr>
+<td>EBS/Oracle</td>
+<td>oe_order_headers, ra_customer_trx</td>
+<td>goldengate / lakeflow_query</td>
+</tr>
+<tr>
+<td>D365</td>
+<td>salesorders</td>
+<td>lakeflow_d365</td>
+</tr>
+<tr>
+<td>QAD (EMEA)</td>
+<td>so_mstr</td>
+<td>lakeflow_sqlserver</td>
+</tr>
+<tr>
+<td>Salesforce</td>
+<td>opportunity</td>
+<td>autoloader_file</td>
+</tr>
+<tr>
+<td>Litmus (OT)</td>
+<td>furnace_telemetry, caster_history</td>
+<td>litmus_eventhub / litmus_adls</td>
+</tr>
+<tr>
+<td>MES</td>
+<td>rollmill_orders</td>
+<td>litmus_eventhub</td>
+</tr>
+</tbody>
+</table>
+<h3>Mechanism: synthetic/one-time, NOT live — verified explicitly</h3>
+<p>No live/scheduled ingestion pipeline runs against any of these 14 sources. Bronze is
+populated entirely by <code>scripts/generate_synthetic_data.py</code>, run once and loaded manually —
+confirmed in <code>docs/SESSION_NOTES.md</code> ("no bronze ingestion pipeline exists in-repo... loaded
+generator output into Bronze as a stand-in"), <code>docs/CODE_GRAPH.md</code>, and
+<code>docs/TRACEABILITY_MATRIX.md</code>. No code anywhere reads the generated files back into Bronze on
+a schedule (confirmed via repo-wide grep). <strong>No EBS synthetic data generation exists at all</strong>
+despite EBS being registered.</p>
+<h3>Templates/patterns available (built, never deployed)</h3>
+<ul>
+<li><code>ingestion/templates/bronze_ingest_template.py</code> — generic config-driven Lakeflow DLT
+  template (goldengate/litmus_adls/autoloader_file patterns), explicitly: "ANY new source =
+  a row in <code>config/replication_sources.yaml</code>. Do not copy this file."</li>
+<li><code>ingestion/litmus_ot/litmus_eventhub_dlt.py</code> + <code>uns_topic_map.yaml</code> — Litmus/OT template.</li>
+<li><code>ingestion/sqlserver/lakeflow_sqlserver.yaml</code> + <code>enable_cdc.sql</code> — declarative Lakeflow
+  Connect config for QAD (managed connector, no custom code).</li>
+<li><code>ingestion/goldengate/gg_adls_handler.props</code> — OGG-for-Big-Data handler config.</li>
+<li><code>docs/REPLICATION_PATTERNS.md</code> documents 3 reusable pattern families and the onboarding
+  contract: one YAML row → <code>scripts/deploy.py --register-source &lt;name&gt;</code>.</li>
+<li><code>scripts/deploy.py::register_source()</code> is the real onboarding mechanism — inserts a row
+  into <code>cfg.source_registry</code> and, for template-backed patterns, POSTs a DLT pipeline-create
+  call; for managed-connector patterns it prints a no-op message.</li>
+<li><strong>Ingestion Registrar agent is spec-only</strong> — <code>agents/ingestion_registrar.md</code> describes
+  PR-triggered validation + registration on merge, but no <code>.py</code> implementation exists.</li>
+</ul>
+<h3>Bronze→Silver transform coverage gap</h3>
+<p><code>acme_bronze.cfg.layer_mappings</code> (seeded by <code>config/seed_layer_mappings.sql</code>) covers SAP
+VBAK/KNA1/LIPS/VBRP, JDE F4201/F0101, QAD so_mstr → <code>sales_order_header</code>/<code>customer</code>/
+<code>shipment</code>/<code>invoice</code>. <strong>SFDC, D365, EBS, MES have zero rows</strong> — even the synthetic seed
+pipeline has no Silver transform for 4 of the 14 registered sources. OT
+(<code>furnace_heat_5min</code>) is deliberately hardcoded, not config-driven (no column-mapping
+semantics).</p>
+<h3>Gaps (explicitly documented)</h3>
+<ol>
+<li>No live ingestion pipeline for any source (<code>docs/TRACEABILITY_MATRIX.md</code> gap #1) — path to
+   production: deploy <code>bronze_ingest_template.py</code> as a DLT pipeline for one pattern
+   (autoloader_file over <code>data/</code> uploads).</li>
+<li><code>rejected_records</code>/<code>batch_log</code> never written (see DQ section).</li>
+<li><code>validate.py</code>'s "sources registered" check was structurally broken until fixed —
+   <code>deploy.py --register-source</code> originally never inserted into <code>cfg.source_registry</code>; now
+   fixed.</li>
+<li>EBS/D365/MES registered but no synthetic data (EBS) or Silver mapping (SFDC/D365/EBS/MES).</li>
+<li>Ingestion Registrar agent aspirational only.</li>
+</ol>
+<hr />
+<h2>4. Data Dictionary / Definitions for AI</h2>
+<h3>Where definitions live, and how rich they are</h3>
+<ul>
+<li><strong>Table-level comments exist and are useful</strong>: <code>@dlt.table(comment=...)</code> in
+  <code>pipelines/silver_dlt.py</code>/<code>gold_dlt.py</code> (e.g. VBRP billing-item comment calls out that
+  amount is doc-currency — join VBRK before finance use).</li>
+<li><strong>Column-level comments are empty everywhere</strong> — FIXED for Silver, 2026-08-14 (see update
+  note at top); still true for Bronze/Gold. Confirmed against the live-generated
+  <code>docs/DATA_MODEL.md</code> (pulled straight from <code>system.information_schema.columns.comment</code> via
+  <code>scripts/extract_data_model.py</code>). Sampled Bronze <code>sap.kna1</code> and Gold <code>sales.dim_customer</code> —
+  every column's Comment field is blank. <code>cfg.layer_mappings</code> also has no
+  <code>description</code>/<code>business_meaning</code> field, only <code>transform_expr</code>/<code>dq_rule</code>.</li>
+<li><strong>Closest thing to a central data dictionary is machine-generated, not hand-authored</strong>:
+  <code>scripts/extract_data_model.py</code> → <code>scripts/generate_data_docs.py</code> → <code>docs/DATA_MODEL.md</code> /
+  <code>docs/DATA_CATALOG.html</code>. Table/column metadata is real, but lineage edges
+  (<code>generate_data_docs.py::EDGES</code>) and governance annotations (<code>GOVERNANCE_NOTES</code>) are
+  <strong>hand-curated Python literals</strong>, not derived from live UC lineage APIs. It's a manual
+  batch-regeneration snapshot (dated "Generated 2026-07-29"), not queried live.</li>
+<li><code>docs/DATA_VAULT_PIT_BRIDGE.md</code> — genuinely rich hand-written doc for <code>pit_customer</code>/
+  <code>bridge_order_fulfillment</code> specifically (grain, worked SQL, use-cases), but static and not
+  wired into any agent or retrieval path.</li>
+</ul>
+<h3>AI-facing semantic/metadata layer that exists today</h3>
+<ul>
+<li><strong><code>semantics/sales_metric_view.sql</code></strong> — the one real AI-facing semantic layer: a UC Metric
+  View (<code>WITH METRICS LANGUAGE YAML</code>) defining <code>revenue_usd</code>, <code>order_count</code>,
+  <code>avg_order_value</code>, <code>active_customers</code> with <code>display_name</code> and <code>synonyms</code> per metric,
+  explicitly built "so Genie grounds NL questions deterministically." Strongest
+  "AI-reads-a-definition-before-acting" pattern in the repo.</li>
+<li><strong><code>agents/vector_content.py</code></strong> builds <code>customer_narratives</code> — one NL sentence per customer
+  (name, country, source, revenue, order count, backlog) for Vector Search embedding. This is
+  a <strong>business-entity content corpus for retrieval, not a schema/column dictionary</strong> — it
+  describes customer facts, not what <code>order_amount_usd</code> or <code>customer_hk</code> mean.</li>
+<li><strong><code>agents/product_creator.py</code></strong> — the NL→data-product agent's system prompt <strong>hand-writes</strong>
+  the available Gold table/column list as prose, not read dynamically from UC comments or
+  <code>docs/DATA_MODEL.md</code>. It has a read-only <code>run_sql</code> tool and is told to verify columns before
+  finalizing, but nothing requires it to query comments — the schema-of-record is a
+  hand-maintained string that can silently drift from the real <code>gold_dlt.py</code> schema.</li>
+<li><strong><code>ai/rag_agent.py</code></strong> — a UC SQL retriever function wrapping <code>VECTOR_SEARCH</code> over
+  <code>customer_profile_idx</code>, grounding on citation of <code>customer_hk</code>. Retrieval of the same
+  customer-narrative corpus, not a table/column dictionary.</li>
+</ul>
+<h3>Naming inconsistency found (not previously documented)</h3>
+<p><code>vector_content.py</code> writes to <code>acme_gold.sales.customer_narratives</code>, but
+<code>ai/vector_search_rag.py</code> sources its index from a <strong>different table</strong>,
+<code>acme_gold.ai.customer_profile_text</code>. <code>generate_data_docs.py</code> papers over this with a
+hand-added lineage edge, but no code in the repo actually performs that copy/rename.</p>
+<h3>Gaps</h3>
+<ul>
+<li>No column-level comments anywhere — an AI agent has no per-column business definitions to
+  read from UC metadata even where table comments exist.</li>
+<li><code>agents/lineage_doc_agent.md</code> — spec-only, confirmed no <code>.py</code>, not scheduled anywhere;
+  <code>docs/CODE_GRAPH.md</code> (the doc it's supposed to auto-generate) is hand-maintained instead.</li>
+<li>RAG <strong>generation</strong> layer is design-only — <code>ai/rag_agent.py</code> unwired into any job; only
+  retrieval is live (already known; now pinpointed to the exact file).</li>
+<li>No system dynamically feeds table/column comments to any agent as runtime grounding — the
+  generated docs are for human browsing, not agent consumption.</li>
+<li>Metadata is scattered across 4 disconnected artifacts (pipeline-code comments,
+  manually-triggered <code>DATA_MODEL.md</code>, hand-written <code>DATA_VAULT_PIT_BRIDGE.md</code>,
+  <code>product_creator.py</code>'s hardcoded prompt string) with nothing reconciling them automatically.</li>
+</ul>
+</div>
+<div id="p9" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</p>
+<h1>POC vs. Databricks "A Comprehensive Guide to Data and AI Governance" — gap analysis</h1>
+<p>Status: <strong>inventory only, nothing changed.</strong> Captured 2026-08-13, comparing this repo against
+Databricks' own ebook (<code>comprehensive-guide-to-data-and-ai-governance.pdf</code>, 2024, authored by
+Databricks Solutions Architecture/Product Management — landing page:
+https://www.databricks.com/resources/ebook/data-analytics-and-ai-governance). Extracted the
+full 39-page PDF text directly since the landing page itself is a lead-gen gate with no
+substantive content.</p>
+<p>Builds on <a href="GOVERNANCE_DQ_INGESTION_AI_AUDIT.md">docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</a> —
+that doc has the file:line detail behind most "covered"/"partial" claims below; this doc adds
+the ebook-framework elements that weren't part of that earlier audit (data federation, entity
+resolution/MDM, Lakehouse Monitoring specifically, DatabricksIQ/Genie, clean rooms, ML
+reproducibility/Feature Store, AI Gateway/Model Serving, DASF, platform security/compliance).</p>
+<p>Legend: ✅ Covered · 🟡 Partial (coded but blocked, or intent without confirmation) ·
+📘 Documented/coded but not deployed · ❌ Not present · ⚪ N/A (out of scope for this POC's
+architecture) · ⚠️ Not verifiable from repo (workspace-admin-level setting)</p>
+<p><strong>Update — 2026-08-14, what's since moved</strong> (table rows below left as originally scored —
+this is a point-in-time gap analysis, not a living scorecard; re-score explicitly if you want
+the table itself updated):
+- Ch.1 "Data discovery &amp; classification" (was ❌): column-level UC comments now real for
+  Silver (24 applied) — moves toward 🟡, still no systematic tagging/classification beyond that.
+- Ch.2 "AI security (DASF)" (was ❌): now ✅ — <code>docs/DASF_ALIGNMENT.md</code>, risk-by-risk against
+  the actual DASF v1.1 whitepaper, Components 9 &amp; 10.
+- Ch.2 "Model monitoring... no toxicity/PII-leakage screening on generated reports" (was ❌):
+  moves toward 🟡 — every agent report is now independently fact-checked against its own
+  evidence log before saving (<code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>'s evaluator-optimizer
+  pass). That's output-<em>accuracy</em> monitoring, not toxicity/PII screening specifically — the
+  original gap's exact wording is still open.
+- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists now —
+  <code>dim_customer.customer_key_mdm</code>, deterministic exact-match on normalized name+country — but
+  it's committed, not deployed (<code>gold_pipeline</code> not re-run). Still 📘 at best, and still just
+  exact-match, not the fuzzy/probabilistic matching real MDM needs.
+- Priority list item 1 (column comments) and item 5 (cite DASF) at the bottom: <strong>done.</strong>
+  Items 2 (real UC lineage), 3 (AI Gateway routing), 4 (Lakehouse Monitoring), 6 (account
+  groups) are still open.</p>
+<hr />
+<h2>Chapter 1: Data Governance</h2>
+<table>
+<thead>
+<tr>
+<th>Ebook pillar</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data persistence (Delta Lake/DLT)</td>
+<td>✅</td>
+<td>Core to the whole POC — Silver/Gold run as DLT pipelines on Delta tables.</td>
+</tr>
+<tr>
+<td>Data integration (Workflows/DLT orchestration)</td>
+<td>✅</td>
+<td><code>pipelines/silver_dlt.py</code>/<code>gold_dlt.py</code> via Lakeflow, config-driven from <code>cfg.layer_mappings</code>.</td>
+</tr>
+<tr>
+<td>Entity resolution / MDM</td>
+<td>❌</td>
+<td>No dedupe/fuzzy-match logic anywhere (e.g. reconciling the same customer across SAP/JDE/QAD). A real gap given MDM is explicitly named in the JD this repo targets.</td>
+</tr>
+<tr>
+<td>Data federation (Lakehouse Federation to Snowflake/Oracle/etc.)</td>
+<td>❌</td>
+<td>No federation config anywhere; all sources are ingest-then-transform, never query-federated.</td>
+</tr>
+<tr>
+<td>Data ingestion (Auto Loader/CDC/Kafka connectors)</td>
+<td>📘</td>
+<td>14 sources registered in <code>config/replication_sources.yaml</code>, real templates exist (<code>ingestion/templates/</code>), but Bronze is 100% synthetic one-time seed — no live pipeline runs.</td>
+</tr>
+<tr>
+<td>Metadata management (UC metastore, catalog hierarchy)</td>
+<td>🟡</td>
+<td>UC catalogs (bronze/silver/gold/products) are real and structurally sound. Ebook's vision includes cataloging <em>all</em> asset types (dashboards, notebooks, ML models) — only tables are catalogued here.</td>
+</tr>
+<tr>
+<td>Data discovery &amp; classification (auto-classification, tags, rich search)</td>
+<td>❌</td>
+<td>Only 2 columns carry a manual <code>pii</code> tag; no systematic tagging, no column-level comments anywhere (confirmed empty across the board). Undercuts the "80% of time on discovery" problem the ebook opens with.</td>
+</tr>
+<tr>
+<td>Access management (RBAC/ABAC)</td>
+<td>🟡</td>
+<td>Row filters + ABAC-style function + GRANTs are real SQL, but the account groups they reference were never provisioned — <code>PRINCIPAL_DOES_NOT_EXIST</code>.</td>
+</tr>
+<tr>
+<td>Auditing entitlements &amp; access</td>
+<td>❌</td>
+<td>Ebook wants "who has access to what, who accessed what, when." POC only audits <em>agent</em> actions (<code>agent_runs</code>), never queries <code>system.access.*</code> for human entitlements/query history.</td>
+</tr>
+<tr>
+<td>Data lineage</td>
+<td>🟡</td>
+<td>Ebook's pitch is <em>automatic, real-time</em> UC lineage. POC hand-maintains lineage as a Python literal (<code>generate_data_docs.py::EDGES</code>) rather than reading it from UC's native lineage system tables — <code>lineage_doc_agent.md</code> (designed to do this) was never built.</td>
+</tr>
+<tr>
+<td>Data quality mgmt &amp; monitoring (DLT expectations + Lakehouse Monitoring)</td>
+<td>🟡</td>
+<td>DLT expectations: real. <strong>Databricks Lakehouse Monitoring (the native product)</strong>: not used at all — POC built a fully bespoke check suite (<code>dq_monitor_rca.py</code>) instead of the platform-native monitoring/anomaly-detection tooling the ebook centers the whole DQ chapter on.</td>
+</tr>
+<tr>
+<td>Data intelligence (DatabricksIQ/Genie)</td>
+<td>🟡</td>
+<td><code>semantics/sales_metric_view.sql</code> was explicitly built "so Genie grounds NL questions deterministically" — but nothing confirms Genie is actually configured/enabled in the workspace.</td>
+</tr>
+<tr>
+<td>Data sharing (Delta Sharing, clean rooms, Marketplace)</td>
+<td>🟡 / ❌</td>
+<td>Delta Share SQL exists, fails on missing metastore privilege. <strong>Clean rooms: not present at all</strong> — never attempted.</td>
+</tr>
+</tbody>
+</table>
+<h2>Chapter 2: AI Governance</h2>
+<p>The ebook's entire AI-governance chapter assumes <strong>classical ML</strong> (trained models, feature
+stores, drift, SHAP). This POC's "AI" is LLM/agentic (Claude tool-calling), not classical ML —
+several sections below are a genuine scope mismatch, not just a gap.</p>
+<table>
+<thead>
+<tr>
+<th>Ebook pillar</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compliance &amp; ethics (regulatory input restrictions)</td>
+<td>❌</td>
+<td>No policy anywhere restricting what data can feed AI decisions, no ethics review process.</td>
+</tr>
+<tr>
+<td>ML reproducibility (Feature Store, MLflow experiment tracking)</td>
+<td>⚪</td>
+<td>No classical model training exists in this POC — no MLflow experiments, no Feature Store usage. Becomes a hard requirement if real ML (e.g. demand forecasting) is ever added.</td>
+</tr>
+<tr>
+<td>Explainability (SHAP etc.)</td>
+<td>⚪</td>
+<td>No ML models to explain. Closest analog — LLM agent decision logs (<code>agent_runs.decision_log</code>) — gives <em>some</em> transparency but nothing like feature-attribution explainability.</td>
+</tr>
+<tr>
+<td>Model monitoring (drift, bias, Lakehouse Monitoring, Inference Tables)</td>
+<td>❌</td>
+<td>No monitoring of Claude output quality, no toxicity/PII-leakage screening on generated reports or <code>product_creator</code> output; "drift" doesn't apply without a trained model, but the <em>spirit</em> (catching degraded output) has no equivalent for LLM outputs either.</td>
+</tr>
+<tr>
+<td>Model serving (Databricks Model Serving, MLflow AI Gateway)</td>
+<td>❌</td>
+<td>Concrete gap: <code>agents/agent_core.py</code> calls the Anthropic SDK <strong>directly</strong> with a Databricks-secret-stored key. The ebook's recommended pattern — MLflow AI Gateway centralizing credential management, rate limits, and routing for SaaS LLMs — is exactly the control this POC bypasses.</td>
+</tr>
+<tr>
+<td>AI security (Databricks AI Security Framework — 55 risks / 12 components)</td>
+<td>❌</td>
+<td>Not referenced anywhere. The POC's own guardrails (read-only-SQL-only tool, regex-gated view creation, forced finalization turn, tool budget) are a genuine informal analog to several DASF control categories — just not mapped to the formal framework.</td>
+</tr>
+<tr>
+<td>Cataloging/documentation for ML (Feature Store + MLflow + UC unified catalog)</td>
+<td>⚪</td>
+<td>No ML models/feature tables exist to catalog.</td>
+</tr>
+</tbody>
+</table>
+<h2>Chapter 3: Platform Security &amp; Compliance</h2>
+<table>
+<thead>
+<tr>
+<th>Ebook pillar</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Control/data plane, SSO, SCIM, service principals, cluster policies, network security (VPC/VNet, private link)</td>
+<td>⚠️</td>
+<td>Azure workspace-admin-level settings, not application code — can't be confirmed or denied from the repo. Needs a direct check against the workspace admin console.</td>
+</tr>
+<tr>
+<td>Encryption in transit/at rest, customer-managed keys</td>
+<td>⚠️</td>
+<td>Same — inherited Azure/Databricks defaults unless explicitly configured otherwise.</td>
+</tr>
+<tr>
+<td>Compliance certifications (ISO 27001, SOC2, HIPAA, PCI, FedRAMP)</td>
+<td>✅</td>
+<td>These are Databricks-the-vendor's certifications, inherited automatically by running on the platform. Not a gap to close — just worth naming correctly if asked.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>What's needed to close the gaps (priority order for a POC/interview context)</h2>
+<ol>
+<li><strong>Column-level UC comments</strong> — cheapest, highest-leverage fix. Directly addresses the
+   "discovery and classification" pillar and the data-dictionary audit finding in one move.</li>
+<li><strong>Wire the existing lineage into real UC lineage system tables</strong> instead of the
+   hand-maintained <code>EDGES</code> list — makes the "automated real-time lineage" claim actually true.</li>
+<li><strong>Route the Claude calls through MLflow AI Gateway / Model Serving</strong> instead of a direct SDK
+   call — closes the single most concrete AI-governance gap; natural interview talking point
+   (centralized credential/rate-limit governance for LLM calls).</li>
+<li><strong>Adopt Databricks Lakehouse Monitoring</strong> on at least one Gold table instead of (or
+   alongside) the bespoke <code>dq_monitor_rca.py</code> suite — shows familiarity with the native
+   product, not just a custom reimplementation of it.</li>
+<li><strong>Cite the DASF explicitly</strong> and map the existing agent guardrails onto it — low effort,
+   since the controls already exist informally.</li>
+<li><strong>Finish provisioning the account groups</strong> — this single manual step (already flagged in
+   <code>docs/TRACEABILITY_MATRIX.md</code>) would flip several "coded but non-functional" items to ✅.</li>
+<li>Everything else (entity resolution/MDM, Lakehouse Federation, clean rooms, classical-ML
+   governance) is legitimately <strong>out of scope</strong> for a POC of this size and can be framed that
+   way rather than built.</li>
+</ol>
+</div>
+<div id="p10" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/ralph_loop.md</p>
+<h1>Agent self-sufficiency loops ("Ralph loops") — research + deployment checklist</h1>
+<p>Status: <strong>planning only, nothing implemented yet.</strong> Captured 2026-08-12.</p>
+<h2>What a Ralph loop is</h2>
+<p>There is no "RALF loop" — the real, current (2026) term is the <strong>Ralph loop</strong> (aka "Ralph
+Wiggum loop"), coined by Geoffrey Huntley in mid-2025, now mainstream in agentic-coding
+circles. OpenAI shipped it as a first-class <code>/goal</code> primitive in Codex CLI 0.128.0 in
+April 2026.</p>
+<p>Core mechanics:
+- A coding agent runs inside a plain <code>while</code> loop against <strong>one stable goal prompt</strong>.
+- Each iteration starts a <strong>fresh context</strong> — no accumulated conversation memory.
+- Progress persists in <strong>files + git</strong>, not in the model's context window — the repo <em>is</em>
+  the memory.
+- Each pass does one unit of work, checks a <strong>verification gate</strong>, and either exits (goal
+  met) or leaves state for the next pass to pick up.
+- Unpredictability of any single run averages out over many runs against a stable target.</p>
+<p>Sources:
+- https://ghuntley.com/loop/ (primary source, Geoffrey Huntley)
+- https://linearb.io/blog/dex-horthy-humanlayer-rpi-methodology-ralph-loop
+- https://www.alibabacloud.com/blog/from-react-to-ralph-loop-a-continuous-iteration-paradigm-for-ai-agents_602799
+- https://ralphloop.sh/</p>
+<h2>How this maps onto this repo today</h2>
+<p>Grounded in <code>agents/agent_core.py</code>, <code>resources/agents.yml</code>, and <code>agents/pipeline_healer.md</code>
+(read 2026-08-12, not assumed).</p>
+<p><strong>Update 2026-08-14</strong> (kept the 2026-08-12 analysis above unedited — this is what's changed
+since): the 4 agents this doc originally called "aspirational-only" — <code>pipeline_healer</code>,
+<code>dq_rca_agent</code>, <code>ingestion_registrar</code>, <code>lineage_doc_agent</code> — are now real <code>.py</code> implementations,
+deployed and confirmed live via <code>databricks jobs get-run-output</code>. The fleet is <strong>ten</strong> agents,
+not six. What's <em>still</em> true, unchanged: the <strong>PR/Slack/webhook trigger design</strong> in those four
+<code>.md</code> specs was never built (no GitHub token/App wiring exists anywhere — confirmed via grep,
+same as before) — the four new agents run on the same on-demand/scheduled-job triggers as the
+original six, writing to <code>agent_reports</code> like every other agent, not opening PRs. Ralph-loop
+mechanics (goal prompt, verification gate, iteration cap, self-triggering) are <strong>still not
+built</strong> — every agent, all ten, is still single-shot. Also new since 2026-08-12: each agent's
+report now includes a second, independent Claude call verifying its own claims against its
+evidence log (<code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>) — a real step toward the "verification
+gate" a loop would need (checklist item A below), though it verifies the <em>report</em>, not yet a
+re-queryable goal condition.</p>
+<ul>
+<li>The <strong>ten live agents</strong> (<code>dq_monitor_rca</code>, <code>dq_rca_agent</code>, <code>pipeline_healer</code>,
+  <code>lineage_doc_agent</code>, <code>operational_intel</code>, <code>schema_evolution</code>, <code>ingestion_registrar</code>,
+  <code>vector_content</code>, <code>product_creator</code>, <code>deployment_gate</code>) are <strong>single-shot</strong>: deterministic
+  checks run, optionally one Claude reasoning pass (max 12 tool calls, read-only SQL only),
+  write a report to <code>acme_bronze.audit.agent_reports</code>, done. No looping, no retry, no
+  self-evaluation of "am I done."</li>
+<li>The <strong>loop/PR/webhook behavior is still only aspirational</strong> — the trigger/action design in
+  the original <code>agents/*.md</code> specs (webhook-triggered, GitHub MCP for PRs, Slack) was never
+  built, even though the agents themselves now exist. No GitHub token/App wiring exists
+  anywhere in the repo (confirmed via grep — zero hits outside the spec docs).</li>
+<li>What's already in place and matches the Ralph-loop precondition: <strong>state lives outside the
+  model</strong> (<code>acme_bronze.audit.agent_runs</code>/<code>agent_reports</code>, config tables like
+  <code>replication_sources.yaml</code>/<code>layer_mappings</code>), not in conversation history. Most of "memory
+  in files, not context" is already done.</li>
+<li>Human-gate principle already stated in <code>agents/README.md</code>: <em>"agents open PRs / propose
+  fixes; never auto-merge to main."</em> A Ralph loop here should still terminate at a PR, not a
+  direct write.</li>
+<li><code>acme_agents_scheduled</code> job is currently <code>PAUSED</code> (still true as of 2026-08-14) — a loop
+  needs an active trigger, not a dormant cron.</li>
+</ul>
+<h2>Deployment checklist — Azure Databricks</h2>
+<h3>A. Loop mechanics (per agent, code-level)</h3>
+<ul>
+<li>☐ Define a <strong>goal prompt</strong> per agent (e.g., "drive <code>dq_results</code> for X to green" / "get
+      <code>deployment_gate</code> to PROMOTE") — replaces the fixed single-shot system prompt in
+      <code>agent_core.py</code>.</li>
+<li>☐ Add a <strong>verification gate function</strong> the loop can actually run each pass (re-query the
+      check it's trying to fix) — not "the LLM says it's done."</li>
+<li>☐ Add an <strong>iteration cap</strong> per invocation (Ralph loops without a cap = runaway spend).</li>
+<li>☐ Decide <strong>where loop iterations persist</strong>: extend <code>agent_runs</code>/<code>agent_reports</code> with a
+      <code>goal_id</code>/<code>iteration</code> column so a loop is a sequence of rows, not one row.</li>
+<li>☐ Keep the existing guardrail: model's only write path is still a proposed diff/PR/config
+      row — never a direct table write.</li>
+</ul>
+<h3>B. Git-as-memory + human gate (doesn't exist yet)</h3>
+<ul>
+<li>☐ Provision a <strong>GitHub App or fine-grained PAT</strong> scoped to this repo only (least
+      privilege: open PRs, no direct push to <code>main</code>/<code>dv2</code>).</li>
+<li>☐ Store it as a <strong>Databricks secret</strong> (new scope, e.g. <code>agents/github_token</code>) — same
+      pattern as <code>agents/anthropic_api_key</code>.</li>
+<li>☐ Add PR-opening as a real tool in <code>agent_core.py</code> (currently the model's only tool is
+      <code>run_sql</code>) — a second, carefully-scoped write action, needs its own guardrail review.</li>
+<li>☐ Decide: does the loop read its own <strong>prior PR status</strong> (open/merged/closed) as part of
+      "am I done," so a merged fix ends the loop?</li>
+</ul>
+<h3>C. Databricks Jobs / compute</h3>
+<ul>
+<li>☐ Decide job shape: <strong>one long-running loop task</strong> vs. <strong>Jobs-triggers-itself pattern</strong>
+      (task completes one iteration, triggers a new job run — safer on serverless, which
+      isn't built for long-lived processes).</li>
+<li>☐ If self-triggering: use Databricks SDK <code>WorkspaceClient().jobs.run_now()</code> from within
+      the task, with iteration count passed as a job parameter and a hard max.</li>
+<li>☐ Unpause or redesign <code>acme_agents_scheduled</code> (currently <code>PAUSED</code>) — a loop needs an
+      active trigger, not a dormant cron.</li>
+<li>☐ Confirm <code>agent_env</code> environment (<code>environment_version: 3</code>, deps <code>["anthropic"]</code>) also
+      gets a GitHub client dependency (<code>PyGithub</code> or plain <code>requests</code> against the REST API).</li>
+</ul>
+<h3>D. Cost &amp; runaway controls</h3>
+<ul>
+<li>☐ Per-loop <strong>token/dollar budget</strong>, not just a step cap.</li>
+<li>☐ A <strong>circuit breaker</strong>: N consecutive failed verification checks → loop stops and files
+      a report instead of continuing silently.</li>
+<li>☐ Job-level <strong>timeout</strong> in <code>resources/agents.yml</code> as a hard backstop independent of the
+      in-code cap.</li>
+</ul>
+<h3>E. Observability</h3>
+<ul>
+<li>☐ Extend existing audit tables (don't build new infra) so a loop's iterations are
+      queryable as a group — add <code>goal_id</code> to <code>acme_bronze.audit.*</code>.</li>
+<li>☐ Surface loop status somewhere a human checks without querying SQL — Slack webhook
+      (mentioned in <code>pipeline_healer.md</code>, never wired) or a row in <code>deployment_gate</code>'s
+      existing report.</li>
+</ul>
+<h3>F. Azure/secrets</h3>
+<ul>
+<li>☐ New Databricks secret scope entry: <code>agents/github_token</code> (and rotate-ability — owner
+      of renewal).</li>
+<li>☐ Optional, more enterprise-y: mirror the secret in Key Vault and reference via
+      Databricks' Key-Vault-backed secret scope instead of a Databricks-native scope. Not
+      required for POC.</li>
+</ul>
+<h3>G. Before flipping it on</h3>
+<ul>
+<li>☐ Dry-run one agent as a loop <strong>against a scratch branch</strong>, cap iterations low (3–5),
+      confirm it opens a sane PR and stops. Candidate: <code>schema_evolution</code> — smallest blast
+      radius, already read-only-scanning.</li>
+<li>☑ Update <code>docs/TRACEABILITY_MATRIX.md</code> and <code>agents/README.md</code> once real — don't let docs
+      drift ahead of code the way <code>pipeline_healer.md</code> already had. Done 2026-08-14: both
+      updated when the six→ten agent count was caught stale (<code>docs/SESSION_NOTES.md</code>); this
+      was about the four agents becoming real, not about a Ralph loop existing — the loop
+      items above are still open.</li>
+</ul>
+<h2>Open decisions (not yet made)</h2>
+<ul>
+<li>Which agent gets a loop first.</li>
+<li>What "done" means per agent (the verification gate definition).</li>
+<li>Whether PR-opening is worth the new write-scoped GitHub credential for a POC/interview
+  repo, versus just widening the report the agent already writes.</li>
+</ul>
+</div>
+<div id="p11" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/DEMO_RUNBOOK.md</p>
+<h1>Demo Runbook — sequence of talking points</h1>
+<p>Five stations, ~2–3 minutes each. Pre-demo checklist at the bottom. Every claim in the
+deck maps to something you can open live at one of these stations.</p>
+<h2>Station 1 — The deck (presentation/index_v3.html)</h2>
+<p>Three versions exist, all preserved: <code>index.html</code> (v1, 19 slides), <code>index_v2.html</code> (v2, 31
+slides, adds RBAC mechanics/decision-log/agentic-traceability detail), <code>index_v3.html</code> (v3,
+34 slides, current — adds a Technical Summary slide, a dedicated Unity Catalog structure
+slide, and an AI Security/DASF slide; every agent-count reference updated 6→10). Open v3 in
+a browser, arrow keys to navigate.
+<strong>Talking point:</strong> "Every number on the title slide is verified against the live workspace —
+including the agent count, re-confirmed live the same day this version shipped."</p>
+<h2>Station 2 — The repo (GitHub, branch dv2)</h2>
+<p>Show: <code>pipelines/</code> (2 DLT files — the whole medallion), <code>agents/</code> (<strong>10</strong> agents + core,
+sharing one guardrail contract including an independent verification pass since 2026-08-14),
+<code>resources/</code> (Asset Bundle = the deployment), <code>sql/</code> (lineage proofs), <code>security/</code>,
+<code>docs/index.html</code> (tabbed doc site, generated by <code>scripts/generate_docs_site.py</code> — do not
+hand-edit).
+<strong>Talking point:</strong> "Deployment is <code>databricks bundle deploy</code> — no hand-built notebooks;
+CI gate is <code>scripts/validate.py</code>, currently 14/14."</p>
+<h2>Station 3 — Databricks workspace (adb-7405618665227003.3.azuredatabricks.net)</h2>
+<ul>
+<li>Catalog Explorer: acme_bronze → silver → gold → products; open
+  <code>acme_gold.sales.dim_customer</code> → note ROW FILTER + column MASK badges.</li>
+<li>Pipelines UI: silver_pipeline / gold_pipeline, both green.</li>
+<li>Jobs UI: acme_agents_scheduled (paused cron), acme_agents_on_demand, acme_ml_features.
+<strong>Talking point:</strong> "Governance is enforced in the pipeline definition — filters and masks
+survive every refresh; account-group grants are staged in security/unity_catalog_policies.sql."</li>
+</ul>
+<h2>Station 4 — Live queries (SQL editor or databricks-connect)</h2>
+<pre><code class="language-sql">-- one order traced Bronze -&gt; Silver -&gt; Gold (swap the id to any order)
+-- run the steps in sql/02_trace_order_lineage.sql
+
+-- governance is real:
+SELECT * FROM system.information_schema.row_filters  WHERE table_name = 'fact_sales_orders';
+SELECT * FROM system.information_schema.column_masks WHERE table_name = 'dim_customer';
+
+-- products + trust:
+SELECT * FROM acme_products.meta.v_product_trust_scores;
+SELECT * FROM acme_products.sales.v_customer_360 LIMIT 5;
+
+-- semantic layer (metric view):
+SELECT order_date, MEASURE(revenue_usd), MEASURE(avg_order_value)
+FROM acme_gold.sales.mv_sales_metrics GROUP BY order_date ORDER BY order_date DESC LIMIT 10;
+
+-- ML features (PIT-correct):
+SELECT * FROM acme_gold.ml.customer_features WHERE churn_risk_score &gt;= 0.5 LIMIT 10;
+</code></pre>
+<h2>Station 5 — Agent evidence (the differentiator)</h2>
+<pre><code class="language-sql">SELECT agent, mode, status, finished_at FROM acme_bronze.audit.agent_runs ORDER BY finished_at DESC;
+SELECT agent, title, body FROM acme_bronze.audit.agent_reports ORDER BY created_at DESC LIMIT 3;
+</code></pre>
+<p>Read aloud from the DQ RCA report: the agent verified the failure itself, traced it to
+source-side staleness (fresh <code>_ingest_ts</code>, frozen business dates, one snapshot batch),
+and proposed the bronze-layer check that would have caught it two months earlier. Since
+2026-08-14 every report also carries an <strong>Evidence log</strong> (the actual queries + returned
+values) and an <strong>Independent verification</strong> section — a second, separate Claude call that
+fact-checks the first pass's claims against that evidence before the report saves. Read that
+section aloud too if asked "how do you know it isn't making this up."
+<strong>Talking point:</strong> "The agent's only tool is read-only SQL; every query it ran — and what it
+returned — is in the report itself, not just the decision log; a second model checks the
+first one's claims against that evidence before anything saves. That's the guardrail model."
+Then: <code>acme_products.sales.order_to_cash</code> — a view an agent created from a natural-language
+request, through a validation gate; mention <code>dry_run=true</code> as the opt-in Plan-Mode path if
+asked how a human reviews before a write happens.</p>
+<h2>Pre-demo checklist (run 30 min before)</h2>
+<ol>
+<li><code>databricks bundle run gold_pipeline -t dev</code> (fresh PIT snapshot — check 13; this also
+   materializes <code>dim_customer.customer_key_mdm</code>, committed in code since 2026-08-13 but not
+   run live as of this writing — expect the column to newly appear)</li>
+<li><code>databricks bundle run agents_scheduled_job -t dev</code> (fresh DQ rows + digest; needs the
+   <code>agents/anthropic_api_key</code> secret for LLM mode)</li>
+<li><code>python scripts/validate.py</code>-equivalent via connect — confirm 14/14</li>
+<li>Open all five stations in browser tabs; presentation on second screen</li>
+</ol>
+<h2>Honest-answer cards (if pressed)</h2>
+<ul>
+<li>Delta Share: <code>CREATE SHARE</code> needs metastore-level privilege this workspace user lacks —
+  designed in <code>data_products/publish_marketplace.sql</code>, blocked on admin action.</li>
+<li>Vector Search: endpoint <code>acme-vs</code> provisioned; index created by rerunning
+  <code>ai/provision_vector_search.py</code> once the endpoint is ONLINE.</li>
+<li>Account groups (sales_analyst_*): filter/mask functions reference them today; the GRANTs
+  activate when an account admin creates the groups.</li>
+<li>Bronze ingestion: synthetic seed stands in for the templated Auto Loader/Lakeflow Connect
+  estate described in <code>docs/REPLICATION_PATTERNS.md</code> — design complete, not deployed.</li>
+</ul>
+</div>
+<div id="p12" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/GAP_ANALYSIS.md</p>
+<h1>Gap Analysis — repo vs. requirement (July 2026)</h1>
+<p>Legend: 🔴 broken/missing (claimed but not real) · 🟠 required but absent · 🟡 improvement / new-feature opportunity · ✅ solid</p>
+<h2>A. Claimed-in-docs but NOT in code (highest interview risk — fix first)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Evidence</th>
+<th>Fix (in this package)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>🔴 <strong>Silver is NOT config-driven.</strong> <code>silver_dlt.py</code> docstring says mappings come from <code>cfg.layer_mappings</code>; all mappings are hardcoded. <code>layer_mappings</code> is never seeded, never read.</td>
+<td><code>pipelines/silver_dlt.py</code> vs <code>config/config_tables.sql</code></td>
+<td>Updated <code>silver_dlt.py</code> (reads <code>cfg.layer_mappings</code>, hardcoded specs kept only as seed/fallback) + <code>config/seed_layer_mappings.sql</code></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>🔴 <strong><code>batch_log</code> never written.</strong> Requirement: "automated checks and logging for the rejected records <strong>and batches</strong>". Table exists; zero writers.</td>
+<td>grep: no writer for <code>audit.batch_log</code></td>
+<td><code>dq/quarantine_writer.py</code> writes batch_log from the DLT event log every run</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>🔴 <strong>DLT-dropped rows never reach <code>rejected_records</code>.</strong> <code>expect_all_or_drop</code> silently drops; the promised <code>dq/quarantine_writer.py</code> doesn't exist (referenced in <code>bronze_ingest_template.py</code>). Only the batch DQ job quarantines.</td>
+<td><code>ingestion/templates/bronze_ingest_template.py</code> comment</td>
+<td>New <code>dq/quarantine_writer.py</code>: parses pipeline event log expectations → rejected_records with DAMA dimension tag</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>🔴 <strong><code>validate.py</code> check #3 can never pass.</strong> "Sources registered ≥6" reads <code>cfg.source_registry</code>, but <code>deploy.py --register-source</code> never inserts into it.</td>
+<td><code>scripts/deploy.py</code></td>
+<td>Updated <code>deploy.py</code> inserts registry row per source</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>🔴 <strong>Referenced files missing</strong>: <code>ingestion/litmus_ot/uns_topic_map.yaml</code> (REPLICATION_PATTERNS R3), <code>gg_bronze_dlt.py</code> (R1 — actually covered by the shared template), <code>fx_rates</code> table (read by Silver, never created), <code>docs/SESSION_NOTES.md</code> (CLAUDE.md rule 4).</td>
+<td>docs vs tree</td>
+<td>Added <code>uns_topic_map.yaml</code>; <code>fx_rates</code> created+seeded in <code>seed_layer_mappings.sql</code>; R1 doc corrected to name the real template; SESSION_NOTES.md stub</td>
+</tr>
+</tbody>
+</table>
+<h2>B. Requirement present, repo silent (🟠 required)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Requirement text</th>
+<th>Gap</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1</td>
+<td>"dashboard showing that metrics" (DAMA 6 DQ dimensions) + trust in data products</td>
+<td>No dashboard artifact at all. <code>dq_results</code> exists but nothing consumes it.</td>
+<td><code>dashboards/dq_trust_dashboard.sql</code> — Lakeview-ready dataset queries: score by dimension over time, product trust scorecard, reject drill-down, freshness SLO</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>"oracle EBS <strong>and D365</strong> data along with <strong>MES</strong>" in region/sensitivity policies</td>
+<td>No EBS, D365, or MES source rows; security SQL only covers SAP/JDE/QAD</td>
+<td>3 new rows in <code>replication_sources.yaml</code> (EBS via OGG, D365 via Lakeflow Connect managed connector, MES via Litmus); <code>unity_catalog_policies.sql</code> region filter extended (EBS→AMERICAS, D365→GLOBAL-masked, MES→ot_engineer)</td>
+</tr>
+<tr>
+<td>B3</td>
+<td>Workflow orchestration (JD: "workflow orchestration tools"; deploy.py step 7 "jobs (DQ, features, vectors)")</td>
+<td>No job definitions exist anywhere</td>
+<td><code>pipelines/jobs/lakeflow_jobs.yaml</code> — Declarative Automation Bundle resources: dq job (with failure→healer webhook), quarantine writer, feature refresh, vector sync</td>
+</tr>
+<tr>
+<td>B4</td>
+<td>ML Feature Store "low-latency serving"</td>
+<td>Only a comment; no online path</td>
+<td><code>ml/feature_store.py</code> updated: publishes a <strong>Lakebase</strong>-synced online feature table (Lakebase is GA on Azure since Mar 2026)</td>
+</tr>
+<tr>
+<td>B5</td>
+<td>"RAG patterns" / Agent Bricks</td>
+<td><code>vector_search_rag.py</code> ends in a comment where the agent should be</td>
+<td><code>ai/rag_agent.py</code> — retriever tool + agent + Model Serving endpoint via Mosaic AI Agent Framework</td>
+</tr>
+<tr>
+<td>B6</td>
+<td>Synthetic data "from multiple source systems"</td>
+<td>Generator covers SAP VBAK, JDE F4201, OT only. No KNA1/F0101 (Silver customer reads them!), no QAD, SFDC, D365; <code>STEEL</code> product list defined but unused</td>
+<td><code>generate_synthetic_data.py</code> extended: kna1, f0101, qad so_mstr, sfdc opportunity, d365 salesorders — with product codes so a <code>dim_product</code> becomes possible</td>
+</tr>
+<tr>
+<td>B7</td>
+<td>Gold star schema depth ("dimensional modeling")</td>
+<td>Only <code>dim_customer</code> + 2 facts; no <code>dim_date</code>, no <code>dim_product</code>; <code>fact_heat_quality</code> comment promises a tonnage join it doesn't do</td>
+<td>Deliberately <strong>not</strong> auto-fixed (would need your grain decisions) — flagged as open question below</td>
+</tr>
+</tbody>
+</table>
+<h2>C. Latest-feature upgrades (🟡 — what changed since the repo was written)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature (status, July 2026)</th>
+<th>Where it lands</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td><strong>Oracle query-based connector — GA May 2026.</strong> Databricks-native Oracle/EBS ingestion via cursor column, no gateway, no OGG.</td>
+<td>New pattern <code>lakeflow_query</code> in YAML + REPLICATION_PATTERNS R1b. Positioning: OGG stays for true CDC/deletes; query-based for cursor-friendly tables (EBS <code>LAST_UPDATE_DATE</code>). This directly answers "how to do it Databricks-native."</td>
+</tr>
+<tr>
+<td>C2</td>
+<td><strong>Zerobus (Lakeflow Connect direct-write API)</strong> — high-throughput (~100MB/s), &lt;5s latency event ingestion without managing Event Hubs consumers.</td>
+<td>Documented as Path C for Litmus OT in R3; Litmus can push straight to the lakehouse. Event Hubs path kept as default (Litmus ships a native EH connector today).</td>
+</tr>
+<tr>
+<td>C3</td>
+<td><strong>AUTO CDC replaces <code>apply_changes</code></strong> in Lakeflow Spark Declarative Pipelines; <code>dlt</code> module direction is <code>pyspark.pipelines</code>.</td>
+<td>Bronze template updated to <code>create_auto_cdc_flow</code> with graceful fallback; comment notes the module rename so the repo doesn't look pre-2025.</td>
+</tr>
+<tr>
+<td>C4</td>
+<td><strong>Unity Catalog Metric Views / Business Semantics — GA</strong>, integrated with AI/BI Dashboards + Genie.</td>
+<td><code>semantics/sales_metric_view.sql</code> — revenue/orders/AOV defined once; Genie space and dashboards both bind to it. Replaces "Genie hits agg table" with the 2026-correct answer.</td>
+</tr>
+<tr>
+<td>C5</td>
+<td><strong>Lakebase GA on Azure (Mar 2026)</strong> — autoscaling, HA, scale-to-zero.</td>
+<td>B4 above; also noted as the backing store for the marketplace UI if it needs app state.</td>
+</tr>
+<tr>
+<td>C6</td>
+<td><strong>Data Quality Monitoring / Anomaly Detection (Public Preview) + table health indicators.</strong></td>
+<td>Noted in dashboard SQL header: complements (not replaces) the DAMA framework — anomaly detection = unknown-unknowns, DAMA rules = contractual thresholds. Good interview talking point.</td>
+</tr>
+<tr>
+<td>C7</td>
+<td><strong>Declarative Automation Bundles</strong> (Asset Bundles renamed).</td>
+<td><code>lakeflow_jobs.yaml</code> written in bundle resource shape; deploy.py notes <code>databricks bundle deploy</code> as the target-state deployer vs raw REST.</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>Real-time mode (<code>update_flow</code>, ms-latency, Public Preview)</td>
+<td>Documented option in R3 for OT alerting use cases; not defaulted (preview).</td>
+</tr>
+</tbody>
+</table>
+<h2>D. Open questions (per CLAUDE.md rule 3 — no assumptions made)</h2>
+<ol>
+<li><strong>Gold dims</strong>: should <code>dim_product</code> key off SAP MATNR / JDE item / QAD part unified by hash key, and what survivorship order? (B7)</li>
+<li><strong>fact_heat_quality ↔ shipped tonnage</strong>: which table carries daily tonnage — JDE F4211 lines or MES? Join grain (site+date?) needs your call.</li>
+<li><strong>D365 scope</strong>: which entities (salesorders only, or accounts/quotes)? Managed connector vs Synapse Link landing?</li>
+<li><strong>OGG retirement horizon</strong>: if EBS tables all have reliable <code>LAST_UPDATE_DATE</code>, query-based connector could retire OGG entirely — licensing decision, not technical.</li>
+<li><code>Old/</code> folder still ships stale content (599-line old README, jsx) — delete before sharing repo access at the interview?</li>
+</ol>
+</div>
+<div id="p13" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/SESSION_NOTES.md</p>
+<h1>Session notes (append-only, dated) — required by CLAUDE.md rule 4</h1>
+<h2>2026-07-05 — Gap analysis + 2026 feature refresh</h2>
+<p>Compared repo vs requirement; produced docs/GAP_ANALYSIS.md. Fixed credibility gaps
+(config-driven Silver made real, batch_log/quarantine writers, source_registry inserts),
+added missing requirement artifacts (DQ trust dashboard, EBS/D365/MES sources, jobs,
+Lakebase online features, RAG agent, metric view), refreshed patterns for GA features
+(Oracle query-based connector, Zerobus, AUTO CDC). Open decisions in GAP_ANALYSIS §D.</p>
+<h2>2026-07-11 — Data Vault 2.0 methodology + PIT/bridge in Gold</h2>
+<p>Requirement now names DV2.0 explicitly. Adopted DV2.0 methodology over existing hash-key design
+(decision revised in JUSTIFICATION_NOTES #5; new #10 PIT, #11 bridge — 2 alternatives each).
+New: docs/DATA_VAULT_PIT_BRIDGE.md (use cases), gold pit_customer + bridge_order_fulfillment,
+silver shipment/invoice (config-driven; SAP LIPS/VBRP seed mappings + YAML sources + synthetic
+lips/vbrp), validate.py checks 13–14 (PIT freshness, bridge FK), ARCHITECTURE.md rewritten,
+presentation Gold layer text updated. User-confirmed scope: customer PIT + order-lifecycle
+bridge; JDE/QAD lifecycle onboarding deferred to mapping rows (no code).</p>
+<h2>2026-07-18 — First real deploy: DAB resources, bronze seeding, bug fixes, lineage queries</h2>
+<p>Went from "code exists" to "pipelines actually run against real data" for the first time. Added
+<code>databricks.yml</code> + <code>resources/pipelines.yml</code> (DAB) to deploy <code>silver_dlt.py</code>/<code>gold_dlt.py</code> as
+Lakeflow Declarative Pipelines. Workspace had none of the <code>acme_*</code> UC catalogs provisioned and no
+bronze ingestion pipeline exists in-repo (gap, see docs/CODE_GRAPH.md) — provisioned catalogs/schemas/
+cfg+audit tables directly and loaded <code>scripts/generate_synthetic_data.py</code> output into Bronze as a
+stand-in, since building the full templated ingestion layer was out of scope for getting the two
+existing pipelines running.</p>
+<p>Found and fixed 5 pre-existing bugs surfaced by actually running this for the first time:
+<code>config/seed_layer_mappings.sql</code>'s <code>MERGE ... USING (VALUES...) s(cols)</code> (column aliases not allowed
+on this Spark version → temp view instead), <code>uuid()</code> inside an inline <code>VALUES</code> table (non-deterministic,
+not foldable → moved to outer SELECT), <code>pipelines/{silver,gold}_dlt.py</code> had a UTF-8 BOM the Lakeflow
+parser rejects, <code>silver_dlt.py</code>'s <code>fx_rates</code> table read from its own publish target
+(<code>acme_silver.sales.fx_rates</code>) causing a DLT graph cycle — reference table moved to <code>acme_silver.ref</code>,
+and the three <code>_current</code> tables were <code>@dlt.view</code> (pipeline-local, never reach Unity Catalog) but
+<code>gold_dlt.py</code> reads them cross-pipeline by fully-qualified name — changed to <code>@dlt.table</code>.</p>
+<p><code>scripts/validate.py</code> needs a SQL warehouse (none provisioned); ran the same 14 checks via a
+serverless Spark Connect session instead — 10/14 pass. Failures are real, pre-existing gaps: no UC
+row filter/column mask exists anywhere in the repo (checks 8–9), no DQ framework exists to populate
+<code>audit.dq_results</code> (check 10), and <code>validate.py</code>'s expected active-source count (6) is stale against
+<code>replication_sources.yaml</code>'s current 14 (check 3) — never updated when EBS/D365/MES were added
+2026-07-05.</p>
+<p>Added <code>sql/01_explore_tables.sql</code>, <code>sql/02_trace_order_lineage.sql</code>,
+<code>sql/03_full_lineage_reconciliation.sql</code> — Bronze→Silver→Gold lineage queries, all verified against
+the live data (all 13,000 synthetic orders across SAP/JDE/QAD reconcile with zero orphans). Restyled
+<code>presentation/index.html</code>: swapped the orange/amber "molten glow" UI chrome for a restrained
+industrial-corporate palette (charcoal/steel-gray/green), in the tone of steel-sector sites like
+nucor.com (public site loads styling via external JS/CSS, so exact brand hex values weren't
+extractable — this is a stylistic approximation, not a literal brand match); kept the literal
+molten-steel SVG gradient warm since that's a realistic detail, and gave the Bronze/Silver/Gold
+medallion circles their literal metal colors instead of the old arbitrary orange/amber/blue mapping.</p>
+<p>Later same day: presentation expanded 14 → 17 slides, structure borrowed from the Vertiv V5 deck
+(same author's prior Snowflake platform presentation): title slide gained a platform-at-a-glance stat
+band using this build's verified numbers (4 catalogs · 14 sources/8 patterns · 32 tables · 40 mapping
+rows · 25.9K records · 13K orders zero-orphan · 14 CI checks · 99.0% avg DQ score); two new data-
+architecture slides (per-layer table/row-count model, field-level source→Bronze→Silver→Gold lineage
+matrix drawn from cfg.layer_mappings transforms); one new agentic-AI architecture slide (6 agents —
+DQ RCA, schema evolution, product creator, vector/content, deployment, operational intel — each mapped
+to the platform layer it owns, with triggers/orchestrator/tools strips and guardrails line); value
+slide upgraded with the Vertiv deck's ROI framing ($1.2M/yr with 4-driver breakdown, before/after
+table, $105K run cost, 11.4×/24× ROI, per-phase roadmap values). DQ slide got a live-result line
+(14 checks, 10 green, gaps named). All 5 changed slides verified via headless-Chrome screenshots.
+Then two more diagram slides (deck now 19): "Cloud architecture" — six-swimlane Azure/Databricks
+service-flow map (sources → ADLS/Event Hubs/Lakeflow Connect/Auto Loader/Zerobus → Bronze → the two
+DLT pipelines + UC → Delta Sharing/Genie/Vector Search/Lakebase → consumers) with a DevOps-spine strip;
+and "Agent stack" — five-band agentic services diagram (triggers → Claude Agent SDK orchestrator →
+MCP/API tools → six agents → platform surfaces acted on, write paths marked PR-only). Both verified
+via headless-Chrome screenshots.</p>
+<p>Final stretch: the six agents were BUILT AND DEPLOYED for real (agents/ + resources/agents.yml —
+two serverless jobs: acme_agents_scheduled with daily-06:00-UTC cron PAUSED, acme_agents_on_demand
+with a product_request job parameter). Design: deterministic work always runs (DAMA checks,
+drift scan, corpus build, gate, digest); Claude reasoning (claude-opus-4-8, adaptive thinking,
+manual tool loop with ONE read-only-SQL tool, everything logged to audit.agent_runs) activates when
+env ANTHROPIC_API_KEY or Databricks secret agents/anthropic_api_key exists — currently NEITHER is
+configured, so all validated runs were deterministic mode. To enable LLM mode: create secret scope
+"agents", put anthropic_api_key in it. Both jobs ran SUCCESS on serverless (env spec
+environment_version 3 + pip anthropic). One deploy bug fixed: <strong>file</strong> is undefined in serverless
+spark_python_task (script exec'd in IPython kernel) — path bootstrap falls back to sys.argv[0].
+Validated outputs: audit.dq_results now populated (10 checks, 9 pass; orders_arriving_30d fails
+by design — synthetic data max order_date ~2026-05); schema drift found for real (unmapped MATNR,
+SHLITM/SHKCOO/SHDOCO/SHDCTO, so_domain/so_part — the JDE key columns are consumed via a
+concat transform_expr with src_column NULL, so the scanner over-reports them: known limitation);
+acme_products.sales.v_sales_orders_unified created (13,000 rows); customer_narratives 1,001 rows;
+gate reads 9/14 — two NEW failures are side effects, not regressions (config-table count grew to 7
+because agents added agent_runs/agent_reports and validate.py expects exactly 5; PIT freshness
+fails because UTC date rolled past the last gold_pipeline run — rerun gold_pipeline to clear).</p>
+<h2>2026-07-19 — Agents completed: LLM mode enabled and validated end-to-end</h2>
+<p>Secret scope "agents" created; user stored anthropic_api_key via interactive put-secret (key never
+in transcript). Three agent_core fixes from the first LLM runs: (1) secret retrieval now tries
+databricks.sdk.runtime.dbutils first (WorkspaceClient().dbutils proved flaky on serverless — one
+task got the key, its sibling didn't) with failure reasons logged; (2) tool budget raised 8→12 and
+a finalization turn added (tool_choice none, "write the report from gathered evidence") — first RCA
+came back truncated mid-investigation; (3) schema_evolution scanner now counts columns referenced
+inside transform_expr as consumed (JDE composite-key columns no longer false-positive).</p>
+<p>All six agents validated in mode=llm (see audit.agent_runs / agent_reports):
+- dq_monitor_rca: full evidence-backed RCA on orders_arriving_30d — correctly diagnosed
+  source-side staleness (fresh _ingest_ts, frozen business dates, single-batch snapshot reload,
+  identical cutoff across 3 ERPs) and proposed the bronze business-date freshness check that
+  would have caught it earlier.
+- operational_intel: digest with self-directed drill-downs (top backlog accounts per customer).
+- schema_evolution: sampled drifted columns, found MATNR/SHLITM/so_part share identical
+  harmonized product codes, proposed 3 mapping INSERTs to a common product_id, and correctly
+  recommended skipping so_domain (constant technical field).
+- product_creator: NL request → acme_products.sales.order_to_cash (13,000 rows), passed the
+  validation gate.
+- vector_content: QA caught a REAL artifact — all 501 JDE customers show backlog == orders
+  because shipment lifecycle sources are SAP-only in the pilot (LIPS mappings only); flagged as
+  ETL gap, plus GmbH-suffix-vs-country synthetic-data mismatch.
+- deployment_gate: classified all 5 failures with evidence and issued HOLD on the one genuine
+  regression (pit_customer 1 day stale) — cleared by rerunning gold_pipeline (PIT now current).
+Remaining known gaps unchanged: row filters/masks not built; validate.py counts stale (checks 2–3).</p>
+<h2>2026-07-19 (later) — Design estate deployed: security, products, ML features, semantics — 14/14</h2>
+<p>After merging the sibling repo's design estate, deployed the deployable parts:
+- SECURITY (checks 8–9 closed): acme_gold.sec schema + region_filter/mask_customer_name
+  functions (is_member('admins') escape added so the owner keeps visibility — the account
+  groups don't exist yet). Learning: DLT-materialized tables REJECT ALTER TABLE SET ROW
+  FILTER/MASK ("expects a table but is a view") — governance must be declared in the pipeline
+  definition: gold_dlt.py now sets row_filter= on fact_sales_orders + dim_customer and a
+  schema DDL with MASK on dim_customer.customer_name. Verified in information_schema.
+  GRANTs to sales_analyst_*/data_engineer fail (PRINCIPAL_DOES_NOT_EXIST — account groups
+  not provisioned); staged in security/unity_catalog_policies.sql until an account admin
+  creates them. PII tags applied.
+- PRODUCTS: v_sales_orders (canonical), v_customer_360 (narrative + fulfillment metrics),
+  ops.v_melt_to_margin (36 rows), meta.v_product_trust_scores (from dq_results), all
+  commented + tagged; registry entries added. CREATE SHARE denied (needs metastore-level
+  privilege) — documented.
+- SEMANTICS: acme_gold.sales.mv_sales_metrics metric view (WITH METRICS LANGUAGE YAML)
+  created successfully — query with MEASURE().
+- ML: ml/build_features.py + resources/ml.yml job acme_ml_features — PIT-correct
+  (order_date &lt; as_of_date strictly) customer features: 1,001 rows, churn_risk computed
+  (594 high-risk — consistent with the frozen order flow). audit.batch_log created.
+- AI: ai/provision_vector_search.py (sdk-based, 3-phase idempotent) — source table
+  customer_profile_text (1,001 rows, CDF), endpoint acme-vs PROVISIONING; rerun for index.
+  NOTE: the endpoint bills while it exists.
+- validate.py baselines refreshed (config tables &gt;=9, sources = 14); deployment_gate
+  known-gaps prompt updated to "no open gaps — every failure is a candidate regression".
+- RESULT: full validation suite 14/14 GREEN for the first time.
+- docs/DEMO_RUNBOOK.md added — 5-station talking-point sequence + honest-answer cards.</p>
+<h2>2026-07-31 — Docs catch-up: requirements traceability, live data model, agent architecture reference</h2>
+<p>(Not logged same-day; reconstructed 2026-08-02 from commit history.) Added
+docs/TRACEABILITY_MATRIX.md (28 requirements scored against live evidence, prioritized gap
+table), docs/DATA_MODEL.md + generated HTML catalog/model docs + Excel export tooling, and
+docs/AGENT_ARCHITECTURE.html (agent guardrail contract, DAB deployment reference, captured
+output from a live agent run). That live run caught a real regression: deployment_gate issued
+HOLD and dq_monitor_rca independently confirmed it — scheduled jobs (DQ agent, gold_pipeline)
+had stopped producing anything since 2026-07-19, so PIT-snapshot and DQ-freshness checks were
+12+ days stale by 2026-07-31. Left unresolved at end of session.</p>
+<h2>2026-08-02 — Cleared the staleness regression; reframed remaining backlog as POC-scope</h2>
+<p>User directive: this build is a POC, so run the jobs needed to clear the real regression and
+stop tracking the rest as open engineering work. <code>databricks bundle deploy</code> (workspace already
+matched repo) → <code>silver_pipeline</code> → <code>gold_pipeline</code> (both green, <code>pit_customer</code> now stamped
+2026-08-02) → <code>agents_scheduled_job</code> (dq_monitor_rca + operational_intel, LLM mode) →
+<code>agents_on_demand_job --only deployment_gate</code>. Gate now reports 14/14 PASS, <strong>PROMOTE</strong>.</p>
+<p>RCA on the two still-failing <em>DQ</em> checks (distinct from validate.py's 14 — these are the DAMA
+checks inside dq_monitor_rca) confirmed two independent, non-fixable-by-rerun root causes: (1)
+<code>orders_arriving_30d</code> — synthetic generator (<code>scripts/generate_synthetic_data.py::_date()</code>) caps
+business dates at <code>2025-01-01 + rand(0,500d)</code> = max 2026-05-16, deterministic (<code>random.seed(42)</code>),
+so this check fails permanently as "now" advances past it — by design, previously accepted
+2026-07-18; (2) <code>bronze_ingest_fresh_24h</code> — bronze is a one-time seed load, not live ingestion
+(matrix gap #1), so <code>_ingest_ts</code> will always eventually exceed 24h. Rerunning pipelines cannot
+fix either; both are POC-scope limitations, not this session's regression (which was specifically
+the <em>meta</em>-checks — did DQ run recently, is the PIT snapshot from today — now cleared).</p>
+<p>New finding from this run (non-blocking): deployment_gate flagged gold FK check as
+"green-but-blind" — all 3,000 QAD fact rows have <code>customer_hk = NULL</code> because no QAD
+customer-master source is registered (<code>source_registry</code> has <code>qad_so_mstr</code> for orders only);
+the FK check only counts non-null orphans so it stays green. Pre-existing since QAD onboarding
+(2026-07-18), not introduced this session.</p>
+<p>docs/TRACEABILITY_MATRIX.md "Score &amp; open gaps" table reframed: added a POC-scope legend entry
+(⏸️) and rewrote the table from "Gap / smallest closing action" to "Item / why deferred (POC
+scope) / path to production" — items blocked on account-admin actions (Delta Share, RBAC groups,
+read-only access) or scoped as production/stretch work (bronze ingestion template, quarantine
+writer wiring, RAG generation layer, marketplace UI, trust dashboard) are now framed as
+consciously out of scope for this exercise rather than unfinished work. Nothing in that table
+blocks the demo.</p>
+<h2>2026-08-02 (later) — Presentation expanded 19 → 23 slides: platform-depth showcase + live proof</h2>
+<p>User asked for interview-ready slides on advanced Databricks/Azure/AI-BI/agentic capabilities,
+sourced from docs/, inserted after "Data products" and before "Value" (deck stayed at
+<code>presentation/index.html</code>; the root-level <code>presentation.html</code> is the stale pre-rename original,
+untouched). Four new slides, each self-contained (eyebrow + lead so they don't need narration):
+- <strong>Databricks depth</strong> — capability matrix across 4 categories (Lakeflow/orchestration,
+  governance/performance, AI-BI/GenAI, sharing/apps/DevOps), each item tagged LIVE/design/blocked
+  against <code>docs/TRACEABILITY_MATRIX.md</code>, not asserted from memory.
+- <strong>Azure integration</strong> — landing/streaming services (ADLS Gen2, Event Hubs, Litmus) vs. control
+  plane (workspace, Azure DevOps <code>.azuredevops/azure-pipelines.yml</code>, secret scope), explicit that
+  the ADO pipeline is designed but has never actually executed a run.
+- <strong>AI/BI maturity</strong> — reused the existing <code>.road</code>/<code>.phase</code> roadmap component as a 4-rung ladder
+  (semantic layer → retrieval → dashboards → generation), citing the 2026-07-31 live vector-search
+  query verification rather than just listing the feature.
+- <strong>Agentic — live proof</strong> — built entirely from <em>this session's</em> real HOLD→PROMOTE fix (see the
+  entry above): a before/after check comparison plus the dq_monitor_rca RCA quoted verbatim,
+  making the point that the agents reasoned about a real regression today, not scripted output.</p>
+<p>Two small consistency touch-ups to older slides so the deck doesn't contradict itself: the "Data
+quality" slide's footer previously said "10 green today (gaps tracked openly)" — stale after
+today's fix — updated to the current PROMOTE/14-14 result with a forward pointer to the new
+"Agentic — live proof" slide. New CSS added (<code>.caprow</code>, <code>.tag.bad</code>, <code>.proofgrid</code>/<code>.proof</code>,
+<code>.quote</code>) — all additive, no existing selectors changed. Verified all 4 new slides + the edited
+DQ slide via headless-Chrome screenshots (scratch copies with <code>go(0)</code> swapped to the target slide
+index — the deck is a one-slide-visible-at-a-time SPA, so a plain screenshot only ever shows the
+title slide). Not yet committed.</p>
+<h2>2026-08-02 (still later) — v2 deck: <code>presentation/index_v2.html</code>, 23 → 31 slides</h2>
+<p>User asked for a <em>new</em> version (old one preserved at <code>presentation/index.html</code> — the root-level
+<code>presentation.html</code> is the separate stale pre-rename original, untouched by either version) with:
+requirement-matrix detail on the agentic architecture, ROI moved to the end with POC/synthetic-data
+assumptions up front, per-decision detail from <code>docs/JUSTIFICATION_NOTES.md</code>, how RBAC is actually
+achieved (not just the policy), the "8 patterns" stat unpacked, and a slide per architecture/decision
+doc under <code>docs/</code>. Asked one clarifying question first — whether <code>docs/JD_ALIGNMENT.md</code>'s named
+former employers (BNY, JPMC, UBS, etc.) should appear on-screen — user chose to leave personal
+history out, so no slide was built from that file; it stays private interview-prep material.</p>
+<p>Eight new slides added to <code>presentation/index_v2.html</code> (23 → 31), each sourced from a specific repo
+file rather than written from memory:
+- <strong>8 patterns</strong> (after Replication) — unpacks the title slide's "8 patterns" stat: all 8 named
+  patterns from <code>config/replication_sources.yaml</code>'s header comment, cross-referenced against the
+  14 source rows to get real usage counts per pattern (<code>zerobus</code> = 0, designed but unassigned).
+- <strong>Code &amp; data flow</strong> (after the mill diagram) — <code>docs/CODE_GRAPH.md</code>'s mermaid graph redrawn as a
+  self-contained monospace box diagram (no mermaid.js/CDN dependency, unlike <code>AGENT_ARCHITECTURE.html</code>)
+  — deliberately a file-path-level view distinct from the existing service-level "Cloud architecture"
+  slide, with an explicit real-vs-design-stage-code caption so it doesn't overstate what's deployed.
+- <strong>PIT &amp; Bridge</strong> (after Gold) — the two DV2.0 use cases from <code>docs/DATA_VAULT_PIT_BRIDGE.md</code> with
+  their actual example SQL (as-of join, O2C cycle time query) rather than just naming the tables.
+- <strong>RBAC mechanics</strong> (after Governance) — how row filters/masks are <em>actually</em> wired: the
+  <code>is_member('admins')</code> escape hatch, and the real production incident from 2026-07-19 (<code>ALTER
+  TABLE ... SET ROW FILTER</code> rejected against a DLT-materialized table — governance had to move
+  into the pipeline's own <code>@dlt.table(row_filter=...)</code> declaration instead).
+- <strong>Agentic — traceability</strong> (after Agents) — ties the 6 deployed agents to requirement R9.1 in
+  <code>docs/TRACEABILITY_MATRIX.md</code> and names the 4 still-design-only agent specs (<code>pipeline_healer.md</code>,
+  <code>ingestion_registrar.md</code>, <code>lineage_doc_agent.md</code>, <code>dq_rca_agent.md</code>) so the gap is explicit, not
+  hidden.
+- <strong>Decisions I/II/III</strong> (Ingestion / Modeling / Platform, before Risks) — all 11 decisions from
+  <code>docs/JUSTIFICATION_NOTES.md</code>, each with its "why" and both rejected alternatives, as three
+  4-column tables grouped thematically rather than numerically (was 3+4+4, not the source doc's
+  1-11 order) so each slide has a coherent theme.</p>
+<p>Plus the two structural changes: the <strong>Value/ROI slide moved from mid-deck to immediately before
+Q&amp;A</strong> (after Risks), and gained an assumptions panel at the top — explicit that the $1.2M model is
+built against <code>scripts/generate_synthetic_data.py</code> output, not acme's real volumes, and every dollar
+figure is a bottom-up rate model, not an observed outcome. First version of that panel pushed the
+roadmap below the 1000px screenshot viewport (harmless — <code>.slide</code> has <code>overflow-y:auto</code> — but not
+ideal for a live presentation); tightened the panel's padding/copy and re-verified it fits without
+scrolling at 1600×1000.</p>
+<p>Scoping calls made without asking (flagged here, not blocking): skipped dedicated slides for
+<code>docs/GAP_ANALYSIS.md</code> (superseded findings from before the DV2.0 pivot — presenting them now would
+read as current, misleadingly) and <code>docs/SESSION_NOTES.md</code>/<code>docs/DEMO_RUNBOOK.md</code> (process/dev-log
+docs, not architecture content). <code>docs/ARCHITECTURE.md</code>, <code>DATA_MODEL.md</code>, <code>REPLICATION_PATTERNS.md</code>,
+and <code>TRACEABILITY_MATRIX.md</code> didn't get new dedicated slides since the existing v1 slides (and the
+new ones above) already derive from them.</p>
+<p>All 9 new-or-changed slides verified via headless-Chrome screenshots (same scratch-copy-with-<code>go(N)</code>
+technique as the v1 session). Not yet committed — both <code>index.html</code> (v1, untouched) and
+<code>index_v2.html</code> (v2) currently sit as uncommitted new/modified files.</p>
+<h2>2026-08-13 — Agent self-sufficiency research, governance/DASF audit, data dictionary, 4 spec-only agents implemented</h2>
+<p>File-level summary already in <code>CHANGES.md</code>'s "2026-08-13 update" section — this entry is the
+narrative/discussion trail CLAUDE.md rule 4 asks for, not a duplicate of that file list.</p>
+<p>Researched Ralph loops (Geoffrey Huntley, mid-2025 agentic-coding pattern — fresh context per
+iteration, state in files/git not conversation memory, one stable goal prompt + a verification
+gate) and mapped it onto this repo's actual agent design: single-shot today, not looping;
+<code>docs/ralph_loop.md</code> has the full deployment checklist for closing that gap later.</p>
+<p>Audited the repo across governance/DQ/ingestion/AI-data-dictionary
+(<code>docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code>) and against Databricks' own "Comprehensive Guide to
+Data and AI Governance" ebook, full 39-page PDF extracted and read directly rather than
+paraphrased from the gated landing page (<code>docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>). Found
+two previously-undocumented bugs: <code>dashboards/dq_trust_dashboard.sql</code> querying columns
+(<code>dimension</code>/<code>score</code>/<code>met_threshold</code>) that don't exist in the live <code>dq_results</code> schema (fixed
+2026-08-14, see below), and a table-naming mismatch between <code>vector_content.py</code>'s
+<code>customer_narratives</code> and <code>ai/vector_search_rag.py</code>'s <code>customer_profile_text</code>. The ebook
+comparison's priority list drove the rest of this day's and the next day's work: column comments
+(done same day), DASF citation (done same day), account-group provisioning (still blocked, not
+an engineering task).</p>
+<p>Implemented the 4 previously spec-only agents (<code>pipeline_healer.py</code>, <code>dq_rca_agent.py</code>,
+<code>ingestion_registrar.py</code>, <code>lineage_doc_agent.py</code>) on the same <code>agent_core.py</code> guardrail contract
+as the original 6 — the PR/Slack/webhook design in their <code>.md</code> specs was never buildable here
+(no GitHub token, no Slack webhook provisioned), so every recommendation lands in
+<code>acme_bronze.audit.agent_reports</code> for a human to act on instead, same as every other agent.
+<code>lineage_doc_agent</code> deliberately does NOT write to the git-tracked <code>docs/</code> folder — a file
+written from inside a Databricks job container is ephemeral compute state, not a commit, so it
+would never reach the repo; caught this before shipping it, not after.</p>
+<p>Added <code>cfg.layer_mappings.business_definition</code> (one human/AI-facing sentence per <code>tgt_column</code>,
+stacked across source systems where meanings differ) and applied it live: <code>ALTER TABLE</code> +
+natural-key <code>MERGE</code> (not a raw re-<code>INSERT</code> — the live table already had 40 rows; a plain insert
+would have duplicated them), then <code>scripts/apply_column_comments.py</code> applied 24 real Unity
+Catalog column comments, independently verified via <code>information_schema.columns</code> rather than
+trusting the script's own success log. This directly closes the audit's "column-level comments
+are empty everywhere" finding for Silver.</p>
+<p><strong>Gotcha found and worked around</strong>: databricks-connect (serverless, this workspace) silently
+corrupts special characters inside SQL <code>VALUES</code>-clause string literals passed via <code>spark.sql(f'...')</code>
+— escaped apostrophes (<code>''</code>) were dropped entirely instead of collapsing to <code>'</code>, em-dashes came
+back as mojibake. Root cause not isolated (Spark Connect transport vs. a <code>VALUES</code>-parsing quirk).
+Fix: <code>config/seed_layer_mappings.sql</code> rewritten plain-ASCII. Logged in memory
+(<code>databricks-tooling-quirks</code>) so a future session doesn't re-lose time to it.</p>
+<p>Also added <code>pipelines/gold_dlt.py::dim_customer.customer_key_mdm</code> — a deterministic cross-source
+entity-resolution key (normalized name + country, sha2) — and fixed a table comment that had been
+overclaiming "MDM-survived" when the code only ever deduped SCD versions within one source, never
+actually resolved entities across SAP/JDE/QAD. Committed but <strong>not run</strong> — <code>gold_pipeline</code> wasn't
+redeployed this session, so this schema change stayed code-only through 2026-08-14 morning (see
+below for when it actually went live).</p>
+<h2>2026-08-14 — Live agent verification, reliability guardrails closed against Anthropic's own standards, presentation v3, dashboard fix</h2>
+<p>Picked up from 2026-08-13's uncommitted state: committed and pushed everything in 4 logical
+commits (dashboard fix scope not yet known at that point, data-dictionary + entity-resolution,
+DASF doc + <code>CHANGES.md</code>, presentation v3), then deployed the bundle for real
+(<code>databricks bundle deploy -t dev</code>) — confirmed via a live <code>information_schema.columns</code> check
+that <code>customer_key_mdm</code> reached the workspace as a <em>file</em> but not as a materialized column
+(deploy syncs code, it doesn't run a pipeline update); <code>gold_pipeline</code> itself is still not run as
+of this entry.</p>
+<p><strong>Ran every agent live and checked the actual results</strong>, not just <code>bundle validate</code>: all 5
+scheduled-job tasks and all 5 on-demand-job tasks executed successfully — except
+<code>ingestion_registrar</code>, which reported job-level SUCCESS while doing zero validation. Root cause:
+<code>open()</code> on the synced YAML hit <code>[Errno 5] Input/output error</code> against
+<code>/Workspace/.../files/config/replication_sources.yaml</code>, a serverless-only flakiness none of the
+other agents hit because they all read through <code>spark.sql()</code>, not a raw filesystem call. Fixed by
+falling back to the Databricks SDK's Workspace Files API (<code>WorkspaceClient().workspace.download()</code>)
+when <code>open()</code> fails; re-ran, all 14 sources validated clean.</p>
+<p>Built <code>presentation/index_v3.html</code> (34 slides, up from 31 in v2, both older versions untouched) —
+a new Technical Summary slide, a dedicated Unity Catalog structure slide (live 4-catalog/
+23-schema tree pulled via <code>SHOW SCHEMAS</code>/<code>SHOW TABLES</code> that same session, not a design doc), and
+an AI Security slide scoring the agent fleet against DASF. Refreshed every agent-related slide
+from the stale "6 live / 4 spec'd" framing to 10-live, and swapped the RBAC mechanics slide's
+illustrative code snippet for the actual live function body pulled from
+<code>information_schema.routines</code> — which surfaced a real finding along the way: this session's
+principal is a workspace admin (<code>is_member('admins')</code> true) but resolves <code>false</code> on every
+<code>is_account_group_member(...)</code> check, since no account groups exist yet. That's the precise
+mechanism behind the RBAC blocker, not just "GRANTs fail."</p>
+<p>Asked what stops the agents from hallucinating, and whether that was documented anywhere — it
+wasn't (checked the <code>agents/*.md</code> specs and <code>docs/AGENT_ARCHITECTURE.html</code> directly; both cover
+write-safety, neither uses the word). Wrote <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>, fetching
+Anthropic's current published standards live (Reduce Hallucinations, Trustworthy Agents in
+Practice, Building Effective AI Agents, Effective Harnesses for Long-Running Agents — not from
+training-data memory) and comparing them against what this repo actually does. Found 4 closable
+gaps and closed all 4 the same session, all through the shared <code>agent_core.py</code> contract so no
+per-agent file needed editing for the first three:
+- <strong>Evaluator-optimizer pass</strong>: <code>run_reasoning()</code> now runs a second, independent Claude call
+  (<code>verify_report</code>) that checks the draft report against the <code>run_sql</code> evidence log before it's
+  saved.
+- <strong>Inline citations</strong>: the evidence log itself (not just a reference to <code>agent_runs</code>) is now
+  appended to every LLM-mode report.
+- <strong>Eval scorecard</strong>: <code>scripts/eval_agent_reports.py</code>, deterministic, scores per-agent
+  verified/flagged rates from <code>agent_runs.decision_log</code> over a 30-day window.
+- <strong>Plan Mode</strong>: <code>product_creator</code> (the one agent that writes directly) got an opt-in <code>dry_run</code>
+  job parameter, default <code>false</code> so existing demo behavior is unchanged.</p>
+<p>The best evidence in that doc came from the guardrail catching a real bug in itself: the first
+live run of <code>dq_monitor_rca</code> under the new verification pass got genuinely flagged — the
+evidence log recorded which queries ran but not their <em>returned values</em>, so several numbers in
+the report weren't strictly re-confirmable from the log alone. Fixed in the same pass
+(<code>safe_sql()</code> now logs a value snippet per query) and reconfirmed live. Separately confirmed
+<code>product_creator --dry_run=true</code> proposes without creating by checking the catalog directly
+(no view existed) rather than trusting the printed log line.</p>
+<p>Fixed <code>dashboards/dq_trust_dashboard.sql</code>'s column-name bug found in yesterday's audit
+(<code>dimension</code>/<code>score</code>/<code>met_threshold</code> → <code>dq_dimension</code>/derived-from-<code>passed</code>/<code>source_table</code>/
+<code>reason</code>) and verified all 5 widget queries execute against the live workspace — 2 return real
+rows, 3 return 0 rows (expected: <code>batch_log</code>/<code>rejected_records</code> are only populated by live
+ingestion, which doesn't exist yet, not a bug).</p>
+<p><strong>Read every tracked <code>.md</code> file in the repo for the first time this session</strong> (prompted by being
+asked what gets read at project load, and to make sure changes were actually being traced) —
+confirmed the concrete cost of the lazy-loading rule this file used to have: <code>docs/CODE_GRAPH.md</code>
+and <code>docs/TRACEABILITY_MATRIX.md</code> both still said "six agents" after a tenth was added and
+deployed, and this file (<code>SESSION_NOTES.md</code>) had gone silent for both 2026-08-13 and this day
+despite major work, because <code>CHANGES.md</code> was carrying that load instead and rule 4 was being
+treated as an end-of-session task rather than a running one. Rewrote <code>CLAUDE.md</code>: rule 1 now
+reads every <code>.md</code> file at session start instead of lazily; rule 4 says log as you go; new rule 7
+says check and update docs in the same session a change makes them stale. Fixed the two "six
+agents" references directly. Other staleness found but deliberately not silently rewritten this
+session — flagged instead, since some of it (<code>docs/DATA_MODEL.md</code>, machine-generated, marked "do
+not hand-edit") needs regeneration via its own pipeline, not hand-patching, and some of it
+(<code>docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code>, <code>docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>)
+are point-in-time snapshots whose value is partly <em>being</em> a snapshot — annotating what's since
+changed belongs there, not a silent rewrite that erases the record of what was found when.</p>
+</div>
+<div id="p14" class="tabpanel" role="tabpanel">
+<p class="srcfile">source: docs/JD_ALIGNMENT.md</p>
+<h1>JD Alignment — Senior Data Engineer (Agentic Lakehouse)</h1>
+<p>Maps each requirement to (a) proof in this repo, (b) real project history. Use for resume
+tailoring and interview talking points. Source-of-truth for both: this file only — do not
+duplicate into ARCHITECTURE.md or REPLICATION_PATTERNS.md.</p>
+<table>
+<thead>
+<tr>
+<th>JD requirement</th>
+<th>Repo evidence</th>
+<th>Real-world evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6+ yrs modern data platforms/pipelines</td>
+<td>Full Bronze→Silver→Gold→Products lakehouse, config-driven</td>
+<td>19+ yrs; BNY (Customer MDM/governance), JPMC, UBS, Bank of America, Westfield, Autoliv, Bayer</td>
+</tr>
+<tr>
+<td>AI/ML-driven workflows</td>
+<td><code>agents/</code> (dq_rca_agent, pipeline_healer, lineage_doc_agent, ingestion_registrar); <code>ml/feature_store.py</code>; <code>ai/vector_search_rag.py</code></td>
+<td>New — this repo is the primary proof point; position as hands-on agentic build, not just theory</td>
+</tr>
+<tr>
+<td>Strong SQL &amp; Python</td>
+<td><code>config/config_tables.sql</code>, <code>dq/dama_dq_framework.py</code>, <code>pipelines/*_dlt.py</code>, <code>scripts/*.py</code></td>
+<td>Snowflake/T-SQL/PySpark across all prior engagements</td>
+</tr>
+<tr>
+<td>Databricks, Delta Lake, Spark hands-on</td>
+<td>Entire repo: DLT pipelines, Delta tables, Liquid Clustering, Unity Catalog</td>
+<td>Azure Databricks at Westfield Insurance (P&amp;C) and Autoliv (manufacturing)</td>
+</tr>
+<tr>
+<td>ETL/ELT in Azure</td>
+<td>ADLS Gen2 landing, Lakeflow Connect, Azure DevOps CI/CD</td>
+<td>Azure Databricks/ADF pipelines at Westfield, Autoliv</td>
+</tr>
+<tr>
+<td>Workflow orchestration tools</td>
+<td>Lakeflow Jobs orchestration; <code>.azuredevops/azure-pipelines.yml</code></td>
+<td>ADF/Databricks Workflows at prior engagements</td>
+</tr>
+<tr>
+<td>Agentic automation concepts</td>
+<td><code>agents/*.md</code> specs: self-healing pipelines, DQ root-cause-analysis agent, lineage-doc agent, ingestion registrar agent — all config-driven, no hardcoded logic</td>
+<td>Differentiator — most candidates will only have orchestration, not self-healing/agentic design</td>
+</tr>
+<tr>
+<td>DW/DL/Lakehouse design</td>
+<td>Medallion (3NF Bronze/Silver, star Gold), hash-key joins, config-table lineage</td>
+<td>Data Vault 2.0 on Snowflake at Autoliv; Snowflake medallion at Vertiv-style platform build</td>
+</tr>
+<tr>
+<td>CI/CD (Azure DevOps preferred)</td>
+<td><code>.azuredevops/azure-pipelines.yml</code>, <code>scripts/validate.py</code> as CI gate</td>
+<td>Azure DevOps pipelines in prior Azure engagements</td>
+</tr>
+<tr>
+<td>Agile</td>
+<td>—</td>
+<td>Standard across all consulting engagements (BNY, Westfield, Autoliv)</td>
+</tr>
+<tr>
+<td>MDM / Reference Data collaboration</td>
+<td><code>security/unity_catalog_policies.sql</code> (region-based RBAC), hash-key dimension model as reference-data backbone</td>
+<td>Direct: Customer MDM + data governance frameworks at BNY</td>
+</tr>
+<tr>
+<td>Observability/monitoring/alerting</td>
+<td><code>dq/</code> quarantine + rejected-record logging; batch_log/dq_results tables; SQL freshness alerts</td>
+<td>Standard governance practice from BNY/Westfield engagements</td>
+</tr>
+</tbody>
+</table>
+<h2>How to use this in interview prep</h2>
+<ul>
+<li>Lead with BNY MDM + governance as the "why data quality/lineage/config-driven design matters to me" story.</li>
+<li>Use this repo as the concrete Databricks-native answer to "have you worked with agentic pipelines?" — walk through <code>agents/pipeline_healer.md</code> and <code>agents/dq_rca_agent.md</code> specifically, since that's the requirement most candidates will fake or hand-wave.</li>
+<li>Bridge Data Vault 2.0 (Autoliv/Snowflake) → hash-key Silver design here: same deterministic-key idea, applied without full hub/link/sat overhead (see <code>JUSTIFICATION_NOTES.md</code> #4–5 for the reasoning to repeat verbatim in an interview).</li>
+<li>If asked about production Databricks depth specifically (vs. Snowflake): be upfront that Westfield/Autoliv is your hands-on Databricks base, and this repo demonstrates the newer Databricks 2025/2026 surface (Lakeflow Connect, Agent Bricks, Genie, Lakebase) applied to that same real-world pattern set.</li>
+</ul>
+<h2>Gaps to name honestly (don't oversell)</h2>
+<ul>
+<li>No production Databricks Marketplace publish in real engagements — <code>data_products/publish_marketplace.sql</code> here is a design/demo, say so if asked directly.</li>
+<li>Agentic pipeline healing is a <strong>build</strong>, not yet <strong>production-run-at-scale</strong> — frame as "designed and implemented in a representative environment," not "running in prod for N years."</li>
+</ul>
 </div>
 </div>
 <script>
