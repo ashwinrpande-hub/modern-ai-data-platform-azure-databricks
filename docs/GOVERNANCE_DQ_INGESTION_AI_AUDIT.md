@@ -1,7 +1,23 @@
 # Governance / DQ / Ingestion / AI Data-Dictionary audit
 
 Status: **inventory only, nothing changed.** Captured 2026-08-12 via a full repo survey
-(4 parallel searches: governance, data quality, ingestion, AI-facing data dictionary).
+(4 parallel searches: governance, data quality, ingestion, AI-facing data dictionary). Left
+unedited below on purpose — this is a point-in-time finding, not a living doc; what's since
+changed is called out here instead of silently rewritten into the original text.
+
+**Update — 2026-08-14, what's since closed:**
+- The dashboard bug in §2 (`dq_trust_dashboard.sql` querying `dimension`/`score`/`met_threshold`)
+  is **fixed** — column names corrected, all 5 widget queries verified live.
+- §4's "column-level comments are empty everywhere" is **no longer true for Silver**: 24 real UC
+  column comments applied via `cfg.layer_mappings.business_definition` +
+  `scripts/apply_column_comments.py`, independently verified in `information_schema.columns`.
+  Bronze/Gold column comments are still empty — this closed the Silver slice of the gap, not
+  the whole thing.
+- §4's data dictionary is still scattered across the same 4 disconnected artifacts named below;
+  the fix added a 5th (real) source rather than reconciling the existing ones.
+- Not addressed by anything since: account groups still unprovisioned, RAG generation still
+  design-only, the `customer_narratives`/`customer_profile_text` naming inconsistency (§4) is
+  still present.
 
 Cross-cutting theme: in all four areas the design work is real and often good (row filters,
 DAMA framework, ingestion templates, metric-view semantics), but roughly half of it stops at
@@ -120,7 +136,7 @@ Gold FK integrity, DQ-ran-in-24h freshness, rejects-logged-with-dimension, bridg
 integrity. `agents/deployment_gate.py` imports this exact `CHECKS` list and has Claude
 classify failures vs. known/tracked gaps to issue PROMOTE/HOLD.
 
-### Bug found (not previously documented)
+### Bug found (not previously documented) — FIXED 2026-08-14, see update note at top
 `dashboards/dq_trust_dashboard.sql` queries columns (`dimension`, `score`, `met_threshold`)
 that belong to the **undeployed** DAMA framework's schema. The actual live `dq_results` table
 (populated by `dq_monitor_rca.py`) has different columns (`dq_dimension`, `passed`,
@@ -222,7 +238,8 @@ semantics).
 - **Table-level comments exist and are useful**: `@dlt.table(comment=...)` in
   `pipelines/silver_dlt.py`/`gold_dlt.py` (e.g. VBRP billing-item comment calls out that
   amount is doc-currency — join VBRK before finance use).
-- **Column-level comments are empty everywhere** — confirmed against the live-generated
+- **Column-level comments are empty everywhere** — FIXED for Silver, 2026-08-14 (see update
+  note at top); still true for Bronze/Gold. Confirmed against the live-generated
   `docs/DATA_MODEL.md` (pulled straight from `system.information_schema.columns.comment` via
   `scripts/extract_data_model.py`). Sampled Bronze `sap.kna1` and Gold `sales.dim_customer` —
   every column's Comment field is blank. `cfg.layer_mappings` also has no

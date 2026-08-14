@@ -85,10 +85,11 @@ details pre{margin:0;border:none;border-top:1px solid var(--line);border-radius:
 <div id="p0" class="tabpanel show" role="tabpanel">
 <p class="srcfile">source: agents/agent_core.py, agents/README.md</p>
 <h1>Agent control model</h1>
-<p>Six platform agents live in <code>agents/</code> and share one contract, defined once in
+<p>Ten platform agents live in <code>agents/</code> and share one contract, defined once in
 <code>agents/agent_core.py</code> and imported by every agent script. The design principle: <strong>the platform
 never depends on a model being up.</strong> Deterministic work always runs; an LLM reasoning pass is
-strictly additive.</p>
+strictly additive. All 10 were confirmed live via <code>databricks jobs get-run-output</code> on
+2026-08-14 — not just <code>bundle validate</code>.</p>
 
 <h2>Two-phase execution contract</h2>
 <ol>
@@ -119,11 +120,17 @@ strictly additive.</p>
   final turn with <code>tool_choice: none</code> and the instruction <em>"write your final report NOW from
   evidence already gathered"</em> — so a truncated investigation still yields a usable report instead
   of dangling mid-tool-call.</li>
+<li><strong>Independent verification (since 2026-08-14):</strong> after the reasoning phase produces a draft,
+  <code>verify_report()</code> makes a <em>second</em>, separate Claude call — no tools, a terse fact-checking
+  system prompt — that checks every claim in the draft against the <code>run_sql</code> evidence log and
+  says so if something isn't backed by it. Both the raw evidence log and that verdict are appended to
+  the report before <code>save_report()</code> — a human reading <code>agent_reports</code> sees the citations
+  inline, not just a pointer to <code>agent_runs</code>.</li>
 </ul>
-<p class="srcfile">These guardrails are mostly about write-safety. For the separate question of what
-stops an agent from <em>hallucinating</em> — inventing numbers, tables, or conclusions not backed by a
-real query — see <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>, which also compares this design
-against Anthropic's current published standards for agent reliability.</p>
+<p class="srcfile">Full writeup, plus a comparison against Anthropic's current published standards for
+agent reliability, in <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>. First live run under the new
+verification pass (2026-08-14) caught a real gap in its own supporting code — the evidence log
+recorded which queries ran but not their <em>returned values</em> — fixed the same session.</p>
 
 <pre class="mermaid">sequenceDiagram
   participant J as Databricks Job Task
@@ -150,39 +157,50 @@ against Anthropic's current published standards for agent reliability.</p>
   end
 </pre>
 
-<h2>The six deployed agents</h2>
+<h2>The ten deployed agents</h2>
 <table>
 <thead><tr><th>Script</th><th>Job / task</th><th>Deterministic output</th><th>LLM reasoning adds</th></tr></thead>
 <tbody>
 <tr><td>dq_monitor_rca.py</td><td>acme_agents_scheduled → dq_monitor_rca</td>
-  <td>Runs DAMA DQ checks, writes <code>audit.dq_results</code></td>
+  <td>Runs 10 DAMA DQ checks, writes <code>audit.dq_results</code></td>
   <td>Root-cause analysis narrative on any breach</td></tr>
+<tr><td>dq_rca_agent.py</td><td>acme_agents_scheduled → dq_rca_agent (depends_on dq_monitor_rca)</td>
+  <td>Reads latest failing checks from <code>dq_results</code></td>
+  <td>Deeper correlation against <code>batch_log</code> ⨝ <code>source_registry</code> — a second pass, not a duplicate of dq_monitor_rca's own RCA</td></tr>
+<tr><td>pipeline_healer.py</td><td>acme_agents_scheduled → pipeline_healer</td>
+  <td>Scans pipeline events via the Databricks SDK</td>
+  <td>Classifies schema drift / bad records / infra / code, drafts type-specific remediation</td></tr>
+<tr><td>lineage_doc_agent.py</td><td>acme_agents_scheduled → lineage_doc_agent</td>
+  <td>Builds lineage edges from live <code>cfg.layer_mappings</code></td>
+  <td>Mermaid diagram + prose; explicitly says so when <code>system.access.table_lineage</code> isn't reachable rather than inventing edges</td></tr>
 <tr><td>operational_intel.py</td><td>acme_agents_scheduled → operational_intel (depends_on dq_monitor_rca)</td>
   <td>Builds the daily digest dataset</td>
   <td>Self-directed drill-downs (e.g. top backlog accounts)</td></tr>
 <tr><td>schema_evolution.py</td><td>acme_agents_on_demand → schema_evolution</td>
   <td>Scans Bronze for columns not covered by <code>cfg.layer_mappings</code></td>
   <td>Evidence-backed mapping proposals (INSERT drafts, not executed)</td></tr>
+<tr><td>ingestion_registrar.py</td><td>acme_agents_on_demand → ingestion_registrar</td>
+  <td>Validates every row in <code>replication_sources.yaml</code> against <code>cfg.source_registry</code></td>
+  <td>Onboarding summary; never calls the deploy script itself</td></tr>
 <tr><td>vector_content.py</td><td>acme_agents_on_demand → vector_content</td>
   <td>Rebuilds the narrative/embedding corpus table</td>
   <td>QA review of the corpus for retrieval-quality issues</td></tr>
 <tr><td>deployment_gate.py</td><td>acme_agents_on_demand → deployment_gate</td>
   <td>Runs the validate.py-style check suite</td>
-  <td>Classifies failures (known gap vs. real regression), issues GO/HOLD</td></tr>
-<tr><td>product_creator.py</td><td>acme_agents_on_demand → product_creator (param: product_request)</td>
+  <td>Classifies failures (known gap vs. real regression), issues PROMOTE/HOLD</td></tr>
+<tr><td>product_creator.py</td><td>acme_agents_on_demand → product_creator (params: product_request, dry_run)</td>
   <td>—</td>
-  <td>NL request → SQL view definition in <code>acme_products</code>, passed through the gate</td></tr>
+  <td>NL request → SQL view definition in <code>acme_products</code>, passed through the gate; <code>dry_run=true</code> proposes without creating, for human review</td></tr>
 </tbody>
 </table>
 
-<div class="note"><strong>Note on agents/*.md specs:</strong> <code>agents/README.md</code> additionally documents
-four agent <em>specs</em> — Pipeline Healer (<code>pipeline_healer.md</code>, trigger: Lakeflow job failure
-webhook), DQ Root-Cause (<code>dq_rca_agent.md</code>), Ingestion Registrar (<code>ingestion_registrar.md</code>,
-trigger: new row in <code>replication_sources.yaml</code>), and Docs/Lineage (<code>lineage_doc_agent.md</code>,
-trigger: nightly). These are design docs for agent behavior; they don't map 1:1 by filename to the
-six <code>.py</code> scripts actually wired into <code>resources/agents.yml</code> above — treat the table above as
-"what's live," and the <code>.md</code> files as the broader design estate (some overlapping in intent,
-e.g. dq_rca_agent.md ≈ dq_monitor_rca.py).</div>
+<div class="note"><strong>Note on agents/*.md specs:</strong> <code>agents/README.md</code> documents the design
+history of four of these — Pipeline Healer, DQ Root-Cause, Ingestion Registrar, Docs/Lineage — each
+originally spec'd (<code>agents/*.md</code>) for a PR/Slack/webhook-triggered design that was never
+buildable here (no GitHub token, no Slack webhook provisioned in this workspace). As of 2026-08-13
+all four now have real <code>.py</code> implementations, on the same guardrail contract as the original six,
+with every recommendation landing in <code>agent_reports</code> instead of a PR/Slack post. The table
+above is the current, complete, live set — ten agents, not six plus four aspirational.</div>
 </div>
 
 <div id="p1" class="tabpanel" role="tabpanel">
@@ -206,24 +224,35 @@ declared vs. live state and reconciles.</p>
 <h2>Job 1 — acme_agents_scheduled</h2>
 <pre class="mermaid">flowchart LR
   T[Cron 0 0 6 * * ? UTC — PAUSED] -.would trigger.-&gt; A[dq_monitor_rca]
+  A --&gt; R[dq_rca_agent]
   A --&gt; B[operational_intel]
+  H[pipeline_healer]
+  L[lineage_doc_agent]
   A -.writes.-&gt; DQ[(audit.dq_results)]
+  R -.reads.-&gt; DQ
   B -.reads.-&gt; DQ
 </pre>
-<p>Two tasks, <strong>sequential</strong> (<code>operational_intel</code> has <code>depends_on: dq_monitor_rca</code>). Cron is
-defined but <code>pause_status: PAUSED</code> — it has never fired on schedule; every run to date has been
-<code>trigger: ONE_TIME</code> (manually invoked).</p>
+<p>Five tasks. <code>dq_rca_agent</code> and <code>operational_intel</code> both declare <code>depends_on: dq_monitor_rca</code>;
+<code>pipeline_healer</code> and <code>lineage_doc_agent</code> have no data dependency and run as siblings — same
+native Databricks Jobs task-DAG mechanism as any ETL job, nothing agent-specific about the
+orchestration layer itself. Cron is defined but <code>pause_status: PAUSED</code> — it has never fired on
+schedule; every run to date, including the 2026-08-14 full-fleet verification, has been
+<code>trigger: ONE_TIME</code> (manually invoked via <code>databricks bundle run</code>).</p>
 
 <h2>Job 2 — acme_agents_on_demand</h2>
 <pre class="mermaid">flowchart LR
-  P[job param: product_request] --&gt; SE[schema_evolution]
+  P[job param: product_request, dry_run] --&gt; SE[schema_evolution]
+  P --&gt; IR[ingestion_registrar]
   P --&gt; VC[vector_content]
   P --&gt; DG[deployment_gate]
   P --&gt; PC[product_creator]
 </pre>
-<p>Four tasks, <strong>no depends_on between them</strong> — confirmed from the 2026-07-31 live run below: all
-four started at the identical <code>start_time</code> and ran concurrently on separate serverless compute.
-Only <code>product_creator</code> consumes the <code>product_request</code> parameter.</p>
+<p>Five tasks, <strong>no depends_on between them</strong> — confirmed from the 2026-07-31 live run below: the
+original four started at the identical <code>start_time</code> and ran concurrently on separate serverless
+compute; <code>ingestion_registrar</code> (added 2026-08-13) is independent the same way. Only
+<code>product_creator</code> consumes the job parameters — <code>product_request</code> (the NL prompt) and, since
+2026-08-14, <code>dry_run</code> (default <code>"false"</code> — set <code>"true"</code> to have it propose the view without
+creating it).</p>
 
 <h2>Compute &amp; environment</h2>
 <ul>
@@ -293,9 +322,9 @@ from docs alone.</p>
 <table>
 <tbody>
 <tr><td>Databricks CLI binary</td>
-  <td><code>C:\Users\ashwi\.vscode\extensions\databricks.databricks-2.12.3-win32-x64\bin\databricks.exe</code>
+  <td><code>C:\Users\ashwi\.vscode\extensions\databricks.databricks-2.13.1-win32-x64\bin\databricks.exe</code>
   (bundled with the VS Code extension — no standalone CLI on PATH; version dir changes on
-  extension update)</td></tr>
+  extension update, was 2.12.3 as of 2026-07-31)</td></tr>
 <tr><td>CLI profile</td><td><code>Azure_data_bricks_dv2</code> (in <code>~/.databrickscfg</code>)</td></tr>
 <tr><td><code>DATABRICKS_CLI_PATH</code></td><td>must point at the exe above — databricks-connect's SDK
   shells out to the CLI for auth</td></tr>
@@ -335,7 +364,11 @@ from docs alone.</p>
 <tr><td>Max output tokens</td><td>8,000 per turn</td></tr>
 <tr><td>Tool</td><td><code>run_sql</code> — single statement, prefixes allowed:
   <code>SELECT, WITH, SHOW, DESCRIBE, DESC</code></td></tr>
-<tr><td>Query result cap</td><td>50 rows, JSON-serialized and truncated to 4,000 chars per tool result</td></tr>
+<tr><td>Query result cap</td><td>50 rows, JSON-serialized and truncated to 4,000 chars per tool result; a
+  value snippet (200 chars) is now logged alongside each query (since 2026-08-14 — the evidence log
+  used to record only the query text, not what it returned)</td></tr>
+<tr><td>Independent verification (since 2026-08-14)</td><td>one extra <code>client.messages.create()</code> call
+  per LLM-mode run, no tools, max_tokens=1024 — <code>agent_core.verify_report()</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -343,6 +376,11 @@ from docs alone.</p>
 <div id="p3" class="tabpanel" role="tabpanel">
 <p class="srcfile">Both agent jobs triggered live via <code>databricks jobs run-now</code> on 2026-07-31 for this
 document — logs captured with <code>databricks jobs get-run-output</code>, not fabricated.</p>
+<div class="note"><strong>Point-in-time capture, kept as-is.</strong> This was the 6-agent fleet, before
+<code>pipeline_healer</code>, <code>dq_rca_agent</code>, <code>ingestion_registrar</code>, and <code>lineage_doc_agent</code> existed, and
+before the 2026-08-14 evaluator-verification pass. The record below is left unedited on purpose —
+see <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code> for the equivalent live-run evidence from the current
+10-agent fleet, captured 2026-08-14.</div>
 <h1>Live run capture — 2026-07-31</h1>
 
 <h2>acme_agents_on_demand — run 434501734946825</h2>

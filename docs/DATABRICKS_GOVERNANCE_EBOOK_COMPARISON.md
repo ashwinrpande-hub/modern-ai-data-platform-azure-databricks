@@ -17,6 +17,26 @@ Legend: ✅ Covered · 🟡 Partial (coded but blocked, or intent without confir
 📘 Documented/coded but not deployed · ❌ Not present · ⚪ N/A (out of scope for this POC's
 architecture) · ⚠️ Not verifiable from repo (workspace-admin-level setting)
 
+**Update — 2026-08-14, what's since moved** (table rows below left as originally scored —
+this is a point-in-time gap analysis, not a living scorecard; re-score explicitly if you want
+the table itself updated):
+- Ch.1 "Data discovery & classification" (was ❌): column-level UC comments now real for
+  Silver (24 applied) — moves toward 🟡, still no systematic tagging/classification beyond that.
+- Ch.2 "AI security (DASF)" (was ❌): now ✅ — `docs/DASF_ALIGNMENT.md`, risk-by-risk against
+  the actual DASF v1.1 whitepaper, Components 9 & 10.
+- Ch.2 "Model monitoring... no toxicity/PII-leakage screening on generated reports" (was ❌):
+  moves toward 🟡 — every agent report is now independently fact-checked against its own
+  evidence log before saving (`docs/AGENT_RELIABILITY_GUARDRAILS.md`'s evaluator-optimizer
+  pass). That's output-*accuracy* monitoring, not toxicity/PII screening specifically — the
+  original gap's exact wording is still open.
+- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists now —
+  `dim_customer.customer_key_mdm`, deterministic exact-match on normalized name+country — but
+  it's committed, not deployed (`gold_pipeline` not re-run). Still 📘 at best, and still just
+  exact-match, not the fuzzy/probabilistic matching real MDM needs.
+- Priority list item 1 (column comments) and item 5 (cite DASF) at the bottom: **done.**
+  Items 2 (real UC lineage), 3 (AI Gateway routing), 4 (Lakehouse Monitoring), 6 (account
+  groups) are still open.
+
 ---
 
 ## Chapter 1: Data Governance
