@@ -120,6 +120,10 @@ strictly additive.</p>
   evidence already gathered"</em> — so a truncated investigation still yields a usable report instead
   of dangling mid-tool-call.</li>
 </ul>
+<p class="srcfile">These guardrails are mostly about write-safety. For the separate question of what
+stops an agent from <em>hallucinating</em> — inventing numbers, tables, or conclusions not backed by a
+real query — see <code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>, which also compares this design
+against Anthropic's current published standards for agent reliability.</p>
 
 <pre class="mermaid">sequenceDiagram
   participant J as Databricks Job Task

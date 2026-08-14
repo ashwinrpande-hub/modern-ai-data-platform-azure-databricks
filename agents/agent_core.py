@@ -13,6 +13,10 @@ Guardrails (deliberate, and load-bearing for the design):
     tables, views) happen in deterministic framework code after validation.
   - Every tool call and result summary is appended to a decision log persisted in
     acme_bronze.audit.agent_runs — agents are auditable like any pipeline.
+  - Every report is independently fact-checked before it's saved: a second, separate
+    Claude call (verify_report) checks each claim in the draft against the evidence log
+    from the first pass, and the report a human actually reads carries both the raw
+    evidence log and that verdict inline — see docs/AGENT_RELIABILITY_GUARDRAILS.md.
 """
 import json
 import os
@@ -77,12 +81,46 @@ def safe_sql(spark, query, log, max_rows=50):
     try:
         rows = spark.sql(q).limit(max_rows).collect()
         out = json.dumps([r.asDict() for r in rows], default=str)[:4000]
-        log.append(f"run_sql ({len(rows)} rows): {q[:200]}")
+        # Log the returned values too, not just the query -- otherwise the evidence log
+        # can't actually ground specific numbers in a report, only prove a query ran. Found
+        # live: the verification pass correctly flagged this gap on its first real run.
+        log.append(f"run_sql ({len(rows)} rows): {q[:200]} -> {out[:200] if rows else '(no rows)'}")
         return out if rows else "(no rows)"
     except Exception as e:
         msg = f"SQL ERROR: {str(e)[:400]}"
         log.append(f"run_sql failed: {q[:120]} -> {msg[:120]}")
         return msg
+
+
+VERIFY_SYSTEM = (
+    "You are an independent fact-checker, not the agent that wrote this report. You will be "
+    "given a report and the log of tool calls actually made while producing it. Check every "
+    "specific factual claim in the report -- numbers, table names, statuses, dates -- against "
+    "the evidence log. List any claim NOT directly supported by something in the log. If every "
+    "claim is supported, respond with exactly: 'All claims verified against the evidence log.' "
+    "Be terse -- a short list of gaps, or that one line. Never restate the whole report."
+)
+
+
+def verify_report(client, report, log):
+    """Second, independent pass over the first pass's own output: catches an agent that
+    queried real data correctly but then misreported what it found -- the class of error a
+    single-pass agent structurally cannot see in itself. Failure to run is reported as such,
+    not swallowed, and never blocks the report from saving (verification degrades the
+    confidence signal, it doesn't gate the artifact)."""
+    evidence = "\n".join(l for l in log if l.startswith("run_sql"))
+    if not evidence:
+        return "No run_sql evidence was logged for this report -- nothing to verify against."
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=1024,
+            system=VERIFY_SYSTEM,
+            messages=[{"role": "user", "content":
+                      f"EVIDENCE LOG (tool calls actually made):\n{evidence}\n\n"
+                      f"REPORT TO VERIFY:\n{report}"}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip()
+    except Exception as e:
+        return f"Verification pass failed to run: {str(e)[:150]} (report not independently checked)"
 
 
 def run_reasoning(spark, agent_name, system, user_prompt, log):
@@ -139,7 +177,16 @@ def run_reasoning(spark, agent_name, system, user_prompt, log):
     text = "".join(b.text for b in response.content if b.type == "text").strip()
     log.append(f"reasoning finished: stop_reason={response.stop_reason}, "
                f"out_tokens={response.usage.output_tokens}")
-    return text or None
+    if not text:
+        return None
+
+    verdict = verify_report(client, text, log)
+    log.append(f"verification: {verdict[:300]}")
+    evidence_lines = [l for l in log if l.startswith("run_sql")]
+    evidence_block = "\n".join(f"- {l}" for l in evidence_lines) or "(no run_sql calls made)"
+    return (f"{text}\n\n---\n\n"
+            f"## Evidence log\n{evidence_block}\n\n"
+            f"## Independent verification\n{verdict}")
 
 
 def log_run(spark, agent, mode, status, started_at, log):

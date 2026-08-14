@@ -17,3 +17,7 @@ open decision on whether to add them).
 
 Human gate: agents propose fixes into their reports; never auto-merge to main, never write
 outside their own audit tables.
+
+Hallucination/reliability guardrails (what stops an agent from inventing data, and how that
+compares to Anthropic's current standards) are written up in
+`docs/AGENT_RELIABILITY_GUARDRAILS.md` — not repeated here to keep this file short.

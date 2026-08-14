@@ -48,10 +48,13 @@ resources:
         On-demand platform agents: schema-evolution drift scan, ingestion-registrar
         validation of replication_sources.yaml, vector/content corpus rebuild, deployment
         gate, and the NL-driven data product creator (set the product_request job
-        parameter).
+        parameter; set dry_run=true to have it propose the view without creating it,
+        for human review before a second run applies it).
       parameters:
         - name: product_request
           default: "Order-to-cash data product: current orders with customer name, country, USD amounts, and shipped/invoiced lifecycle status, for BI consumption."
+        - name: dry_run
+          default: "false"
       environments:
         - environment_key: agent_env
           spec:
@@ -77,5 +80,5 @@ resources:
         - task_key: product_creator
           spark_python_task:
             python_file: ../agents/product_creator.py
-            parameters: ["{{job.parameters.product_request}}"]
+            parameters: ["{{job.parameters.product_request}}", "{{job.parameters.dry_run}}"]
           environment_key: agent_env

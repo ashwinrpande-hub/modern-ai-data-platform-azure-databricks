@@ -61,13 +61,17 @@ def extract_sql(report):
 def main():
     started = datetime.now(timezone.utc)
     request = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_REQUEST
+    # Plan-mode opt-in: default False keeps the existing one-shot demo behavior (propose
+    # and create in a single run) unchanged; pass dry_run=true (job param) to make the
+    # agent stop after proposing, so a human reviews the SQL before anything is created.
+    dry_run = len(sys.argv) > 2 and sys.argv[2].strip().lower() == "true"
     spark = get_spark()
     ensure_audit_tables(spark)
     spark.sql("""
         CREATE TABLE IF NOT EXISTS acme_bronze.cfg.product_registry (
           product_name STRING, view_name STRING, request STRING,
           created_by STRING, created_at TIMESTAMP)""")
-    log = [f"request: {request[:200]}"]
+    log = [f"request: {request[:200]}", f"dry_run: {dry_run}"]
 
     report = run_reasoning(
         spark, "product_creator", CREATOR_SYSTEM,
@@ -83,19 +87,30 @@ def main():
         sql, report = FALLBACK_SQL.strip(), (report or "Deterministic fallback product (Anthropic key unavailable - see agent_runs log).")
 
     view_name = re.search(r"acme_products\.sales\.([a-z0-9_]+)", sql, re.IGNORECASE).group(1)
-    spark.sql(sql)
-    rows = spark.sql(f"SELECT count(*) FROM acme_products.sales.{view_name}").collect()[0][0]
-    log.append(f"created acme_products.sales.{view_name} ({rows} rows)")
-    print(f"Created acme_products.sales.{view_name} — {rows} rows")
 
-    spark.sql(
-        "INSERT INTO acme_bronze.cfg.product_registry VALUES "
-        f"('{view_name}', 'acme_products.sales.{view_name}', "
-        f"'{request.replace(chr(39), chr(39) * 2)[:500]}', 'product_creator_agent', current_timestamp())")
-    save_report(spark, "product_creator", f"Data product created: {view_name}",
-                f"Request: {request}\n\n```sql\n{sql}\n```\n\n{report}")
-    log_run(spark, "product_creator", mode, "PRODUCT_CREATED", started, log)
-    print(f"product_creator finished: mode={mode}")
+    if dry_run:
+        log.append(f"dry_run=true — proposed acme_products.sales.{view_name}, NOT created")
+        print(f"[DRY RUN] Proposed acme_products.sales.{view_name} — not executed, awaiting review")
+        title = f"Data product PROPOSED (dry run, awaiting review): {view_name}"
+        body = (f"Request: {request}\n\n**DRY RUN — nothing was created.** Review the SQL below; "
+                f"re-run with dry_run=false to apply it.\n\n```sql\n{sql}\n```\n\n{report}")
+        status = "PRODUCT_PROPOSED"
+    else:
+        spark.sql(sql)
+        rows = spark.sql(f"SELECT count(*) FROM acme_products.sales.{view_name}").collect()[0][0]
+        log.append(f"created acme_products.sales.{view_name} ({rows} rows)")
+        print(f"Created acme_products.sales.{view_name} — {rows} rows")
+        spark.sql(
+            "INSERT INTO acme_bronze.cfg.product_registry VALUES "
+            f"('{view_name}', 'acme_products.sales.{view_name}', "
+            f"'{request.replace(chr(39), chr(39) * 2)[:500]}', 'product_creator_agent', current_timestamp())")
+        title = f"Data product created: {view_name}"
+        body = f"Request: {request}\n\n```sql\n{sql}\n```\n\n{report}"
+        status = "PRODUCT_CREATED"
+
+    save_report(spark, "product_creator", title, body)
+    log_run(spark, "product_creator", mode, status, started, log)
+    print(f"product_creator finished: mode={mode}, dry_run={dry_run}")
 
 
 if __name__ == "__main__":
