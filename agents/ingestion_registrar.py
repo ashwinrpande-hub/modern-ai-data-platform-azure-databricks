@@ -37,6 +37,22 @@ that pass validation but aren't registered yet (the exact `scripts/deploy.py
 yourself — a human runs it after reviewing."""
 
 
+def read_yaml_config(log):
+    """Read config/replication_sources.yaml. Plain open() works for local dev runs and
+    usually on serverless too, but a raw filesystem read against /Workspace/... can hit a
+    transient I/O error there (seen live: [Errno 5] Input/output error on this exact path) --
+    fall back to the Workspace Files API, which reads over the REST/Files service instead of
+    local filesystem semantics."""
+    try:
+        with open(YAML_PATH, "r", encoding="utf-8-sig") as fh:
+            return yaml.safe_load(fh)
+    except Exception as e1:
+        log.append(f"open() failed on {YAML_PATH}: {str(e1)[:150]} -- falling back to Workspace Files API")
+        from databricks.sdk import WorkspaceClient
+        with WorkspaceClient().workspace.download(YAML_PATH) as f:
+            return yaml.safe_load(f)
+
+
 def validate_source(src):
     issues = []
     if src.get("pattern") not in ALLOWED_PATTERNS:
@@ -60,10 +76,9 @@ def main():
     log = []
 
     try:
-        with open(YAML_PATH, "r", encoding="utf-8-sig") as fh:
-            cfg = yaml.safe_load(fh)
+        cfg = read_yaml_config(log)
     except Exception as e:
-        log.append(f"could not read {YAML_PATH}: {str(e)[:200]}")
+        log.append(f"could not read {YAML_PATH} via open() or Workspace Files API: {str(e)[:200]}")
         log_run(spark, "ingestion_registrar", "deterministic", "YAML_UNREADABLE", started, log)
         print(f"ERROR: {log[-1]}")
         return
