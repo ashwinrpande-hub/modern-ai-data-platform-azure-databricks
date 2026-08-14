@@ -392,3 +392,49 @@ not hand-edit") needs regeneration via its own pipeline, not hand-patching, and 
 (`docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`)
 are point-in-time snapshots whose value is partly *being* a snapshot — annotating what's since
 changed belongs there, not a silent rewrite that erases the record of what was found when.
+
+## 2026-08-14 (continued) — docs/index.html regenerated from source, gold_pipeline run for real, presentation v4
+Picked up where the previous entry left off. Wrote `scripts/generate_docs_site.py` — the actual
+fix for `docs/index.html` having been hand-built HTML with no generator, which is exactly how it
+had silently missed `DASF_ALIGNMENT.md`, `GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`,
+`DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`, `ralph_loop.md`, and
+`AGENT_RELIABILITY_GUARDRAILS.md` entirely (15 tabs now, was 10). Also ran the real
+`extract_data_model.py`→`generate_data_docs.py` pipeline live against the workspace instead of
+hand-patching `DATA_MODEL.md`/`DATA_CATALOG.html` (both marked "do not hand-edit" for exactly
+this reason) — picked up the 24 Silver column comments the 2026-07-29 snapshot predated.
+Updated `AGENT_ARCHITECTURE.html` for the ten-agent state (was still saying six in three
+places), including the Job 1/Job 2 deployment diagrams, which needed real changes, not just a
+count fix, since the task-dependency graph itself grew from 2+4 tasks to 5+5.
+
+User then asked, verbatim, to run `databricks bundle run gold_pipeline -t dev` — the exact
+command, about as explicit as authorization gets. Ran it: all 6 flows green in under a minute.
+Verified live, not just trusted the green checkmark: `dim_customer.customer_key_mdm` is real —
+1,001 rows, 1,001 distinct keys, 0 collapsed. Worth being honest about what that number does
+and doesn't prove: it demonstrates the key computes and is unique per row, not that the
+matching logic actually resolves duplicates, because this synthetic dataset was never built to
+contain overlapping entities across SAP/JDE/QAD in the first place — the collapse rate here
+will be 0 regardless of whether the matching logic is correct, so this isn't evidence the
+entity-resolution logic *works*, only that it *runs*. `pit_customer` also confirmed refreshed
+for today.
+
+User then asked whether anything else was "committed but not deployed," to deploy it, and to
+update the presentation + remove any such stale references. Ran `databricks bundle deploy`
+again to force-confirm zero code drift (clean — nothing else pending), then launched a
+background repo-wide search rather than trusting memory of which docs mentioned
+`customer_key_mdm`'s old undeployed status. It found two categories: (1) the `customer_key_mdm`
+staleness, in `docs/DEMO_RUNBOOK.md`, `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`,
+`CHANGES.md`, `docs/SESSION_NOTES.md` (this file — see the note above about not rewriting dated
+entries), and `presentation/index_v3.html` (two spots: the Technical Summary slide and a
+dedicated Gold-slide panel); (2) a second, independent staleness thread about the four agents
+that shipped 2026-08-13 — `docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md` still called
+`ingestion_registrar` and `lineage_doc_agent` "spec-only" in three spots, predating its own
+2026-08-14 update banner (which covered the dashboard fix and column comments but never
+mentioned the agents shipping the very next day — a real gap in the update note itself, now
+fixed). Also caught, as a side effect of the search: `presentation/index_v3.html` had a genuine
+leftover bug from the earlier six→ten agent-count pass — one slide ("Code & data flow") still
+said "the six agents that are deployed," contradicting two other slides in the *same file* that
+correctly said ten. Fixed all of it, following the same discipline as before: point-in-time
+docs (`GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, this file) got annotated, not rewritten;
+`presentation/index_v3.html` itself was left untouched (including its bug) since the
+established convention this session is that shipped versions are frozen snapshots — the fix
+landed in a new `presentation/index_v4.html` instead, same pattern as v2→v3.

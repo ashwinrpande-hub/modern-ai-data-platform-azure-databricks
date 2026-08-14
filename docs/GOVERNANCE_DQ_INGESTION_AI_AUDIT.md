@@ -6,8 +6,18 @@ unedited below on purpose — this is a point-in-time finding, not a living doc;
 changed is called out here instead of silently rewritten into the original text.
 
 **Update — 2026-08-14, what's since closed:**
+- §1/§3's "Ingestion Registrar agent is spec-only" and §1's "Lineage-based audit agent...
+  spec-only, never implemented" are **no longer true**: `pipeline_healer.py`, `dq_rca_agent.py`,
+  `ingestion_registrar.py`, and `lineage_doc_agent.py` all shipped 2026-08-13 and were
+  confirmed live via real job runs 2026-08-14 (`docs/AGENT_RELIABILITY_GUARDRAILS.md`). What's
+  still genuinely open, narrower than before: none of the four implement the PR/Slack/ticketing
+  trigger design their original `.md` specs called for — see the inline notes below for exactly
+  which half of each gap closed.
 - The dashboard bug in §2 (`dq_trust_dashboard.sql` querying `dimension`/`score`/`met_threshold`)
   is **fixed** — column names corrected, all 5 widget queries verified live.
+- §4's `dim_customer.customer_key_mdm` entity-resolution key (not covered by the original
+  2026-08-12 audit at all) is now live — see `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`
+  for the fuller MDM-framing discussion.
 - §4's "column-level comments are empty everywhere" is **no longer true for Silver**: 24 real UC
   column comments applied via `cfg.layer_mappings.business_definition` +
   `scripts/apply_column_comments.py`, independently verified in `information_schema.columns`.
@@ -67,11 +77,17 @@ honestly-scoped POC, not a hidden gap.
   metastore privilege missing" (`docs/TRACEABILITY_MATRIX.md`).
 - **Read-only interview/reviewer access grant**: documented as a manual admin step, never
   executed.
-- **Steward ticketing / Slack escalation**: only exists in the unimplemented
-  `agents/pipeline_healer.md` (`log to audit.agent_actions` — table doesn't exist anywhere;
-  real audit tables are `agent_runs`/`agent_reports`) and `agents/dq_rca_agent.md` specs.
-- **Lineage-based audit agent**: `agents/lineage_doc_agent.md` spec-only, never implemented;
-  no code anywhere queries `system.access.table_lineage`.
+- **Steward ticketing / Slack escalation**: `pipeline_healer.py` and `dq_rca_agent.py` are
+  real, deployed implementations now (2026-08-13, confirmed live 2026-08-14 — see update note
+  at top), but neither implements the ticketing/Slack half of their original `.md` specs
+  (`log to audit.agent_actions` — that table still doesn't exist; real audit tables are
+  `agent_runs`/`agent_reports`, same as every other agent). The gap is real, just narrower
+  than "unimplemented agent" — it's "implemented agent, unimplemented escalation channel."
+- **Lineage-based audit agent**: `lineage_doc_agent.py` is real and deployed now (see update
+  note at top) — it does attempt `system.access.table_lineage`, degrading gracefully if that
+  schema isn't enabled on this metastore, which as of 2026-08-14 it still isn't confirmed to
+  be. So the underlying claim narrows to: no code has yet *successfully read* native UC
+  lineage, not that no code tries.
 - **`acme_products.meta.v_product_trust_scores`**: referenced as live everywhere (row counts
   in `docs/DATA_MODEL.md`, read by `scripts/generate_data_docs.py`) but **no `CREATE VIEW`
   DDL exists in the repo** — created ad hoc directly in the workspace, not IaC.
@@ -208,8 +224,11 @@ despite EBS being registered.
 - `scripts/deploy.py::register_source()` is the real onboarding mechanism — inserts a row
   into `cfg.source_registry` and, for template-backed patterns, POSTs a DLT pipeline-create
   call; for managed-connector patterns it prints a no-op message.
-- **Ingestion Registrar agent is spec-only** — `agents/ingestion_registrar.md` describes
-  PR-triggered validation + registration on merge, but no `.py` implementation exists.
+- **Ingestion Registrar agent**: `ingestion_registrar.py` is real and deployed now (see update
+  note at top) — validates every row in `replication_sources.yaml` and cross-checks
+  `cfg.source_registry`. The PR-triggered/comment-on-merge half of the original
+  `agents/ingestion_registrar.md` spec is still not built; it runs as an on-demand job task
+  instead, same pattern as the other three agents in this situation.
 
 ### Bronze→Silver transform coverage gap
 `acme_bronze.cfg.layer_mappings` (seeded by `config/seed_layer_mappings.sql`) covers SAP
@@ -282,8 +301,12 @@ hand-added lineage edge, but no code in the repo actually performs that copy/ren
 ### Gaps
 - No column-level comments anywhere — an AI agent has no per-column business definitions to
   read from UC metadata even where table comments exist.
-- `agents/lineage_doc_agent.md` — spec-only, confirmed no `.py`, not scheduled anywhere;
-  `docs/CODE_GRAPH.md` (the doc it's supposed to auto-generate) is hand-maintained instead.
+- `lineage_doc_agent.py` is real and scheduled now (see update note at top), but it still
+  doesn't close this gap the way the spec intended: it writes to `agent_reports`, not to
+  `docs/CODE_GRAPH.md` directly (a job container can't commit to git — see the agent's own
+  docstring), so `CODE_GRAPH.md` is still hand-maintained. `docs/index.html` is now at least
+  generated from the `.md` sources by `scripts/generate_docs_site.py`, closing an adjacent
+  but different gap (docs/index.html going stale, not CODE_GRAPH.md's content itself).
 - RAG **generation** layer is design-only — `ai/rag_agent.py` unwired into any job; only
   retrieval is live (already known; now pinpointed to the exact file).
 - No system dynamically feeds table/column comments to any agent as runtime grounding — the

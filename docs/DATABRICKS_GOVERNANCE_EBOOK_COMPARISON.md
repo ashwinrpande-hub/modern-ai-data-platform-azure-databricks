@@ -29,10 +29,12 @@ the table itself updated):
   evidence log before saving (`docs/AGENT_RELIABILITY_GUARDRAILS.md`'s evaluator-optimizer
   pass). That's output-*accuracy* monitoring, not toxicity/PII screening specifically — the
   original gap's exact wording is still open.
-- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists now —
-  `dim_customer.customer_key_mdm`, deterministic exact-match on normalized name+country — but
-  it's committed, not deployed (`gold_pipeline` not re-run). Still 📘 at best, and still just
-  exact-match, not the fuzzy/probabilistic matching real MDM needs.
+- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists and is now live (2026-08-14
+  — `gold_pipeline` re-run, `dim_customer.customer_key_mdm` verified materialized) —
+  deterministic exact-match on normalized name+country. Moves to 🟡: live, but still just
+  exact-match, not the fuzzy/probabilistic matching real MDM needs, and this synthetic
+  dataset doesn't model overlapping entities across ERPs so the key has never actually had a
+  chance to collapse a duplicate (1,001 rows in, 1,001 distinct keys out).
 - Priority list item 1 (column comments) and item 5 (cite DASF) at the bottom: **done.**
   Items 2 (real UC lineage), 3 (AI Gateway routing), 4 (Lakehouse Monitoring), 6 (account
   groups) are still open.

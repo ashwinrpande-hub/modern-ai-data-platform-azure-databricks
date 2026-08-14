@@ -96,7 +96,7 @@ isolated (Spark Connect transport vs. a `VALUES`-parsing quirk — didn't chase 
 Logged in memory (`databricks-tooling-quirks`) so it doesn't cost debugging time again;
 `config/seed_layer_mappings.sql` is deliberately plain-ASCII because of it.
 
-## Deliberately NOT run
+## Deliberately NOT run (as of this entry — since resolved, see the 2026-08-14 section below)
 `gold_pipeline` has not been redeployed/run — `dim_customer`'s schema change
 (`customer_key_mdm` + column comments) is committed in code but not live. Run
 `databricks bundle deploy -t dev && databricks bundle run gold_pipeline -t dev` to materialize
@@ -109,3 +109,58 @@ verified above.
 (untracked) — everything else in this section (the 3 audit docs, 4 new agents, README/
 agents.yml wiring) is committed as `1e2fe2c`, `ff9fd24`, `50bb9a3` on `dv2`, 2 commits ahead
 of `origin/dv2` and not yet pushed.
+
+---
+
+# 2026-08-14 update — live verification, reliability guardrails, doc-site regeneration, full deploy
+
+Four threads, same day: (1) push + deploy everything from 2026-08-13 and actually run every
+agent live instead of trusting `bundle validate`; (2) find and close 4 real reliability gaps
+against Anthropic's own current published standards; (3) stop hand-maintaining `docs/index.html`
+and regenerate it (plus `DATA_MODEL.md`/`DATA_CATALOG.html`) from source instead; (4) run
+`gold_pipeline` for real, closing the last "committed but not deployed" item and updating every
+doc/slide that still said otherwise.
+
+## Files
+
+| File | New/Upd | Justification |
+|---|---|---|
+| `agents/ingestion_registrar.py` | UPD | Live run exposed a real bug: `open()` on the synced YAML hit `[Errno 5] Input/output error` on serverless, and the agent's own error handling swallowed it into a job-level SUCCESS. Now falls back to the Databricks SDK's Workspace Files API. |
+| `agents/agent_core.py` | UPD | Closes 4 gaps found comparing this repo's guardrails against Anthropic's current published agent-reliability standards (fetched live, not from memory — see `docs/AGENT_RELIABILITY_GUARDRAILS.md`): a second, independent `verify_report()` call fact-checks every draft report against its own evidence log before saving; `safe_sql()` now logs a value snippet per query, not just the query text (a gap the verification pass caught in its own first live run). |
+| `agents/product_creator.py`, `resources/agents.yml` | UPD | Adds an opt-in `dry_run` job parameter (default `false`, existing demo behavior unchanged) — a Plan-Mode path for the one agent that writes directly. |
+| `scripts/eval_agent_reports.py` | NEW | Deterministic scorecard reading `agent_runs.decision_log` for each agent's verified/flagged rate — no LLM in the loop, so the eval itself can't hallucinate. |
+| `docs/AGENT_RELIABILITY_GUARDRAILS.md` | NEW | What stops these agents from hallucinating, compared against Anthropic's current published standards (Reduce Hallucinations, Trustworthy Agents in Practice, Building Effective AI Agents, Effective Harnesses for Long-Running Agents) — 4 gaps found and closed the same session. |
+| `dashboards/dq_trust_dashboard.sql` | UPD | Fixed the column-name bug the 2026-08-13 audit found — `dimension`/`score`/`met_threshold` don't exist on the live `dq_results` table; corrected to `dq_dimension`/derived-from-`passed`/`source_table`/`reason`. All 5 widget queries verified live. |
+| `CLAUDE.md` | UPD | Rule 1: read every tracked `.md` at session start, not lazily. Rule 4: log as you go. New rule 7: check/update docs the same session a change makes them stale — prompted by finding `docs/CODE_GRAPH.md` and `docs/TRACEABILITY_MATRIX.md` both still saying "six agents" after a tenth was added. |
+| `docs/CODE_GRAPH.md`, `docs/TRACEABILITY_MATRIX.md` | UPD | The "six agents" fix above. R9.1 moved 🟡→✅, 18/28 requirements now green. |
+| `docs/SESSION_NOTES.md` | UPD | Backfilled 2026-08-13 and 2026-08-14 entries — this file had gone silent for two days of real work despite CLAUDE.md rule 4, because this file (`CHANGES.md`) was carrying file-list summaries but not the discussion/reasoning trail `SESSION_NOTES.md` is for. |
+| `scripts/generate_docs_site.py` | NEW | `docs/index.html` was hand-built HTML with no generator — exactly how it ended up missing `DASF_ALIGNMENT.md`, `GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, `DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md`, `ralph_loop.md`, and `AGENT_RELIABILITY_GUARDRAILS.md` entirely. Converts any `docs/*.md` into a matching-style tab; 15 tabs now instead of 10. |
+| `docs/DATA_MODEL.md`, `docs/DATA_MODEL.html`, `docs/DATA_CATALOG.html` | UPD | Regenerated live via the real pipeline (`extract_data_model.py` → `generate_data_docs.py`) instead of hand-patched — picks up the 24 Silver column comments, previously missing from the 2026-07-29 snapshot. |
+| `docs/AGENT_ARCHITECTURE.html` | UPD | Six agents → ten; full agent table; Job 1/Job 2 deployment diagrams updated with the real task-dependency graph; verification-pass guardrail documented; stale CLI version fixed. The 2026-07-31 live-run capture tab is left as-is with a pointer note, not rewritten. |
+| `docs/DEMO_RUNBOOK.md`, `docs/ralph_loop.md`, `docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md`, `docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md` | UPD | Agent count and `customer_key_mdm` deployment status corrected; audit-style docs annotated with "what's since closed" rather than rewritten, keeping the point-in-time record intact. |
+| `presentation/index_v4.html` | NEW | New version (v1/v2/v3 all preserved untouched, same convention as every prior version). Fixes every stale "committed, not deployed" tag now that `gold_pipeline` has actually run, and a genuine leftover bug from the v3 6→10 agent-count pass (one slide still said "the six agents that are deployed"). |
+
+## Applied live against the workspace (not just files)
+- All 10 agents run for real via `databricks jobs run-now`/`bundle run`, output read end to
+  end — not just `bundle validate`. `ingestion_registrar`'s bug (job-level SUCCESS while doing
+  zero validation) was only visible this way.
+- `agent_core.verify_report()`'s first live run (`dq_monitor_rca`, run `904966710921460`) got
+  genuinely flagged — caught that the evidence log recorded queries but not their returned
+  values. Fixed in the same session and reconfirmed.
+- `product_creator --dry_run=true` confirmed to propose without creating by checking the
+  catalog directly (no view existed), not by trusting the printed log line.
+- `scripts/extract_data_model.py` sampled all 47 tables live (read-only) to regenerate the
+  data catalog docs.
+- `databricks bundle run gold_pipeline -t dev` — all 6 flows green.
+  `dim_customer.customer_key_mdm` confirmed materialized: 1,001 rows, 1,001 distinct keys, 0
+  collapsed (expected — this synthetic dataset doesn't model overlapping entities across
+  ERPs). `pit_customer` confirmed refreshed for today's `snapshot_date`. This was the last
+  "committed but not deployed" item in the repo — a full re-sweep for the phrase found nothing
+  else outstanding beyond genuinely-still-blocked items (account groups, Delta Share, RAG
+  generation, bronze ingestion, marketplace UI, trust dashboard needing a SQL warehouse).
+
+## Deliberately not touched
+`presentation/index.html` (v1) and `index_v2.html` (v2), and `presentation/index_v3.html`
+itself — all three stay frozen historical snapshots, per the versioning convention established
+this session; `index_v3.html`'s known "six agents" leftover bug is fixed only in the new
+`index_v4.html`, not retroactively in v3.

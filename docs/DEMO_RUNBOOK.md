@@ -70,9 +70,10 @@ request, through a validation gate; mention `dry_run=true` as the opt-in Plan-Mo
 asked how a human reviews before a write happens.
 
 ## Pre-demo checklist (run 30 min before)
-1. `databricks bundle run gold_pipeline -t dev` (fresh PIT snapshot — check 13; this also
-   materializes `dim_customer.customer_key_mdm`, committed in code since 2026-08-13 but not
-   run live as of this writing — expect the column to newly appear)
+1. `databricks bundle run gold_pipeline -t dev` (fresh PIT snapshot — check 13; also refreshes
+   `dim_customer.customer_key_mdm`, live since 2026-08-14 — 1,001 rows, 1,001 distinct keys,
+   0 collapsed, expected since this synthetic dataset doesn't model overlapping entities
+   across ERPs)
 2. `databricks bundle run agents_scheduled_job -t dev` (fresh DQ rows + digest; needs the
    `agents/anthropic_api_key` secret for LLM mode)
 3. `python scripts/validate.py`-equivalent via connect — confirm 14/14

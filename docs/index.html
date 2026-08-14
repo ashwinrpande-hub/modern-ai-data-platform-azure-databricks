@@ -1216,8 +1216,18 @@ platform) risks are workspace-admin-level, covered under Chapter 3 of that same 
 unedited below on purpose — this is a point-in-time finding, not a living doc; what's since
 changed is called out here instead of silently rewritten into the original text.</p>
 <p><strong>Update — 2026-08-14, what's since closed:</strong>
+- §1/§3's "Ingestion Registrar agent is spec-only" and §1's "Lineage-based audit agent...
+  spec-only, never implemented" are <strong>no longer true</strong>: <code>pipeline_healer.py</code>, <code>dq_rca_agent.py</code>,
+  <code>ingestion_registrar.py</code>, and <code>lineage_doc_agent.py</code> all shipped 2026-08-13 and were
+  confirmed live via real job runs 2026-08-14 (<code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>). What's
+  still genuinely open, narrower than before: none of the four implement the PR/Slack/ticketing
+  trigger design their original <code>.md</code> specs called for — see the inline notes below for exactly
+  which half of each gap closed.
 - The dashboard bug in §2 (<code>dq_trust_dashboard.sql</code> querying <code>dimension</code>/<code>score</code>/<code>met_threshold</code>)
   is <strong>fixed</strong> — column names corrected, all 5 widget queries verified live.
+- §4's <code>dim_customer.customer_key_mdm</code> entity-resolution key (not covered by the original
+  2026-08-12 audit at all) is now live — see <code>docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>
+  for the fuller MDM-framing discussion.
 - §4's "column-level comments are empty everywhere" is <strong>no longer true for Silver</strong>: 24 real UC
   column comments applied via <code>cfg.layer_mappings.business_definition</code> +
   <code>scripts/apply_column_comments.py</code>, independently verified in <code>information_schema.columns</code>.
@@ -1275,11 +1285,17 @@ honestly-scoped POC, not a hidden gap.</p>
   metastore privilege missing" (<code>docs/TRACEABILITY_MATRIX.md</code>).</li>
 <li><strong>Read-only interview/reviewer access grant</strong>: documented as a manual admin step, never
   executed.</li>
-<li><strong>Steward ticketing / Slack escalation</strong>: only exists in the unimplemented
-  <code>agents/pipeline_healer.md</code> (<code>log to audit.agent_actions</code> — table doesn't exist anywhere;
-  real audit tables are <code>agent_runs</code>/<code>agent_reports</code>) and <code>agents/dq_rca_agent.md</code> specs.</li>
-<li><strong>Lineage-based audit agent</strong>: <code>agents/lineage_doc_agent.md</code> spec-only, never implemented;
-  no code anywhere queries <code>system.access.table_lineage</code>.</li>
+<li><strong>Steward ticketing / Slack escalation</strong>: <code>pipeline_healer.py</code> and <code>dq_rca_agent.py</code> are
+  real, deployed implementations now (2026-08-13, confirmed live 2026-08-14 — see update note
+  at top), but neither implements the ticketing/Slack half of their original <code>.md</code> specs
+  (<code>log to audit.agent_actions</code> — that table still doesn't exist; real audit tables are
+  <code>agent_runs</code>/<code>agent_reports</code>, same as every other agent). The gap is real, just narrower
+  than "unimplemented agent" — it's "implemented agent, unimplemented escalation channel."</li>
+<li><strong>Lineage-based audit agent</strong>: <code>lineage_doc_agent.py</code> is real and deployed now (see update
+  note at top) — it does attempt <code>system.access.table_lineage</code>, degrading gracefully if that
+  schema isn't enabled on this metastore, which as of 2026-08-14 it still isn't confirmed to
+  be. So the underlying claim narrows to: no code has yet <em>successfully read</em> native UC
+  lineage, not that no code tries.</li>
 <li><strong><code>acme_products.meta.v_product_trust_scores</code></strong>: referenced as live everywhere (row counts
   in <code>docs/DATA_MODEL.md</code>, read by <code>scripts/generate_data_docs.py</code>) but <strong>no <code>CREATE VIEW</code>
   DDL exists in the repo</strong> — created ad hoc directly in the workspace, not IaC.</li>
@@ -1506,8 +1522,11 @@ despite EBS being registered.</p>
 <li><code>scripts/deploy.py::register_source()</code> is the real onboarding mechanism — inserts a row
   into <code>cfg.source_registry</code> and, for template-backed patterns, POSTs a DLT pipeline-create
   call; for managed-connector patterns it prints a no-op message.</li>
-<li><strong>Ingestion Registrar agent is spec-only</strong> — <code>agents/ingestion_registrar.md</code> describes
-  PR-triggered validation + registration on merge, but no <code>.py</code> implementation exists.</li>
+<li><strong>Ingestion Registrar agent</strong>: <code>ingestion_registrar.py</code> is real and deployed now (see update
+  note at top) — validates every row in <code>replication_sources.yaml</code> and cross-checks
+  <code>cfg.source_registry</code>. The PR-triggered/comment-on-merge half of the original
+  <code>agents/ingestion_registrar.md</code> spec is still not built; it runs as an on-demand job task
+  instead, same pattern as the other three agents in this situation.</li>
 </ul>
 <h3>Bronze→Silver transform coverage gap</h3>
 <p><code>acme_bronze.cfg.layer_mappings</code> (seeded by <code>config/seed_layer_mappings.sql</code>) covers SAP
@@ -1580,8 +1599,12 @@ hand-added lineage edge, but no code in the repo actually performs that copy/ren
 <ul>
 <li>No column-level comments anywhere — an AI agent has no per-column business definitions to
   read from UC metadata even where table comments exist.</li>
-<li><code>agents/lineage_doc_agent.md</code> — spec-only, confirmed no <code>.py</code>, not scheduled anywhere;
-  <code>docs/CODE_GRAPH.md</code> (the doc it's supposed to auto-generate) is hand-maintained instead.</li>
+<li><code>lineage_doc_agent.py</code> is real and scheduled now (see update note at top), but it still
+  doesn't close this gap the way the spec intended: it writes to <code>agent_reports</code>, not to
+  <code>docs/CODE_GRAPH.md</code> directly (a job container can't commit to git — see the agent's own
+  docstring), so <code>CODE_GRAPH.md</code> is still hand-maintained. <code>docs/index.html</code> is now at least
+  generated from the <code>.md</code> sources by <code>scripts/generate_docs_site.py</code>, closing an adjacent
+  but different gap (docs/index.html going stale, not CODE_GRAPH.md's content itself).</li>
 <li>RAG <strong>generation</strong> layer is design-only — <code>ai/rag_agent.py</code> unwired into any job; only
   retrieval is live (already known; now pinpointed to the exact file).</li>
 <li>No system dynamically feeds table/column comments to any agent as runtime grounding — the
@@ -1620,10 +1643,12 @@ the table itself updated):
   evidence log before saving (<code>docs/AGENT_RELIABILITY_GUARDRAILS.md</code>'s evaluator-optimizer
   pass). That's output-<em>accuracy</em> monitoring, not toxicity/PII screening specifically — the
   original gap's exact wording is still open.
-- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists now —
-  <code>dim_customer.customer_key_mdm</code>, deterministic exact-match on normalized name+country — but
-  it's committed, not deployed (<code>gold_pipeline</code> not re-run). Still 📘 at best, and still just
-  exact-match, not the fuzzy/probabilistic matching real MDM needs.
+- Ch.1 "Entity resolution / MDM" (was ❌): a real mechanism exists and is now live (2026-08-14
+  — <code>gold_pipeline</code> re-run, <code>dim_customer.customer_key_mdm</code> verified materialized) —
+  deterministic exact-match on normalized name+country. Moves to 🟡: live, but still just
+  exact-match, not the fuzzy/probabilistic matching real MDM needs, and this synthetic
+  dataset doesn't model overlapping entities across ERPs so the key has never actually had a
+  chance to collapse a duplicate (1,001 rows in, 1,001 distinct keys out).
 - Priority list item 1 (column comments) and item 5 (cite DASF) at the bottom: <strong>done.</strong>
   Items 2 (real UC lineage), 3 (AI Gateway routing), 4 (Lakehouse Monitoring), 6 (account
   groups) are still open.</p>
@@ -2012,9 +2037,10 @@ request, through a validation gate; mention <code>dry_run=true</code> as the opt
 asked how a human reviews before a write happens.</p>
 <h2>Pre-demo checklist (run 30 min before)</h2>
 <ol>
-<li><code>databricks bundle run gold_pipeline -t dev</code> (fresh PIT snapshot — check 13; this also
-   materializes <code>dim_customer.customer_key_mdm</code>, committed in code since 2026-08-13 but not
-   run live as of this writing — expect the column to newly appear)</li>
+<li><code>databricks bundle run gold_pipeline -t dev</code> (fresh PIT snapshot — check 13; also refreshes
+   <code>dim_customer.customer_key_mdm</code>, live since 2026-08-14 — 1,001 rows, 1,001 distinct keys,
+   0 collapsed, expected since this synthetic dataset doesn't model overlapping entities
+   across ERPs)</li>
 <li><code>databricks bundle run agents_scheduled_job -t dev</code> (fresh DQ rows + digest; needs the
    <code>agents/anthropic_api_key</code> secret for LLM mode)</li>
 <li><code>python scripts/validate.py</code>-equivalent via connect — confirm 14/14</li>
@@ -2554,6 +2580,49 @@ not hand-edit") needs regeneration via its own pipeline, not hand-patching, and 
 (<code>docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code>, <code>docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>)
 are point-in-time snapshots whose value is partly <em>being</em> a snapshot — annotating what's since
 changed belongs there, not a silent rewrite that erases the record of what was found when.</p>
+<h2>2026-08-14 (continued) — docs/index.html regenerated from source, gold_pipeline run for real, presentation v4</h2>
+<p>Picked up where the previous entry left off. Wrote <code>scripts/generate_docs_site.py</code> — the actual
+fix for <code>docs/index.html</code> having been hand-built HTML with no generator, which is exactly how it
+had silently missed <code>DASF_ALIGNMENT.md</code>, <code>GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code>,
+<code>DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>, <code>ralph_loop.md</code>, and
+<code>AGENT_RELIABILITY_GUARDRAILS.md</code> entirely (15 tabs now, was 10). Also ran the real
+<code>extract_data_model.py</code>→<code>generate_data_docs.py</code> pipeline live against the workspace instead of
+hand-patching <code>DATA_MODEL.md</code>/<code>DATA_CATALOG.html</code> (both marked "do not hand-edit" for exactly
+this reason) — picked up the 24 Silver column comments the 2026-07-29 snapshot predated.
+Updated <code>AGENT_ARCHITECTURE.html</code> for the ten-agent state (was still saying six in three
+places), including the Job 1/Job 2 deployment diagrams, which needed real changes, not just a
+count fix, since the task-dependency graph itself grew from 2+4 tasks to 5+5.</p>
+<p>User then asked, verbatim, to run <code>databricks bundle run gold_pipeline -t dev</code> — the exact
+command, about as explicit as authorization gets. Ran it: all 6 flows green in under a minute.
+Verified live, not just trusted the green checkmark: <code>dim_customer.customer_key_mdm</code> is real —
+1,001 rows, 1,001 distinct keys, 0 collapsed. Worth being honest about what that number does
+and doesn't prove: it demonstrates the key computes and is unique per row, not that the
+matching logic actually resolves duplicates, because this synthetic dataset was never built to
+contain overlapping entities across SAP/JDE/QAD in the first place — the collapse rate here
+will be 0 regardless of whether the matching logic is correct, so this isn't evidence the
+entity-resolution logic <em>works</em>, only that it <em>runs</em>. <code>pit_customer</code> also confirmed refreshed
+for today.</p>
+<p>User then asked whether anything else was "committed but not deployed," to deploy it, and to
+update the presentation + remove any such stale references. Ran <code>databricks bundle deploy</code>
+again to force-confirm zero code drift (clean — nothing else pending), then launched a
+background repo-wide search rather than trusting memory of which docs mentioned
+<code>customer_key_mdm</code>'s old undeployed status. It found two categories: (1) the <code>customer_key_mdm</code>
+staleness, in <code>docs/DEMO_RUNBOOK.md</code>, <code>docs/DATABRICKS_GOVERNANCE_EBOOK_COMPARISON.md</code>,
+<code>CHANGES.md</code>, <code>docs/SESSION_NOTES.md</code> (this file — see the note above about not rewriting dated
+entries), and <code>presentation/index_v3.html</code> (two spots: the Technical Summary slide and a
+dedicated Gold-slide panel); (2) a second, independent staleness thread about the four agents
+that shipped 2026-08-13 — <code>docs/GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code> still called
+<code>ingestion_registrar</code> and <code>lineage_doc_agent</code> "spec-only" in three spots, predating its own
+2026-08-14 update banner (which covered the dashboard fix and column comments but never
+mentioned the agents shipping the very next day — a real gap in the update note itself, now
+fixed). Also caught, as a side effect of the search: <code>presentation/index_v3.html</code> had a genuine
+leftover bug from the earlier six→ten agent-count pass — one slide ("Code &amp; data flow") still
+said "the six agents that are deployed," contradicting two other slides in the <em>same file</em> that
+correctly said ten. Fixed all of it, following the same discipline as before: point-in-time
+docs (<code>GOVERNANCE_DQ_INGESTION_AI_AUDIT.md</code>, this file) got annotated, not rewritten;
+<code>presentation/index_v3.html</code> itself was left untouched (including its bug) since the
+established convention this session is that shipped versions are frozen snapshots — the fix
+landed in a new <code>presentation/index_v4.html</code> instead, same pattern as v2→v3.</p>
 </div>
 <div id="p14" class="tabpanel" role="tabpanel">
 <p class="srcfile">source: docs/JD_ALIGNMENT.md</p>
