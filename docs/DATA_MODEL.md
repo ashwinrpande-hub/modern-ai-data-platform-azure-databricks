@@ -1,6 +1,6 @@
 # Data Model — acme Sales Lakehouse (medallion architecture)
 
-Generated 2026-07-29 directly from the live Unity Catalog metastore on `adb-7405618665227003.3.azuredatabricks.net`. Table/column inventory comes from `system.information_schema`; Bronze→Silver lineage from the live `acme_bronze.cfg.layer_mappings` config table; Gold→Products lineage from live `SHOW CREATE TABLE` DDL on each view; remaining edges (Silver internal, Silver→Gold, Gold internal) from `pipelines/silver_dlt.py` / `pipelines/gold_dlt.py` / `ml/build_features.py` / `ai/provision_vector_search.py` / `agents/vector_content.py`, all of which are the code actually deployed to this workspace.
+Generated 2026-08-14 directly from the live Unity Catalog metastore on `adb-7405618665227003.3.azuredatabricks.net`. Table/column inventory comes from `system.information_schema`; Bronze→Silver lineage from the live `acme_bronze.cfg.layer_mappings` config table; Gold→Products lineage from live `SHOW CREATE TABLE` DDL on each view; remaining edges (Silver internal, Silver→Gold, Gold internal) from `pipelines/silver_dlt.py` / `pipelines/gold_dlt.py` / `ml/build_features.py` / `ai/provision_vector_search.py` / `agents/vector_content.py`, all of which are the code actually deployed to this workspace.
 
 This file is machine-generated (do not hand-edit) — regenerate with the pipeline in the Appendix below. The interactive version of the same data, with a clickable lineage diagram, is `docs/DATA_CATALOG.html`. 500-row samples of every table below live in `data/exports/excel/{bronze,silver,gold,products}.xlsx` (one workbook per layer, one sheet per table; gitignored, regenerate locally).
 
@@ -13,7 +13,7 @@ This file is machine-generated (do not hand-edit) — regenerate with the pipeli
 | [Gold](#gold-layer) | 11 | star schema + Data Vault 2.0 PIT/bridge + ML features + AI/vector |
 | [Products](#products-layer) | 6 | governed output ports (views), published via Delta Sharing |
 
-**47** tables/views total, **45** lineage edges, **153,333** live rows summed across all tables.
+**47** tables/views total, **45** lineage edges, **167,431** live rows summed across all tables.
 
 ## Bronze layer
 
@@ -311,14 +311,14 @@ Not part of the medallion data flow — these carry pipeline config and run audi
 
 | Schema | Table | Type | Live rows | Comment |
 |---|---|---|---|---|
-| audit | `agent_reports` | MANAGED | 12 |  |
-| audit | `agent_runs` | MANAGED | 14 |  |
+| audit | `agent_reports` | MANAGED | 32 |  |
+| audit | `agent_runs` | MANAGED | 36 |  |
 | audit | `batch_log` | MANAGED | 0 |  |
-| audit | `dq_results` | MANAGED | 30 |  |
+| audit | `dq_results` | MANAGED | 70 |  |
 | audit | `rejected_records` | MANAGED | 0 |  |
 | cfg | `layer_mappings` | MANAGED | 40 |  |
 | cfg | `pipeline_registry` | MANAGED | 0 |  |
-| cfg | `product_registry` | MANAGED | 5 |  |
+| cfg | `product_registry` | MANAGED | 7 |  |
 | cfg | `source_registry` | MANAGED | 14 |  |
 
 ## Silver layer
@@ -335,10 +335,10 @@ _3NF insert-only customer; config-driven; MDM survivorship in Gold_
 
 | Column | Type | Nullable | Comment |
 |---|---|---|---|
-| `country` | STRING | YES |  |
-| `customer_name` | STRING | YES |  |
-| `source_system` | STRING | YES |  |
-| `src_customer_id` | STRING | YES |  |
+| `country` | STRING | YES | JDE: country code (ABCTR) of the customer registered address.  \|\|  SAP: ISO-2 country code of the customer registered address (LAND1). |
+| `customer_name` | STRING | YES | JDE: alpha name (ABALPH), as recorded in this source ERP, not yet resolved across sources. See dim_customer.customer_key_mdm for the cross-source entity-resolution key.  \|\|  SAP: customer legal or short name (NAME1), as recorded in this source ERP, not yet resolved across sources. See dim_customer.customer_key_mdm for the cross-source entity-resolution key. |
+| `source_system` | STRING | YES | Which source ERP this customer record originated from. |
+| `src_customer_id` | STRING | YES | JDE: address book number (ABAN8) representing a customer.  \|\|  SAP: customer master number (KUNNR). |
 | `hk` | STRING | YES |  |
 | `record_hash` | STRING | YES |  |
 | `effective_ts` | TIMESTAMP | YES |  |
@@ -396,13 +396,13 @@ _3NF insert-only billing items (SAP VBRP); amount is doc-currency — join VBRK 
 
 | Column | Type | Nullable | Comment |
 |---|---|---|---|
-| `invoice_amount` | STRING | YES |  |
-| `invoice_date` | DATE | YES |  |
-| `source_system` | STRING | YES |  |
-| `src_invoice_id` | STRING | YES |  |
-| `src_invoice_line` | STRING | YES |  |
-| `src_order_id` | STRING | YES |  |
-| `src_shipment_id` | STRING | YES |  |
+| `invoice_amount` | STRING | YES | SAP: net billed amount (NETWR) in the invoice document currency. This is doc-currency, not USD; join VBRK (not modeled here) for the header currency before any finance use. |
+| `invoice_date` | DATE | YES | SAP: date the billing document was created (ERDAT). |
+| `source_system` | STRING | YES | Which source ERP this invoice record originated from. |
+| `src_invoice_id` | STRING | YES | SAP: billing document number (VBELN). |
+| `src_invoice_line` | STRING | YES | SAP: billing line item number (POSNR). |
+| `src_order_id` | STRING | YES | SAP: reference (AUBEL) to the originating sales order document. |
+| `src_shipment_id` | STRING | YES | SAP: reference (VGBEL) to the originating delivery document, when the invoice was created with reference to a delivery. |
 | `hk` | STRING | YES |  |
 | `record_hash` | STRING | YES |  |
 | `effective_ts` | TIMESTAMP | YES |  |
@@ -420,12 +420,12 @@ _3NF insert-only; config-driven from cfg.layer_mappings_
 
 | Column | Type | Nullable | Comment |
 |---|---|---|---|
-| `currency_code` | STRING | YES |  |
-| `order_amount` | STRING | YES |  |
-| `order_date` | STRING | YES |  |
-| `source_system` | STRING | YES |  |
-| `src_customer_id` | STRING | YES |  |
-| `src_order_id` | STRING | YES |  |
+| `currency_code` | STRING | YES | JDE: ISO currency code of the order amount (SHCRCD).  \|\|  QAD: ISO currency code of the order amount (so_curr).  \|\|  SAP: ISO currency code of the order amount (WAERK). |
+| `order_amount` | STRING | YES | JDE: order amount (SHOTOT) stored as an implied-2-decimal integer, divided by 100 here to get the true decimal amount.  \|\|  QAD: order total amount (so_t_amt), currency per so_curr.  \|\|  SAP: net order value (NETWR) in the order document currency, not yet USD; order_amount_usd is derived downstream via fx_rates. |
+| `order_date` | STRING | YES | JDE: order date stored as a Julian date (CYYDDD, SHTRDJ), converted here to a calendar DATE.  \|\|  QAD: order entry date (so_ord_date).  \|\|  SAP: date the order was created (ERDAT), converted from the SAP YYYYMMDD date format. |
+| `source_system` | STRING | YES | Which source ERP this order originated from, part of the natural key alongside src_order_id. |
+| `src_customer_id` | STRING | YES | JDE: address book number (SHAN8) of the sold-to customer.  \|\|  QAD: customer code (so_cust) of the sold-to party.  \|\|  SAP: sold-to customer number (KUNNR); joins to customer.src_customer_id within the same source_system. |
+| `src_order_id` | STRING | YES | JDE: composite order key (company, document number, document type) concatenated into one natural key, since no single JDE column uniquely identifies an order.  \|\|  QAD: sales order number (so_nbr).  \|\|  SAP: sales order document number (VBELN), the natural key for the order header. |
 | `hk` | STRING | YES |  |
 | `record_hash` | STRING | YES |  |
 | `effective_ts` | TIMESTAMP | YES |  |
@@ -446,13 +446,13 @@ _3NF insert-only delivery items (SAP LIPS; JDE/QAD = mapping rows); config-drive
 
 | Column | Type | Nullable | Comment |
 |---|---|---|---|
-| `plant` | STRING | YES |  |
-| `qty` | STRING | YES |  |
-| `ship_date` | DATE | YES |  |
-| `source_system` | STRING | YES |  |
-| `src_order_id` | STRING | YES |  |
-| `src_shipment_id` | STRING | YES |  |
-| `src_shipment_line` | STRING | YES |  |
+| `plant` | STRING | YES | SAP: plant or shipping location code (WERKS). |
+| `qty` | STRING | YES | SAP: delivered quantity (LFIMG) for this line, in the delivery base unit of measure. |
+| `ship_date` | DATE | YES | SAP: date the delivery document was created (ERDAT). |
+| `source_system` | STRING | YES | Which source ERP this shipment record originated from. |
+| `src_order_id` | STRING | YES | SAP: reference (VGBEL) back to the originating sales order document number. |
+| `src_shipment_id` | STRING | YES | SAP: delivery document number (VBELN). |
+| `src_shipment_line` | STRING | YES | SAP: delivery line item number (POSNR) within the delivery document. |
 | `hk` | STRING | YES |  |
 | `record_hash` | STRING | YES |  |
 | `effective_ts` | TIMESTAMP | YES |  |
@@ -699,7 +699,7 @@ _Grain: one row per order per source; FKs are hash keys_
 
 _DV2.0 PIT: (snapshot_date, customer_hk) -> as_of_ts of the Silver version current that day. Equality as-of joins; no BETWEEN scans, no label leakage._
 
-**Type:** MATERIALIZED_VIEW · **Live rows:** 2,002 · **Sampled to Excel:** 500 rows
+**Type:** MATERIALIZED_VIEW · **Live rows:** 16,016 · **Sampled to Excel:** 500 rows
 
 | Column | Type | Nullable | Comment |
 |---|---|---|---|
